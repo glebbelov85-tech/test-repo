@@ -119,9 +119,36 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #tRun.on{background:rgba(242,194,48,.5)}
 #loading{position:fixed;inset:0;display:grid;place-items:center;z-index:40;background:#000;font-family:var(--display);font-size:22px;letter-spacing:.1em}
 @media (max-width:640px){#mini{width:185px;height:75px}#dossier{display:none}#vitals{width:170px}#br{min-width:130px}}
-@media (pointer:coarse){.keys{display:none}#mini{width:150px;height:61px;padding:4px}#obj{max-width:min(380px,48vw);padding:8px 12px}#objText{font-size:13px}
-  #tFire{bottom:calc(115px + env(safe-area-inset-bottom,0px))}#tUse{bottom:calc(120px + env(safe-area-inset-bottom,0px));right:calc(125px + env(safe-area-inset-right,0px))}
-  #tJump{bottom:calc(212px + env(safe-area-inset-bottom,0px))}#tSwap{bottom:calc(202px + env(safe-area-inset-bottom,0px));right:calc(118px + env(safe-area-inset-right,0px))}}
+/* Phone HUD: vitals top-left, objective under it, map top-right, joystick bottom-left, action arc bottom-right, weapon label bottom-center. */
+@media (pointer:coarse){
+  .keys{display:none}
+  .panel{border-radius:6px;backdrop-filter:none;background:rgba(10,14,18,.6)}
+  #bl{top:calc(8px + env(safe-area-inset-top,0px));bottom:auto;left:max(8px,env(safe-area-inset-left,0px));align-items:flex-start;gap:6px}
+  #vitals{width:118px;padding:5px 7px}
+  .vrow{font-size:9px;gap:5px}.vrow+.vrow{margin-top:4px}.bar{height:5px}#hpn{width:20px}
+  #kc{width:46px;height:29px;border-radius:4px}#kc .k1{display:none}#kc .chip{width:9px;height:7px;right:5px;top:5px}#kc .k2{font-size:12px;left:5px;bottom:4px}
+  #obj{top:calc(50px + env(safe-area-inset-top,0px));left:max(8px,env(safe-area-inset-left,0px));max-width:min(240px,27vw);padding:5px 8px}
+  #obj .lbl{font-size:8px}#objText{font-size:11px;line-height:1.3}
+  #mini{width:118px;height:48px;padding:3px;top:calc(8px + env(safe-area-inset-top,0px));right:max(8px,env(safe-area-inset-right,0px))}
+  #compass{top:calc(8px + env(safe-area-inset-top,0px));padding:3px 9px;font-size:11px;gap:6px}#arrow{width:16px;height:16px;font-size:14px}
+  #boss{top:calc(36px + env(safe-area-inset-top,0px));width:min(280px,38vw);padding:4px 8px}#boss .bname{font-size:11px}.bbar{height:6px;margin:3px 0 2px}#bsub{font-size:9px}
+  #blinkbar{top:calc(8px + env(safe-area-inset-top,0px));width:120px;padding:3px 8px;font-size:9px}
+  #dossier{top:calc(62px + env(safe-area-inset-top,0px));right:max(8px,env(safe-area-inset-right,0px));width:min(180px,26vw);padding:6px 8px;border-left-width:3px}
+  #dossier .dt{font-size:8px}#dossier .dn{font-size:12px}#dossier .dc{font-size:9px;margin-bottom:3px}#dossier p{font-size:10px;line-height:1.35}
+  #br{left:50%;right:auto;transform:translateX(-50%);bottom:calc(6px + env(safe-area-inset-bottom,0px));min-width:0;padding:3px 10px;display:flex;gap:8px;align-items:baseline}
+  #wname{font-size:11px}#wammo{font-size:11px}#wslots{display:none}
+  #toasts{top:34%;gap:4px;width:min(420px,50vw)}.toast{font-size:13px}
+  #prompt{font-size:11px;padding:4px 9px;top:calc(50% + 30px)}
+  #cross{width:16px;height:16px}#cross::before{left:7px;top:2px;height:12px}#cross::after{top:7px;left:2px;width:12px}
+  #joy{left:calc(18px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:104px;height:104px;background:rgba(255,255,255,.05);border-width:1px}
+  #knob{left:33px;top:33px;width:38px;height:38px;background:rgba(242,194,48,.45)}
+  .tb{width:44px;height:44px;font-size:8px;letter-spacing:0;background:rgba(20,24,28,.38);border:1px solid rgba(255,255,255,.28)}
+  #tFire{right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:62px;height:62px;font-size:10px;background:rgba(224,38,43,.4)}
+  #tUse{right:calc(90px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  #tJump{right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(90px + env(safe-area-inset-bottom,0px))}
+  #tSwap{right:calc(80px + env(safe-area-inset-right,0px));bottom:calc(68px + env(safe-area-inset-bottom,0px));width:40px;height:40px}
+  #tRun{left:calc(132px + env(safe-area-inset-left,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+}
 @media (pointer:fine){.tonly{display:none}}
 @media (prefers-reduced-motion:reduce){.toast,#dossier{animation:none}}
 </style>
@@ -155,7 +182,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <button class="tb" id="tFire" type="button">ОГОНЬ</button>
   <button class="tb" id="tUse" type="button">E</button>
   <button class="tb" id="tJump" type="button">ПРЫЖОК</button>
-  <button class="tb" id="tSwap" type="button">ОРУЖИЕ</button>
+  <button class="tb" id="tSwap" type="button">⇄</button>
   <button class="tb" id="tRun" type="button">БЕГ</button>
 </div>
 
