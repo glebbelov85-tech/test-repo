@@ -1,5 +1,12 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#07090b">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="SCP Побег">
+<link rel="apple-touch-icon" href="icon-192.png"><link rel="icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <title>SCP: Побег</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1365,8 +1372,9 @@ let unlocked2=false;try{unlocked2=localStorage.getItem('scp-escape-p2')==='1'}ca
 function refreshMenu(){$('bPart2').disabled=!unlocked2;$('p2note').textContent=unlocked2?'Часть 2 открыта: можно начать сразу с неё.':'Часть 2 откроется, когда ты сбежишь из Фонда.'}
 refreshMenu();
 async function fontsReady(){try{await Promise.race([Promise.all(['40px "Russo One"','20px "PT Mono"'].map(f=>document.fonts.load(f))),new Promise(r=>setTimeout(r,1500))])}catch(e){}}
+function goFull(){if(!TOUCH)return;try{const el=document.documentElement;const r=(el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el,{navigationUI:'hide'});const lock=()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(e){}};if(r&&r.then)r.then(lock,()=>{});else lock()}catch(e){}}
 async function startPart1(){
-  audioInit();$('loading').hidden=false;await fontsReady();await new Promise(r=>setTimeout(r,30));
+  goFull();audioInit();$('loading').hidden=false;await fontsReady();await new Promise(r=>setTimeout(r,30));
   G.part=1;G.kills=0;G.dmg=0;G.startT=performance.now();G.seen=new Set();
   buildFacility();buildMiniBase();
   G.cp={x:W(2),z:W(7),yaw:-Math.PI/2,card:1,opened:[],taken:[]};resetFacility(G.cp);
@@ -1375,7 +1383,7 @@ async function startPart1(){
   setTimeout(()=>toast('Сбой содержания в Зоне-19!','warn',2600),400);setTimeout(()=>toast('Подойди к зелёной двери, она откроется сама','info',3000),3200);
 }
 async function startPart2(fresh){
-  audioInit();$('loading').hidden=false;await fontsReady();await new Promise(r=>setTimeout(r,30));
+  goFull();audioInit();$('loading').hidden=false;await fontsReady();await new Promise(r=>setTimeout(r,30));
   if(fresh){G.kills=0;G.dmg=0;G.startT=performance.now();G.seen=new Set()}
   G.part=2;buildOutdoor();$('mini').hidden=true;
   G.cp2={stage:'tower',wave:0,x:0,z:5,yaw:0,trig:[]};resetOutdoor(G.cp2);
@@ -1387,7 +1395,7 @@ function winGame(){G.state='win';sirenStop();SFX.win();document.exitPointerLock&
   $('stats').innerHTML=`<div><b>${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}</b><span>время</span></div><div><b>${G.kills}</b><span>монстров побеждено</span></div><div><b>${Math.round(G.dmg)}</b><span>урона получено</span></div>`;
   $('fade').style.opacity=1;setTimeout(()=>{show('win');$('fade').style.opacity=0;setAmbient(null)},700)}
 function pauseGame(){if(G.state!=='play')return;G.state='pause';mouse.down=false;show('pause')}
-function resumeGame(){hideScreens();G.state='play';requestLock()}
+function resumeGame(){goFull();hideScreens();G.state='play';requestLock()}
 function toMenu(){G.state='menu';sirenStop();setAmbient(null);show('menu');refreshMenu()}
 function retry(){hideScreens();if(G.part===1)resetFacility(G.cp);else resetOutdoor(G.cp2);G.state='play';G.vig=0;requestLock();toast('Контрольная точка','info')}
 $('bStart').onclick=startPart1;$('bPart2').onclick=()=>startPart2(true);$('bResume').onclick=resumeGame;$('bMenu').onclick=toMenu;$('bMenu2').onclick=toMenu;$('bRetry').onclick=retry;
@@ -1418,5 +1426,5 @@ function tick(dt){
 requestAnimationFrame(frame);
 window.__G={G,L,player,get monsters(){return monsters},get world(){return world},get siren(){return siren},tick,startPart1,startPart2,setWeapon,shoot,tryUse,startSirenWave,hitSiren};
 </script>
-
+<script>if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
 </html>
