@@ -1,7 +1,16 @@
-const CACHE='scp-escape-v5';
-const CORE=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>Promise.all(CORE.map(u=>fetch(new Request(u,{mode:u.startsWith('http')?'no-cors':'same-origin'})).then(r=>c.put(u,r)).catch(()=>{}))))) ;self.skipWaiting()});
+const CACHE='scp-escape-v6';
+const CORE=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','three.min.js','fonts.css','fonts/pt-mono-cyrillic-400-normal.woff2','fonts/pt-mono-latin-400-normal.woff2','fonts/rubik-cyrillic-400-normal.woff2','fonts/rubik-cyrillic-500-normal.woff2','fonts/rubik-cyrillic-700-normal.woff2','fonts/rubik-latin-400-normal.woff2','fonts/rubik-latin-500-normal.woff2','fonts/rubik-latin-700-normal.woff2','fonts/russo-one-cyrillic-400-normal.woff2','fonts/russo-one-latin-400-normal.woff2'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>Promise.all(CORE.map(u=>fetch(u).then(r=>c.put(u,r)).catch(()=>{}))))) ;self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
-// Network first (so updates arrive), cache as offline fallback.
-self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
-  e.respondWith(fetch(e.request).then(r=>{const cp=r.clone();caches.open(CACHE).then(c=>c.put(e.request,cp)).catch(()=>{});return r}).catch(()=>caches.match(e.request,{ignoreSearch:true}).then(m=>m||caches.match('index.html'))))});
+// Page: network first with a 4 s timeout (a hanging network must not freeze the app), cache as fallback.
+// Engine, fonts, icons: cache first.
+const STATIC=/(three\.min\.js|\.woff2|fonts\.css|\.png)$/;
+const put=(req,r)=>{if(r&&r.ok){const cp=r.clone();caches.open(CACHE).then(c=>c.put(req,cp)).catch(()=>{})}return r};
+self.addEventListener('fetch',e=>{const req=e.request;if(req.method!=='GET'||!req.url.startsWith(self.location.origin))return;
+  const cached=()=>caches.match(req,{ignoreSearch:true}).then(m=>m||caches.match('index.html'));
+  if(STATIC.test(new URL(req.url).pathname)){e.respondWith(caches.match(req).then(m=>m||fetch(req).then(r=>put(req,r))));return}
+  e.respondWith(new Promise(res=>{let done=false;
+    const t=setTimeout(()=>cached().then(m=>{if(m&&!done){done=true;res(m)}}),4000);
+    fetch(req).then(r=>{put(req,r);if(!done){done=true;clearTimeout(t);res(r)}})
+      .catch(()=>cached().then(m=>{if(!done){done=true;clearTimeout(t);res(m||Response.error())}}));
+  }))});

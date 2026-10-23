@@ -5,12 +5,10 @@
 <meta name="theme-color" content="#07090b">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="SCP Побег">
+<link rel="stylesheet" href="fonts.css">
 <link rel="apple-touch-icon" href="icon-192.png"><link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <title>SCP: Побег</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;700&family=PT+Mono&display=swap">
 <style>
 /* Layout: full-screen WebGL canvas, HUD pinned to the four corners, modal screens centered on top. */
 :root{
@@ -241,7 +239,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 <div id="fade"></div>
 <div id="loading" hidden>ЗАГРУЗКА…</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="three.min.js"></script><script>if(!window.THREE)document.body.insertAdjacentHTML("beforeend","<div style=\"position:fixed;inset:0;z-index:99;background:#000;color:#fff;display:grid;place-items:center;font:18px sans-serif;text-align:center;padding:20px\">Не загрузился 3D-движок. Проверьте интернет и обновите страницу.</div>")</script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
