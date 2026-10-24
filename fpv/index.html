@@ -100,6 +100,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 #bLearn{margin:0;padding-left:22px;display:grid;gap:6px;color:#cfd6dc;line-height:1.45}
 .ctlbox{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:12px 14px;font-size:15px;line-height:1.5;color:#cfd6dc}
 #calSteps{font-size:18px;font-family:var(--display)}
+.ver{justify-self:start;font-family:var(--mono);font-size:14px;letter-spacing:.1em;color:#111;background:var(--hazard);border-radius:4px;padding:3px 10px}
 #calAxes{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:pre-wrap}
 </style>
 </head>
@@ -135,6 +136,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 <div class="screen" id="sMenu">
   <div class="card">
     <h1>Операторы дронов<small>ФОНД · УЧЕБНЫЙ АНГАР 01</small></h1>
+    <span class="ver"></span>
     <div class="hz"></div>
     <p>После прорыва в комплексе людей в опасные зоны больше не пускают. Туда летят дроны. Ты курсант школы операторов: сначала учишься в безопасном ангаре, потом получаешь допуск в зоны.</p>
     <div class="tasks" id="taskList"></div>
@@ -210,6 +212,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 <div class="screen" id="sPause" hidden>
   <div class="card">
     <h2>Пауза</h2>
+    <span class="ver"></span>
     <div class="btns"><button id="pResume">Продолжить</button><button class="ghost" id="pRestart">Заново</button><button class="ghost" id="pSet">Настройки</button><button class="ghost" id="pMenu">В меню</button></div>
   </div>
 </div>
@@ -231,6 +234,9 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 "use strict";
 if(!window.THREE){document.body.innerHTML='<p style="padding:24px">Не загрузился 3D-движок (three.min.js). Обнови страницу.</p>';throw new Error('no three');}
 const $=id=>document.getElementById(id);
+const VERSION='3.0 от 24.10.2026'; // bump on every release so testers can tell builds apart
+document.querySelectorAll('.ver').forEach(e=>e.textContent='Версия '+VERSION);
+document.title='Операторы дронов · v'+VERSION.split(' ')[0];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const G=9.81;
 
