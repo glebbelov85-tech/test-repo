@@ -71,7 +71,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 #armed.on{color:#ff6a4a}
 .warnc{color:#ffb020}
 .bad{color:#ff5a4a}
-#toast{position:fixed;left:50%;top:19%;transform:translateX(-50%);z-index:12;pointer-events:none;font-family:var(--display);font-size:clamp(15px,2.1vw,22px);text-shadow:0 2px 6px #000;text-align:center;width:min(90vw,640px)}
+#toast{position:fixed;left:50%;top:40%;transform:translateX(-50%);z-index:12;pointer-events:none;font-family:var(--display);font-size:clamp(15px,2.1vw,22px);text-shadow:0 2px 6px #000;text-align:center;width:min(90vw,640px)}
 /* Touch controls */
 #touch{position:fixed;inset:0;z-index:15;pointer-events:none}
 .stick{position:absolute;bottom:max(18px,env(safe-area-inset-bottom,0px));width:150px;height:150px;border-radius:50%;background:rgba(20,24,28,.35);border:2px solid rgba(255,255,255,.22);pointer-events:auto;touch-action:none}
@@ -100,6 +100,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 #bLearn{margin:0;padding-left:22px;display:grid;gap:6px;color:#cfd6dc;line-height:1.45}
 .ctlbox{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:12px 14px;font-size:15px;line-height:1.5;color:#cfd6dc}
 #calSteps{font-size:18px;font-family:var(--display)}
+.lochead{grid-column:1/-1;font-family:var(--display);font-size:20px;color:var(--hazard);letter-spacing:.04em;margin-top:6px;border-bottom:2px solid var(--line);padding-bottom:4px}
 .ver{justify-self:start;font-family:var(--mono);font-size:14px;letter-spacing:.1em;color:#111;background:var(--hazard);border-radius:4px;padding:3px 10px}
 #calAxes{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:pre-wrap}
 </style>
@@ -234,7 +235,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 "use strict";
 if(!window.THREE){document.body.innerHTML='<p style="padding:24px">Не загрузился 3D-движок (three.min.js). Обнови страницу.</p>';throw new Error('no three');}
 const $=id=>document.getElementById(id);
-const VERSION='3.1 от 24.10.2026'; // bump on every release so testers can tell builds apart
+const VERSION='3.2 от 24.10.2026'; // bump on every release so testers can tell builds apart
 document.querySelectorAll('.ver').forEach(e=>e.textContent='Версия '+VERSION);
 document.title='Операторы дронов · v'+VERSION.split(' ')[0];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -420,8 +421,23 @@ const texGlow=canvasTex(128,128,(g,w,h)=>{const r=g.createRadialGradient(64,64,0
 const texBlob=canvasTex(128,128,(g,w,h)=>{const r=g.createRadialGradient(64,64,0,64,64,64);r.addColorStop(0,'rgba(0,0,0,.85)');r.addColorStop(.6,'rgba(0,0,0,.35)');r.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=r;g.fillRect(0,0,w,h);});
 
 /* ---------- Hangar ---------- */
-const HX=30,HZ=20,HY=12;           // half sizes and height, metres
-const boxes=[];                     // solid AABBs for collisions: {min:Vector3,max:Vector3}
+let HX=30,HZ=20,HY=12;             // half sizes and height of the current room, metres
+let boxes=[];                       // solid AABBs of the current room: {min:Vector3,max:Vector3}
+// Locations: each room is a group with its own size, solids and look; only the current one is visible
+const LOCS={
+  hangar:{name:'Учебный ангар 01',g:new THREE.Group(),size:[30,20,12],fog:[0x0b0f13,30,95],sun:[-12,24,8,0.9],orbit:[18,5,13],
+    qrows:[{x:0,z:-2,ry:0},{x:17,z:-2,ry:Math.PI/2},{x:-17,z:-2,ry:Math.PI/2}]},
+  lab:{name:'Лаборатория 02',g:new THREE.Group(),size:[20,16,6.5],fog:[0x101a1e,25,70],sun:[-8,22,10,0.55],orbit:[12,3.6,10],
+    qrows:[{x:0,z:5,ry:0},{x:-8,z:-3,ry:Math.PI/2},{x:8,z:-3,ry:Math.PI/2}]},
+};
+let locId='hangar';
+function buildLoc(id,fn){const L=LOCS[id];[HX,HZ,HY]=L.size;boxes=L.boxes=[];scene.add(L.g);fn(L.g);}
+function setLoc(id){
+  const L=LOCS[id];locId=id;for(const k in LOCS)LOCS[k].g.visible=k===id;
+  [HX,HZ,HY]=L.size;boxes=L.boxes;
+  scene.background.setHex(L.fog[0]);scene.fog.color.setHex(L.fog[0]);scene.fog.near=L.fog[1];scene.fog.far=L.fog[2];
+  sun.position.set(L.sun[0],L.sun[1],L.sun[2]);sun.intensity=L.sun[3];
+}
 function solid(x,y,z,sx,sy,sz){boxes.push({min:new THREE.Vector3(x-sx/2,y-sy/2,z-sz/2),max:new THREE.Vector3(x+sx/2,y+sy/2,z+sz/2)});}
 const M={
   floor:new THREE.MeshStandardMaterial(Object.assign({roughness:1,metalness:.05,normalScale:new THREE.Vector2(.6,.6)},surfFloor)),
@@ -433,11 +449,10 @@ const M={
 };
 const sun=new THREE.DirectionalLight(0xfff0dd,0.9);
 const fxHi=[];                      // atmosphere objects hidden on low quality
-function buildHangar(){
+function buildHangar(scene){
   scene.add(new THREE.HemisphereLight(0xbfd4e6,0x303030,0.75));
   sun.position.set(-12,24,8);sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-0.0006;sun.shadow.normalBias=0.03;
   Object.assign(sun.shadow.camera,{left:-32,right:32,top:24,bottom:-24,near:1,far:60});
-  scene.add(sun);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(HX*2,HZ*2),M.floor);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
   const room=new THREE.Mesh(new THREE.BoxGeometry(HX*2,HY+0.2,HZ*2),M.wall);room.position.y=HY/2-0.1;scene.add(room);
   // hazard band along walls
@@ -521,12 +536,12 @@ let dust=null;
 
 /* ---------- Pads, hover zone, gates ---------- */
 const PAD_A=new THREE.Vector3(0,0,10), PAD_B=new THREE.Vector3(0,0,-12);
-function pad(pos,label,col){const m=new THREE.Mesh(new THREE.CircleGeometry(1.2,40),new THREE.MeshStandardMaterial({map:padTex(label,col),roughness:.8}));m.rotation.x=-Math.PI/2;m.position.set(pos.x,0.01,pos.z);m.receiveShadow=true;scene.add(m);
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.32,0.035,6,48),new THREE.MeshBasicMaterial({color:new THREE.Color(col)}));ring.rotation.x=Math.PI/2;ring.position.set(pos.x,0.03,pos.z);scene.add(ring);return m;}
+function pad(pos,label,col,par){const m=new THREE.Mesh(new THREE.CircleGeometry(1.2,40),new THREE.MeshStandardMaterial({map:padTex(label,col),roughness:.8}));m.rotation.x=-Math.PI/2;m.position.set(pos.x,0.01,pos.z);m.receiveShadow=true;par.add(m);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.32,0.035,6,48),new THREE.MeshBasicMaterial({color:new THREE.Color(col)}));ring.rotation.x=Math.PI/2;ring.position.set(pos.x,0.03,pos.z);par.add(ring);return m;}
 let padB;
 const hoverZone=new THREE.Group();
-function buildMarks(){
-  pad(PAD_A,'H','#f2c230');padB=pad(PAD_B,'B','#4ad2ff');
+function buildMarks(scene){
+  pad(PAD_A,'H','#f2c230',scene);padB=pad(PAD_B,'B','#4ad2ff',scene);
   const ringMat=new THREE.MeshBasicMaterial({color:0x4ad2ff,transparent:true,opacity:.5,depthWrite:false});
   const r1=new THREE.Mesh(new THREE.TorusGeometry(1.2,0.03,8,48),ringMat);r1.rotation.x=Math.PI/2;r1.position.y=1;
   const r2=r1.clone();r2.position.y=2.5;
@@ -559,29 +574,28 @@ function buildGates(){
   }
 }
 
-// Quiz gates: three answer gates with a sign each; every question moves them to the next row
-const QROWS=[{x:0,z:-2,ry:0},{x:17,z:-2,ry:Math.PI/2},{x:-17,z:-2,ry:Math.PI/2}];
-const QLET=['А','Б','В'];
+// Answer gates: up to five gates with a sign each; quizzes put them in a row, order games scatter them
+const QLET=['А','Б','В','Г','Д'];
 const qgates=[];
 function drawSign(G,letter,text,state){
   const g=G.ctx,w=512,h=200;
   const bg={idle:'#101820',ok:'#0f5a26',bad:'#6a1414',dim:'#0b0f13'}[state],fg=state==='dim'?'#55606a':'#ffffff';
   g.fillStyle=bg;g.fillRect(0,0,w,h);
   g.strokeStyle=state==='ok'?'#30ff6a':state==='bad'?'#ff4a3a':state==='dim'?'#26303a':'#f2c230';g.lineWidth=10;g.strokeRect(5,5,w-10,h-10);
-  g.fillStyle=state==='idle'?'#f2c230':fg;g.font='bold 110px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(letter,70,h/2+6);
+  g.fillStyle=state==='idle'?'#f2c230':fg;g.font='bold 110px Arial';g.textAlign='center';g.textBaseline='middle';if(letter)g.fillText(letter,70,h/2+6);
   g.fillStyle=fg;g.textAlign='left';
   // wrap the answer into at most 3 lines, shrinking the font if needed
   for(const fs of [40,34,29,25]){
     g.font=`bold ${fs}px Arial`;const lines=[];let cur='';
-    for(const word of text.split(' ')){const t=cur?cur+' '+word:word;if(g.measureText(t).width>360&&cur){lines.push(cur);cur=word;}else cur=t;}
+    for(const word of text.split(' ')){const t=cur?cur+' '+word:word;if(g.measureText(t).width>(letter?360:450)&&cur){lines.push(cur);cur=word;}else cur=t;}
     if(cur)lines.push(cur);
-    if(lines.length<=3||fs===25){const lh=fs*1.18,y0=h/2-(lines.length-1)*lh/2;lines.slice(0,4).forEach((s,i)=>g.fillText(s,135,y0+i*lh));break;}
+    if(lines.length<=3||fs===25){const lh=fs*1.18,y0=h/2-(lines.length-1)*lh/2;lines.slice(0,4).forEach((s,i)=>g.fillText(s,letter?135:32,y0+i*lh));break;}
   }
   G.tex.needsUpdate=true;
 }
 function buildQuizGates(){
   const t=0.14;
-  for(let i=0;i<3;i++){
+  for(let i=0;i<5;i++){
     const g=new THREE.Group(),mat=new THREE.MeshStandardMaterial({color:0x555b60,roughness:.5});
     for(const [px,py,w,h] of [[0,GH/2+t/2,GW+2*t,t],[0,-GH/2-t/2,GW+2*t,t],[-GW/2-t/2,0,t,GH],[GW/2+t/2,0,t,GH]]){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,t),mat);m.position.set(px,py,0);m.castShadow=true;g.add(m);}
     const led=new THREE.MeshBasicMaterial({color:0xffc030});
@@ -596,11 +610,18 @@ function buildQuizGates(){
     qgates.push({g,mat,led,ctx:c.getContext('2d'),tex,pos:new THREE.Vector3(),ry:0,n:new THREE.Vector3(),solids:[]});
   }
 }
-function placeQuizGates(row){
-  const t=0.14,y=2.1,c=Math.cos(row.ry),s=Math.sin(row.ry);
+// n gates side by side along a row
+function placeQuizGates(row,n){
+  const c=Math.cos(row.ry),s=Math.sin(row.ry),gap=n>3?4.3:5.5;
+  placeSpots([...Array(n).keys()].map(i=>{const off=(i-(n-1)/2)*gap;return [row.x+off*c,row.z-off*s,row.ry];}));
+}
+// spots: [x,z,ry] per gate; gates without a spot are hidden
+function placeSpots(spots){
+  const t=0.14,y=2.1;
   qgates.forEach((G,i)=>{
-    const off=(i-1)*5.5,x=row.x+off*c,z=row.z-off*s;
-    G.pos.set(x,y,z);G.ry=row.ry;G.n.set(s,0,c);G.g.position.copy(G.pos);G.g.rotation.y=row.ry;G.g.visible=true;
+    if(!spots[i]){G.g.visible=false;G.solids=[];return;}
+    const [x,z,ry]=spots[i],c=Math.cos(ry),s=Math.sin(ry);
+    G.pos.set(x,y,z);G.ry=ry;G.n.set(s,0,c);G.g.position.copy(G.pos);G.g.rotation.y=ry;G.g.visible=true;
     G.solids=[[0,GH/2+t/2,GW+2*t,t],[0,-GH/2-t/2,GW+2*t,t],[-GW/2-t/2,0,t,GH],[GW/2+t/2,0,t,GH],[0,GH/2+t+0.72,3.2,1.25]].map(([lx,ly,w,h])=>{
       const wx=x+lx*c,wz=z-lx*s,sx=Math.abs(w*c)+Math.abs(t*s),sz=Math.abs(w*s)+Math.abs(t*c);
       return {min:new THREE.Vector3(wx-sx/2,y+ly-h/2,wz-sz/2),max:new THREE.Vector3(wx+sx/2,y+ly+h/2,wz+sz/2)};});
@@ -612,6 +633,144 @@ function passed(g,prev){
   if(!(a*b<0)||D.crashed)return false;
   const lx=(D.pos.x-g.pos.x)*Math.cos(g.ry)-(D.pos.z-g.pos.z)*Math.sin(g.ry),ly=D.pos.y-g.pos.y;
   return Math.abs(lx)<GW/2&&Math.abs(ly)<GH/2;
+}
+
+/* ---------- Laboratory 02 (module 2): stands with giant drone parts around a big whoop model ---------- */
+const STANDS=[
+  {id:'frame',name:'Рама',x:-14,z:-9},{id:'motor',name:'Мотор и винт',x:-14,z:2},
+  {id:'fc',name:'Полётный контроллер',x:-5,z:-12},{id:'esc',name:'Регулятор (ESC)',x:5,z:-12},
+  {id:'cam',name:'Камера и видео',x:14,z:-9},{id:'radio',name:'Пульт и приёмник',x:14,z:2}];
+const WHOOP=new THREE.Vector3(0,0,-2);
+const labSpin=[];                   // {o, speed}: props and turntables that rotate around their y axis
+function labelTex(n,name){return canvasTex(512,128,(g,w,h)=>{
+  g.fillStyle='#0e1a1f';g.fillRect(0,0,w,h);g.fillStyle='#1fb5a8';g.fillRect(0,0,14,h);
+  g.fillStyle='#1fb5a8';g.beginPath();g.arc(74,64,40,0,7);g.fill();
+  g.fillStyle='#071012';g.font='bold 52px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(String(n),74,67);
+  g.fillStyle='#eaf6f5';g.textAlign='left';let fs=46;g.font=`bold ${fs}px Arial`;while(g.measureText(name).width>370&&fs>26){fs-=2;g.font=`bold ${fs}px Arial`;}g.fillText(name,128,67);
+});}
+function buildLab(scene){
+  const N=PBR_N;
+  // light epoxy floor with 1 m tiles, glossy
+  const fl=surface(N,(h,c,r,N)=>{const n=fbm(N,16,4,21),big=fbm(N,4,2,22),T=N/2;
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x,seam=x%T<2||y%T<2;
+      h[i]=seam?0:0.6+n[i]*0.08;const v=seam?0.3:0.5+big[i]*0.08+n[i]*0.04;
+      c[i*4]=v*232;c[i*4+1]=v*244;c[i*4+2]=v*250;r[i]=seam?0.85:clamp(0.25+n[i]*0.25,0,1);}},[HX,HZ],4);
+  // white wall panels with seams
+  const wl=surface(N>>1,(h,c,r,N)=>{const n=fbm(N,8,3,23),P=N/2;
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x,seam=x%P<2||y<2;
+      h[i]=seam?0:0.7;const v=seam?0.42:0.78+n[i]*0.06;c[i*4]=v*236;c[i*4+1]=v*242;c[i*4+2]=v*246;r[i]=0.55;}},[10,2],3);
+  scene.add(new THREE.HemisphereLight(0xe8f4ff,0x3a4248,0.9));
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(HX*2,HZ*2),new THREE.MeshStandardMaterial(Object.assign({roughness:1,metalness:.05,normalScale:new THREE.Vector2(.5,.5)},fl)));
+  floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+  const room=new THREE.Mesh(new THREE.BoxGeometry(HX*2,HY+0.2,HZ*2),new THREE.MeshStandardMaterial(Object.assign({roughness:1,side:THREE.BackSide},wl)));room.position.y=HY/2-0.1;scene.add(room);
+  // teal band and dark skirting along the walls
+  const teal=new THREE.MeshStandardMaterial({color:0x1f9d93,roughness:.5}),skirt=new THREE.MeshStandardMaterial({color:0x2a3238,roughness:.7});
+  for(const [x,z,ry,len] of [[0,-HZ+.02,0,HX*2],[0,HZ-.02,Math.PI,HX*2],[-HX+.02,0,Math.PI/2,HZ*2],[HX-.02,0,-Math.PI/2,HZ*2]]){
+    const b=new THREE.Mesh(new THREE.PlaneGeometry(len,0.35),teal);b.position.set(x,1.3,z);b.rotation.y=ry;scene.add(b);
+    const s=new THREE.Mesh(new THREE.PlaneGeometry(len,0.25),skirt);s.position.set(x,0.125,z);s.rotation.y=ry;scene.add(s);}
+  // ceiling light strips
+  const lampM=new THREE.MeshBasicMaterial({color:new THREE.Color(0xeaf6ff).multiplyScalar(3.5)});
+  for(let x=-14;x<=14;x+=7)for(const z of [-11,-4,3,10]){const l=new THREE.Mesh(new THREE.BoxGeometry(3,0.06,0.25),lampM);l.position.set(x,HY-0.04,z);scene.add(l);}
+  if(+S.q>=1)for(const [x,z] of [[-9,-5],[9,-5],[0,8]]){const p=new THREE.PointLight(0xe8f4ff,0.5,28,2);p.position.set(x,HY-0.6,z);scene.add(p);}
+  // wall sign and a poster with the 4 drone systems
+  const sign=canvasTex(1024,256,(g,w,h)=>{g.fillStyle='#e9f1f0';g.fillRect(0,0,w,h);g.fillStyle='#1f9d93';g.fillRect(0,0,w,26);
+    g.fillStyle='#14262b';g.font='bold 96px Arial';g.textBaseline='middle';g.fillText('ЛАБОРАТОРИЯ 02',40,110);g.font='48px Arial';g.fillStyle='#1f7d75';g.fillText('УСТРОЙСТВО FPV-ДРОНА',44,200);});
+  const sg=new THREE.Mesh(new THREE.PlaneGeometry(8,2),new THREE.MeshStandardMaterial({map:sign,roughness:.6}));sg.position.set(0,4.5,-HZ+0.05);scene.add(sg);
+  const post=canvasTex(512,512,(g,w,h)=>{g.fillStyle='#14262b';g.fillRect(0,0,w,h);g.fillStyle='#fff';g.font='bold 40px Arial';g.fillText('4 СИСТЕМЫ ДРОНА',30,64);
+    [['ПОЛЁТ','рама, моторы, винты, регулятор','#f2c230'],['УПРАВЛЕНИЕ','пульт, приёмник, контроллер','#4ad2ff'],['ВИДЕО','камера, передатчик, антенна, очки','#ff6a5a'],['ПИТАНИЕ','АКБ, разъём, провода','#5ad27a']].forEach(([a,b,c],i)=>{
+      const y=130+i*95;g.fillStyle=c;g.fillRect(30,y-30,18,70);g.font='bold 34px Arial';g.fillText(a,64,y);g.fillStyle='#cfe';g.font='24px Arial';g.fillText(b,64,y+34);});});
+  const pm=new THREE.Mesh(new THREE.PlaneGeometry(3.4,3.4),new THREE.MeshStandardMaterial({map:post,roughness:.6}));pm.position.set(-HX+0.05,3,8);pm.rotation.y=Math.PI/2;scene.add(pm);
+  // workbenches with monitors along the south wall, server cabinets on the east wall
+  const benchM=new THREE.MeshStandardMaterial({color:0xd8dde0,roughness:.5}),dark=new THREE.MeshStandardMaterial({color:0x22282c,roughness:.5,metalness:.3});
+  const scrT=canvasTex(256,160,(g,w,h)=>{g.fillStyle='#061a1c';g.fillRect(0,0,w,h);for(const [c,k] of [['#4ad2ff',1],['#f2c230',2],['#ff6a5a',3]]){g.strokeStyle=c;g.lineWidth=2;g.beginPath();for(let x=0;x<w;x+=4){const y=h/2+Math.sin(x/(12+k*5)+k)*20*k/2+Math.sin(x/5)*3;x?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();}
+    g.fillStyle='#9fe';g.font='bold 16px Arial';g.fillText('GYRO  ROLL  PITCH  YAW',8,18);});
+  const scrM=new THREE.MeshBasicMaterial({map:scrT,color:new THREE.Color(1.6,1.6,1.6)});
+  for(const bx of [-12,12]){
+    const t=new THREE.Mesh(new THREE.BoxGeometry(6,0.08,1.1),benchM);t.position.set(bx,0.9,HZ-1.2);t.castShadow=t.receiveShadow=true;scene.add(t);
+    for(const dx of [-2.8,2.8])for(const dz of [-0.45,0.45]){const l=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.9,0.06),dark);l.position.set(bx+dx,0.45,HZ-1.2+dz);scene.add(l);}
+    for(const dx of [-1.6,1.6]){const m=new THREE.Mesh(new THREE.BoxGeometry(1,0.62,0.05),dark);m.position.set(bx+dx,1.35,HZ-1.55);scene.add(m);
+      const s=new THREE.Mesh(new THREE.PlaneGeometry(0.92,0.54),scrM);s.position.set(bx+dx,1.35,HZ-1.58);s.rotation.y=Math.PI;scene.add(s);}
+    solid(bx,0.85,HZ-1.2,6,1.7,1.2);
+  }
+  const ledM=new THREE.MeshBasicMaterial({color:new THREE.Color(0x4ad2ff).multiplyScalar(2)});
+  for(const z of [-6,-3,0,3]){const c=new THREE.Mesh(new THREE.BoxGeometry(1,2.2,2.6),dark);c.position.set(HX-0.6,1.1,z*1.0+1.5);c.castShadow=true;scene.add(c);
+    for(let k=0;k<5;k++){const l=new THREE.Mesh(new THREE.PlaneGeometry(0.04,0.04),ledM);l.position.set(HX-1.11,0.6+k*0.3,z+1.5+((k*37)%9)/10-0.4);l.rotation.y=-Math.PI/2;scene.add(l);}
+    solid(HX-0.6,1.1,z+1.5,1,2.2,2.6);}
+  // launch pad H
+  pad(PAD_A,'H','#f2c230',scene);
+  // stands
+  const carbon=new THREE.MeshStandardMaterial({color:0x1b1d20,roughness:.4,metalness:.4});
+  const pedM=new THREE.MeshStandardMaterial({color:0xe4e9ec,roughness:.45}),edgeM=new THREE.MeshBasicMaterial({color:new THREE.Color(0x1fd5c8).multiplyScalar(1.8)});
+  const ringM=new THREE.MeshBasicMaterial({color:0x1f9d93,transparent:true,opacity:.7});
+  const std=(c,r,m)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m||0});
+  const box=(w,h,d,mat,x,y,z,par)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);o.position.set(x,y,z);o.castShadow=true;par.add(o);return o;};
+  const cyl=(rt,rb,h,mat,x,y,z,par,seg)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg||24),mat);o.position.set(x,y,z);o.castShadow=true;par.add(o);return o;};
+  const pcb=(col,par)=>{const g=new THREE.Group();box(1.3,0.06,1.3,std(col,.6,.1),0,0,0,g);
+    const gold=std(0xd4a84a,.3,.9);for(const sx of [-1,1])for(const sz of [-1,1]){const r=new THREE.Mesh(new THREE.TorusGeometry(0.06,0.02,6,16),gold);r.rotation.x=Math.PI/2;r.position.set(sx*0.55,0.035,sz*0.55);g.add(r);}
+    par.add(g);return g;};
+  STANDS.forEach((st,i)=>{
+    const g=new THREE.Group();g.position.set(st.x,0,st.z);g.rotation.y=Math.atan2(-st.x,2-st.z);scene.add(g);
+    box(1.6,1,1.6,pedM,0,0.5,0,g).receiveShadow=true;box(1.64,0.04,1.64,edgeM,0,1.0,0,g);
+    const lab=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.375),new THREE.MeshBasicMaterial({map:labelTex(i+1,st.name)}));lab.position.set(0,0.62,0.805);g.add(lab);
+    const ring=new THREE.Mesh(new THREE.RingGeometry(1.25,1.33,48),ringM);ring.rotation.x=-Math.PI/2;ring.position.y=0.006;g.add(ring);
+    const m=new THREE.Group();g.add(m);
+    if(st.id==='frame'){m.position.y=1.75;m.rotation.x=0.35;const t=new THREE.Group();m.add(t);
+      for(const a of [Math.PI/4,-Math.PI/4]){const b=box(2.6,0.07,0.28,carbon,0,0,0,t);b.rotation.y=a;}
+      box(0.6,0.04,0.85,carbon,0,0.12,0,t);for(const sx of [-1,1])for(const sz of [-1,1]){cyl(0.15,0.15,0.05,carbon,sx*0.92,0.04,sz*0.92,t);cyl(0.025,0.025,0.12,std(0xb02a22,.4,.6),sx*0.22,0.06,sz*0.3,t,8);}
+      labSpin.push({o:t,speed:0.4});}
+    if(st.id==='motor'){m.position.y=1.0;cyl(0.45,0.45,0.08,carbon,0,0.04,0,m);cyl(0.3,0.3,0.28,std(0xb87333,.35,.8),0,0.22,0,m);
+      const rot=new THREE.Group();rot.position.y=0.24;m.add(rot);cyl(0.38,0.38,0.34,std(0x2a2d31,.3,.8),0,0.1,0,rot);cyl(0.39,0.39,0.05,std(0xd03030,.4,.5),0,0.29,0,rot);
+      cyl(0.04,0.04,0.34,std(0xc0c6cc,.2,.9),0,0.45,0,rot,10);const pm=std(0x30b8ff,.35);for(const a of [0,Math.PI]){const b=box(1.25,0.03,0.24,pm,0,0.55,0,rot);b.position.x=Math.cos(a)*0.66;b.rotation.x=0.18*(a?-1:1);}
+      cyl(0.12,0.12,0.08,pm,0,0.55,0,rot);labSpin.push({o:rot,speed:9});}
+    if(st.id==='fc'){m.position.y=1.65;m.rotation.x=0.55;const b=pcb(0x1d6b3a,m);box(0.42,0.05,0.42,std(0x111111,.4),0,0.05,0,b);
+      const gy=box(0.2,0.05,0.2,new THREE.MeshBasicMaterial({color:new THREE.Color(0x4ad2ff).multiplyScalar(2)}),0.38,0.05,-0.32,b);
+      for(let k=0;k<8;k++){box(0.05,0.04,0.05,std(0xd4a84a,.3,.9),-0.42+k*0.12,0.05,0.58,b);box(0.05,0.04,0.05,std(0xd4a84a,.3,.9),-0.42+k*0.12,0.05,-0.58,b);}
+      box(0.18,0.05,0.12,std(0x666c70,.4,.5),-0.4,0.05,0.25,b);}
+    if(st.id==='esc'){m.position.y=1.65;m.rotation.x=0.55;const b=pcb(0x14305a,m);
+      for(const sx of [-1,1])for(const sz of [-1,1])for(let k=0;k<6;k++)box(0.1,0.05,0.14,std(0x111111,.4),sx*0.32+(k%3-1)*0.12,0.05,sz*0.3+((k/3|0)-0.5)*0.17,b);
+      for(const sx of [-1,1])for(const sz of [-1,1])box(0.14,0.03,0.14,std(0xd88a3a,.3,.9),sx*0.58,0.04,sz*0.58,b);
+      for(const [x,c] of [[-0.12,0xc02020],[0.12,0x111111]]){const w=cyl(0.05,0.05,0.9,std(c,.5),x,0.05,0.95,b,10);w.rotation.x=Math.PI/2;}
+      box(0.3,0.06,0.2,std(0xc8c040,.5),0,0.05,0.62,b);}
+    if(st.id==='cam'){m.position.y=1.0;box(0.6,0.05,0.8,std(0xa02020,.5,.1),0,0.3,-0.15,m);
+      const c=box(0.6,0.6,0.6,std(0x24272b,.4,.3),0,0.75,0.15,m);c.rotation.x=-0.25;
+      const lens=cyl(0.21,0.24,0.3,std(0x111111,.3,.6),0,0.84,0.55,m);lens.rotation.x=Math.PI/2-0.25;
+      const glass=cyl(0.16,0.16,0.02,new THREE.MeshBasicMaterial({color:new THREE.Color(0x4a7aff).multiplyScalar(1.4)}),0,0.9,0.71,m);glass.rotation.x=Math.PI/2-0.25;
+      cyl(0.03,0.03,1.0,std(0x222222,.5),0,0.82,-0.45,m,8);cyl(0.16,0.16,0.2,std(0xe03030,.5),0,1.38,-0.45,m);}
+    if(st.id==='radio'){m.position.y=1.0;const body=new THREE.Group();body.position.set(-0.15,0.6,0);body.rotation.x=-0.35;m.add(body);
+      box(1.5,0.75,0.32,std(0x30363c,.5,.2),0,0,0,body);
+      for(const sx of [-1,1]){cyl(0.13,0.13,0.06,std(0x111111,.4),sx*0.45,0,0.17,body).rotation.x=Math.PI/2;cyl(0.03,0.03,0.25,std(0xb0b6bc,.3,.8),sx*0.45,0,0.3,body,8).rotation.x=Math.PI/2;
+        const k=new THREE.Mesh(new THREE.SphereGeometry(0.06,12,8),std(0x111111,.4));k.position.set(sx*0.45,0,0.43);body.add(k);}
+      const scr=new THREE.Mesh(new THREE.PlaneGeometry(0.34,0.22),new THREE.MeshBasicMaterial({color:new THREE.Color(0x4ad2ff).multiplyScalar(1.6)}));scr.position.set(0,0.15,0.165);body.add(scr);
+      cyl(0.03,0.03,0.6,std(0x111111,.5),0.5,0.62,-0.1,body,8);
+      box(0.25,0.07,0.32,std(0x2f7fe0,.5),0.62,0.05,0.35,m);for(const a of [0.5,-0.5]){const w=cyl(0.008,0.008,0.5,std(0x111111,.5),0.62+Math.sin(a)*0.2,0.25,0.4,m,6);w.rotation.z=a;}}
+    solid(st.x,1.2,st.z,1.9,2.4,1.9);
+    st.view=V3(st.x+Math.sin(g.rotation.y)*3.2,1.8,st.z+Math.cos(g.rotation.y)*3.2);
+  });
+  // big whoop model on a turntable in the middle (Mobula 7, about 40 times bigger)
+  const tt=new THREE.Group();tt.position.copy(WHOOP);scene.add(tt);
+  cyl(1.6,1.7,0.6,pedM,0,0.3,0,tt,40).receiveShadow=true;
+  const ed=new THREE.Mesh(new THREE.TorusGeometry(1.62,0.025,6,64),edgeM);ed.rotation.x=Math.PI/2;ed.position.y=0.6;tt.add(ed);
+  const wl2=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.375),new THREE.MeshBasicMaterial({map:labelTex('★','Mobula 7 ×40')}));wl2.position.set(0,0.3,1.72);tt.add(wl2);
+  const wh=new THREE.Group();wh.position.y=0.62;tt.add(wh);
+  const duct=new THREE.MeshStandardMaterial({color:0x2a2e33,roughness:.5,side:THREE.DoubleSide});
+  box(0.8,0.12,1.9,carbon,0,0.12,0,wh);box(1.9,0.12,0.8,carbon,0,0.12,0,wh);
+  const canopy=box(0.62,0.32,0.95,std(0xf2c230,.45,.1),0,0.36,-0.05,wh);canopy.rotation.x=0.08;
+  box(0.36,0.32,0.3,std(0x111111,.4,.3),0,0.38,-0.62,wh);
+  const bat=box(0.35,0.18,0.7,std(0x2f7fe0,.5),0,0.6,0.1,wh);
+  for(const sx of [-1,1])for(const sz of [-1,1]){
+    const d=new THREE.Mesh(new THREE.CylinderGeometry(0.66,0.66,0.32,32,1,true),duct);d.position.set(sx*0.92,0.2,sz*0.92);d.castShadow=true;wh.add(d);
+    const rim=new THREE.Mesh(new THREE.TorusGeometry(0.66,0.04,6,32),duct);rim.rotation.x=Math.PI/2;rim.position.set(sx*0.92,0.36,sz*0.92);wh.add(rim);
+    cyl(0.13,0.13,0.16,std(0x8a9096,.3,.85),sx*0.92,0.24,sz*0.92,wh);
+    const p=new THREE.Group();p.position.set(sx*0.92,0.34,sz*0.92);wh.add(p);
+    for(const a of [0,Math.PI*2/3,Math.PI*4/3]){const b=box(0.55,0.02,0.13,std(sz<0?0xff3a2a:0x202224,.4),0,0,0,p);b.position.set(Math.cos(a)*0.3,0,Math.sin(a)*0.3);b.rotation.y=-a;}
+    labSpin.push({o:p,speed:sx*sz>0?14:-14});
+  }
+  labSpin.push({o:wh,speed:0.25});
+  solid(WHOOP.x,0.9,WHOOP.z,3.6,1.8,3.6);
+  // dust in the light
+  const n=250,pos=new Float32Array(n*3);for(let i=0;i<n;i++){pos[i*3]=(Math.random()*2-1)*HX;pos[i*3+1]=Math.random()*HY;pos[i*3+2]=(Math.random()*2-1)*HZ;}
+  const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const ds=new THREE.Points(dg,new THREE.PointsMaterial({color:0xeaf6ff,size:0.025,transparent:true,opacity:.3,depthWrite:false,blending:THREE.AdditiveBlending}));scene.add(ds);fxHi.push(ds);
 }
 
 /* ---------- Drone model ---------- */
@@ -669,6 +828,7 @@ function updFx(dt,now){
   // beacon pulse
   if(beacon.visible){const u=beacon.userData,k=1+Math.sin(now/220)*0.12;u.ring.scale.setScalar(k);u.ring.rotation.y+=dt*1.5;u.ring.rotation.x=Math.PI/2;
     u.beam.scale.y=Math.max(beacon.position.y,0.01);u.beam.position.y=-beacon.position.y/2;}
+  if(locId==='lab')for(const s of labSpin)s.o.rotation.y+=s.speed*dt;
   // dust drifts slowly
   if(dust&&dust.visible){dust.rotation.y+=dt*0.004;dust.position.y=Math.sin(now/4000)*0.2;}
 }
@@ -900,7 +1060,7 @@ function placeCameras(dt){
   if(S.cam==='chase'){
     const yaw=new THREE.Euler().setFromQuaternion(D.q,'YXZ').y;
     _v.set(Math.sin(yaw)*3.2,1.3,Math.cos(yaw)*3.2).add(D.pos);
-    _v.y=Math.max(_v.y,0.3);
+    _v.set(clamp(_v.x,-HX+0.4,HX-0.4),clamp(_v.y,0.3,HY-0.4),clamp(_v.z,-HZ+0.4,HZ-0.4));
     chasePos.lerp(_v,1-Math.exp(-dt*5));
     camExt.position.copy(chasePos);camExt.fov=65;camExt.updateProjectionMatrix();
     camExt.lookAt(_v2.copy(D.pos).add(_v.set(0,0.25,0)));
@@ -988,17 +1148,17 @@ function pickQuiz(pool,n){
 function showQuiz(T){
   T.prev=D.pos.clone();
   if(T.qi>=T.qs.length){for(const G of qgates)G.g.visible=false;T.solids=[];T.gatesOn=false;return;}
-  const q=T.qs[T.qi];placeQuizGates(QROWS[T.qi%QROWS.length]);
-  qgates.forEach((G,i)=>{drawSign(G,QLET[i],q.a[i],'idle');G.led.color.setHex(0xffc030).multiplyScalar(2.2);});
+  const q=T.qs[T.qi],rows=LOCS[locId].qrows;placeQuizGates(rows[T.qi%rows.length],q.a.length);
+  q.a.forEach((a,i)=>{drawSign(qgates[i],QLET[i],a,'idle');qgates[i].led.color.setHex(0xffc030).multiplyScalar(2.2);});
   T.solids=qgates.flatMap(G=>G.solids);T.gatesOn=true;
 }
 function quizTick(T,dt){
   if(T.wait>0){T.wait-=dt;if(T.wait<=0){T.qi++;showQuiz(T);}return;}
   const q=T.qs[T.qi];if(!q)return;
-  for(let i=0;i<3;i++)if(passed(qgates[i],T.prev)){
+  for(let i=0;i<q.a.length;i++)if(passed(qgates[i],T.prev)){
     const ok=i===q.right;T.lastOk=ok;T.pick=i;T.wait=ok?1.8:4.5;
     if(ok){T.right++;beep(880,0.08);setTimeout(()=>beep(1320,0.1),90);}else{beep(200,0.35);T.wrong.push(q);}
-    qgates.forEach((G,k)=>{const st=k===q.right?'ok':k===i?'bad':'dim';drawSign(G,QLET[k],q.a[k],st);G.led.color.setHex(st==='ok'?0x30ff6a:st==='bad'?0xff3020:0x1d3a52).multiplyScalar(st==='dim'?1:3);});
+    qgates.slice(0,q.a.length).forEach((G,k)=>{const st=k===q.right?'ok':k===i?'bad':'dim';drawSign(G,QLET[k],q.a[k],st);G.led.color.setHex(st==='ok'?0x30ff6a:st==='bad'?0xff3020:0x1d3a52).multiplyScalar(st==='dim'?1:3);});
     break;
   }
   T.prev.copy(D.pos);
@@ -1008,6 +1168,86 @@ function quizText(T){
   const N=T.qs.length;
   if(T.wait>0)return T.lastOk?`<b style="color:#30ff6a">Верно!</b> ${q.e}`:`<b style="color:#ff5a4a">Неверно.</b> Правильный ответ: «${q.a[q.right]}». ${q.e}`;
   return `Вопрос ${T.qi+1} из ${N} · верно ${T.right}<br><b>${q.q}</b><br><small>${q.a.map((a,i)=>QLET[i]+': '+a).join(' · ')}</small>`;
+}
+// module 2 content from kurs-fpv-dannye.json (levels 1-2): stand cards, quiz pool (answer [0] is right), order sets, sort items
+const STAND_CARDS={"frame":[["Рама — скелет","Рама держит все детали. Её делают из карбона - лёгкого и очень прочного материала. У Mobula 7 рама пластиковая, с кольцами-защитой вокруг винтов."]],"motor":[["Моторы","На каждом луче свой мотор, всего 4. Моторы бесколлекторные: внутри нет трущихся щёток, поэтому они мощные и долго работают."],["Винты крутятся в разные стороны","Соседние винты крутятся в разные стороны: два по часовой, два против. Иначе весь дрон начал бы крутиться вокруг себя."]],"fc":[["Полётный контроллер — мозг","Полётный контроллер - маленькая плата, мозг дрона. В нём есть датчик-гироскоп: он чувствует, куда дрон наклонился. Контроллер очень быстро поправляет моторы, и дрон держится ровно."]],"esc":[["Регулятор — \"водитель\" моторов","Регулятор (ESC) получает команду от контроллера и крутит каждый мотор так быстро, как велел контроллер. Без него мотор не закрутится."]],"cam":[["Путь картинки","Камера на носу дрона снимает. Видеопередатчик превращает картинку в радиосигнал. Антенна отправляет его в воздух. Антенна очков ловит, и пилот видит полёт."]],"radio":[["Приёмник","На дроне стоит маленький приёмник с антенной. Он ловит сигнал только своего пульта и передаёт команды контроллеру."],["Failsafe — на случай потери связи","Если связь с пультом пропала, дрон должен сам выключить моторы. Это failsafe (\"защита от сбоя\"). Тренер проверяет его перед полётами."]]};
+const QUIZ_M2=[["Что делает рама?",["Держит все детали","Снимает видео","Заряжает АКБ"],"Рама - скелет дрона, на ней держатся все детали."],["Сколько моторов у квадрокоптера?",["4","2","6"],"\"Квадро\" - четыре: по мотору на каждый луч."],["Почему соседние винты крутятся в разные стороны?",["Чтобы дрон не закручивало вокруг себя","Для красоты","Чтобы было тише"],"Иначе их закрутка вращала бы весь дрон вокруг себя."],["Из чего делают рамы гоночных дронов?",["Из карбона","Из дерева","Из стекла"],"Карбон лёгкий и очень прочный."],["Как винт поднимает дрон?",["Отбрасывает воздух вниз","Отталкивается от земли магнитом","Никак, поднимает АКБ"],"Винт отбрасывает воздух вниз, а воздух толкает дрон вверх."],["Что значит \"75 мм\" у Mobula 7?",["Расстояние между моторами по диагонали","Длина винта","Высота полёта"],"Это расстояние между осями противоположных моторов по диагонали."],["Что значит \"пятидюймовик\"?",["Дрон с винтами 5 дюймов","Дрон весом 5 кг","Дрон на 5 минут полёта"],"Это дрон с винтами 5 дюймов, около 13 см."],["Почему бесколлекторные моторы живут долго?",["Нет трущихся щёток","Они пластиковые","Их не включают"],"Внутри нет щёток, которые стираются."],["Винт поставили не той стороной. Что будет?",["Дрон не взлетит или перевернётся","Полетит быстрее","Ничего"],"Он погонит воздух вверх - дрон не взлетит или перевернётся."],["Какая деталь держит все остальные?",["Рама","Камера","Антенна"],"Рама - скелет дрона."],["Если все 4 винта крутятся в одну сторону...",["Дрон закрутит вокруг себя","Он полетит быстрее","Ничего не изменится"],"Дрон начнёт крутиться вокруг себя."],["На что похожа лопасть винта?",["На маленькое крыло","На колесо","На парус"],"Лопасть - маленькое крыло, движущееся по кругу."],["Сколько примерно сантиметров в 5 дюймах?",["Около 13 см","5 см","50 см"],"1 дюйм = 2,54 см, 5 x 2,54 = около 13 см."],["Какая деталь - мозг дрона?",["Полётный контроллер","Винт","Рама"],"Полётный контроллер принимает решения за дрон."],["Что чувствует гироскоп?",["Наклоны и повороты дрона","Температуру","Свет"],"Гироскоп чувствует наклоны и повороты."],["Что делает регулятор (ESC)?",["Управляет скоростью моторов","Показывает видео","Заряжает АКБ"],"Регулятор крутит моторы так быстро, как велит контроллер."],["Кто получает команду с пульта первым на дроне?",["Приёмник","Мотор","Камера"],"Приёмник ловит сигнал пульта."],["Почему в режиме Angle дрон держится ровно, когда пилот отпустил стики?",["Контроллер сам поправляет моторы","Он висит на воздухе как шарик","Помогает ветер"],"Контроллер сам поправляет моторы, чувствуя наклоны гироскопом."],["Как часто контроллер поправляет моторы?",["Тысячи раз в секунду","Раз в минуту","Раз в секунду"],"Тысячи раз в секунду - человек так не может."],["Что такое \"4 в 1\"?",["Четыре регулятора на одной плате","Четыре АКБ","Четыре камеры"],"Четыре регулятора на одной плате - по одному на мотор."],["Что такое AIO?",["Контроллер и регулятор на одной плате","Режим полёта","Тип винта"],"All in one: контроллер и регуляторы на одной плате, как у Mobula 7."],["Чтобы лететь вперёд, дрон...",["Наклоняется носом вниз","Выключает передние моторы","Поднимается вверх"],"Дрон наклоняется носом вниз, и тяга толкает его вперёд."],["Без какой детали мотор не закрутится?",["Без регулятора","Без камеры","Без антенны"],"Регулятор подаёт ток на мотор."],["Что идёт после приёмника на пути команды?",["Полётный контроллер","Пульт","Очки"],"Приёмник передаёт команду контроллеру."],["Порыв ветра наклонил дрон. Кто первым это заметил?",["Гироскоп","Пилот","Регулятор"],"Гироскоп в контроллере."],["Откуда пилот видит картинку?",["С камеры на дроне через очки","Со спутника","Из пульта"],"Камера на дроне снимает, картинка приходит в очки."],["Что делает видеопередатчик?",["Отправляет картинку в очки","Крутит моторы","Принимает команды пульта"],"Он превращает картинку в радиосигнал и отправляет в очки."],["Почему у пилотов разные каналы?",["Иначе картинки смешаются","Чтобы быстрее летать","Для красоты"],"На одном канале картинки смешиваются."],["Что делаем после полёта в очках?",["Снимаем и смотрим вдаль","Сразу следующий полёт без перерыва","Смотрим в телефон"],"Снимаем очки и смотрим вдаль - отдых для глаз."],["Какой мощности хватает в зале?",["25 mW","1000 mW","Чем больше, тем лучше"],"В зале хватает 25 mW, и соседи не мешают."],["На какой частоте обычно летит FPV-видео?",["5,8 ГГц","100 МГц","50 Гц"],"Около 5,8 ГГц."],["Что значит канал R1?",["Группа R, канал номер 1","Первый пилот","Скорость 1"],"Буква - группа каналов, цифра - номер в ней."],["Почему нельзя включать видеопередатчик без антенны?",["Он может перегреться и сгореть","Будет громко","Ничего страшного"],"Без антенны он может перегреться и сгореть."],["Чем плоха большая мощность в зале?",["Мешает соседям","Ничем","Дрон тяжелее"],"Сильный сигнал мешает соседним пилотам."],["Что идёт после камеры на пути картинки?",["Видеопередатчик","Мотор","Приёмник"],"Видеопередатчик."],["Закружилась голова в очках. Что делаем?",["Снимаю очки и отдыхаю","Летаю дальше","Закрываю глаза в очках"],"Снимаем очки, садимся, отдыхаем."],["Двое пилотов на одном канале. Что будет?",["У обоих пропадёт или зарябит картинка","Будет в 2 раза чётче","Ничего"],"Картинки смешаются, у обоих рябь или пропадание."],["Какой стик отвечает за газ в Mode 2?",["Левый, вверх-вниз","Правый, вбок","Правый, вперёд-назад"],"Левый стик вверх-вниз - газ."],["Что делает правый стик вперёд?",["Наклоняет нос - дрон летит вперёд","Поднимает дрон выше","Включает моторы"],"Дрон наклоняется носом вниз и летит вперёд."],["Что делает приёмник?",["Ловит сигнал пульта","Отправляет видео","Заряжает АКБ"],"Приёмник ловит сигнал пульта и передаёт контроллеру."],["Связь с пультом пропала. Что должен сделать наш Mobula 7?",["Выключить моторы (failsafe)","Улететь домой сам","Лететь быстрее"],"Сработает failsafe: моторы выключатся, дрон упадёт и не улетит в людей."],["Почему пульт должен быть заряжен?",["Иначе пропадёт связь в полёте","Для подсветки","Это не важно"],"Пульт выключится - дрон потеряет связь."],["Что такое бинд?",["Привязка приёмника к пульту","Режим скорости","Название рамы"],"Привязка приёмника к одному пульту."],["Какая ось стиков не возвращается в центр сама?",["Газ","Крен","Тангаж"],"Стик газа держится там, где его оставили."],["Что такое рыскание (yaw)?",["Поворот на месте вокруг себя","Подъём вверх","Полёт вбок"],"Поворот дрона вокруг себя, как стрелка компаса."],["Почему для FPV-дрона failsafe обычно \"выключить моторы\"?",["Упасть на месте безопаснее, чем улететь","Так экономится АКБ","Это ошибка настройки"],"Падение на месте безопаснее, чем полёт без управления."],["Левый стик влево-вправо делает...",["Поворот на месте","Полёт вверх","Полёт вперёд"],"Поворот на месте."],["Правый стик вбок делает...",["Полёт вбок (крен)","Газ","Дизарм"],"Крен: дрон наклоняется и летит вбок."],["Кто у нас делает привязку пульта?",["Тренер","Любой ученик","Она не нужна"],"Привязку делает тренер."],["К какой системе относится камера?",["Видео","Питание","Полёт"],"Камера снимает картинку - это видео."],["К какой системе относится приёмник?",["Управление","Видео","Питание"],"Приёмник ловит команды - это управление."],["Что будет, если отказал видеопередатчик?",["Пропадёт картинка в очках","Перестанут крутиться моторы","Выключится пульт"],"Пропадёт картинка в очках, а управление останется."],["Без какой системы дрон вообще не включится?",["Питание","Видео","Ни без какой"],"Без питания энергии нет совсем."],["Какая система показывает пилоту, куда летит дрон?",["Видео","Питание","Полёт"],"Камера, видеопередатчик и очки - это видео."],["Отказал приёмник. Что будет?",["Команды не дойдут, сработает failsafe","Пропадёт картинка","Ничего"],"Команды не дойдут, сработает failsafe."],["Куда отнести регулятор?",["Полёт","Видео","Управление"],"Регулятор крутит моторы - система полёта."],["Мотор относится к системе...",["Полёт","Питание","Видео"],"Мотор крутит винт."],["Очки относятся к системе...",["Видео","Управление","Полёт"],"Очки показывают картинку."],["Гироскоп относится к системе...",["Управление","Видео","Питание"],"Гироскоп помогает контроллеру держать дрон ровно."]];
+const ORDER_M2=[{"q":"Ты сдвинул стик вперёд. По порядку, куда идёт команда?","items":["Пульт","Приёмник","Полётный контроллер","Регулятор","Мотор"],"why":"Пульт - приёмник - контроллер - регулятор - мотор."},{"q":"Как энергия идёт к мотору? Расставь по порядку","items":["АКБ","Регулятор","Мотор"],"why":"Ток идёт от АКБ через регулятор, который дозирует его для мотора."},{"q":"Дрон наклонился от ветра. Что происходит?","items":["Гироскоп чувствует наклон","Контроллер считает поправку","Регулятор меняет обороты","Дрон выравнивается"],"why":"Так дрон держится ровно сам, тысячи раз в секунду."},{"q":"Как картинка попадает к пилоту?","items":["Камера","Видеопередатчик","Антенна дрона","Антенна очков","Очки пилота"],"why":"Камера - видеопередатчик - антенна - очки."},{"q":"Включаем видео перед полётом","items":["Включить очки","Выбрать свой канал","Подключить АКБ к дрону","Проверить картинку"],"why":"Канал выбираем заранее, чтобы не мешать соседям."},{"q":"После полёта - береги глаза","items":["Посадить дрон","Дизарм","Снять очки","Посмотреть вдаль"],"why":"Глазам нужен отдых после экрана вблизи."}];
+const SORT_CATS=["Полёт","Управление","Видео","Питание"];
+const SORT_M2=[["Мотор",0,"Мотор крутит винт - это полёт."],["Винт",0,"Винт создаёт тягу."],["Пульт",1,"Пульт - управление."],["Камера",2,"Камера - видео."],["АКБ",3,"АКБ - питание."],["Очки пилота",2,"Очки показывают картинку."],["Приёмник",1,"Приёмник ловит команды пульта."],["Видеопередатчик",2,"Отправляет картинку в очки."],["Регулятор",0,"Крутит моторы - полёт."],["Гироскоп",1,"Помогает контроллеру держать дрон ровно."],["Разъём АКБ",3,"Через него идёт питание."]];
+// Order game: gates carry the steps of a chain, fly through them in the right order
+const LAB_SPOTS=[[-9,6,0],[9,6,0],[-8,-4,Math.PI/2],[8,-4,Math.PI/2],[0,-8,0]];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;};
+function idleGate(G,txt,letter){drawSign(G,letter||'',txt,'idle');G.led.color.setHex(0xffc030).multiplyScalar(2.2);}
+function orderShow(T){
+  T.prev=D.pos.clone();T.k=0;T.flash=0;T.badG=null;
+  const s=T.sets[T.ri];
+  if(!s){for(const G of qgates)G.g.visible=false;T.solids=[];T.gatesOn=false;return;}
+  const n=s.items.length;T.map=shuffle([...Array(n).keys()]);
+  placeSpots(shuffle(LAB_SPOTS).slice(0,n));
+  qgates.forEach((G,g)=>{if(g<n)idleGate(G,s.items[T.map[g]]);});
+  T.solids=qgates.slice(0,n).flatMap(G=>G.solids);T.gatesOn=true;
+}
+function orderTick(T,dt){
+  if(T.wait>0){T.wait-=dt;if(T.wait<=0){T.ri++;orderShow(T);}return;}
+  const s=T.sets[T.ri];if(!s)return;
+  if(T.flash>0){T.flash-=dt;if(T.flash<=0&&T.badG!=null){idleGate(qgates[T.badG],s.items[T.map[T.badG]]);T.badG=null;}}
+  for(let g=0;g<s.items.length;g++)if(passed(qgates[g],T.prev)){
+    const it=T.map[g];if(it<T.k)continue;
+    if(it===T.k){T.k++;drawSign(qgates[g],String(it+1),s.items[it],'ok');qgates[g].led.color.setHex(0x30ff6a).multiplyScalar(3);beep(880,0.07);
+      if(T.k===s.items.length){T.wait=3.5;beep(1320,0.12);}}
+    else{T.err++;if(T.badG!=null&&T.badG!==g)idleGate(qgates[T.badG],s.items[T.map[T.badG]]);T.badG=g;T.flash=1.4;drawSign(qgates[g],'',s.items[it],'bad');qgates[g].led.color.setHex(0xff3020).multiplyScalar(3);beep(200,0.3);}
+    break;
+  }
+  T.prev.copy(D.pos);
+}
+function orderText(T){
+  const s=T.sets[T.ri];if(!s)return '';
+  if(T.wait>0)return `<b style="color:#30ff6a">Верно!</b> ${s.why}`;
+  const prev=T.k?`После «${s.items[T.k-1]}» что дальше?`:'С чего всё начинается?';
+  return `Задание ${T.ri+1} из ${T.sets.length} · готово ${T.k} из ${s.items.length}<br><b>${s.q}</b><br><small>${T.flash>0?'<span style="color:#ff5a4a">Не тот шаг.</span> ':''}${prev} Пролети ворота по порядку.</small>`;
+}
+function onStand(st){return st.view;}
+function lessonsLab(){
+  const out={};
+  out.lab1={loc:'lab',after:'quiz1',tag:'ЛАБОРАТОРИЯ · МОДУЛЬ 2',name:'Экскурсия по стендам',desc:'Облети 6 стендов с деталями дрона и прочитай про каждую.',
+    learn:['взлететь на 1,5 метра','лететь к стенду, его покажет жёлтая стрелка','зависнуть рядом и прочитать карточку, пока идёт отсчёт','обойти все 6 стендов и сесть на H'],
+    steps:T=>{const list=[sArm(),sUp(1.5)];
+      STANDS.forEach((st,i)=>{const cards=STAND_CARDS[st.id];let rd=0;const need=6+cards.length*4;
+        list.push(sGo(st.view,`стенду ${i+1} «${st.name}»`,1.8));
+        list.push({text:()=>cards.map(c=>`<b>${c[0]}.</b> ${c[1]}`).join('<br>')+`<br><small>Повиси у стенда и прочитай: ещё ${Math.max(0,need-rd).toFixed(0)} с</small>`,target:()=>D.pos.distanceTo(st.view)>3?st.view:null,
+          tick:dt=>{if(D.armed&&D.pos.distanceTo(st.view)<3)rd+=dt;},check:()=>rd>=need});});
+      list.push(sGo(H_UP,'площадке H',1.5),sLand(PAD_A,'площадку H'),sDisarm());return list;},
+    result:T=>({val:T.t,stars:crashStars(T.crashes),label:'Все 6 стендов за '+fmtT(T.t)}),
+    better:(a,b)=>a<b, fmtBest:v=>'лучшее время: '+fmtT(v)};
+  out.lab2={loc:'lab',tag:'ЛАБОРАТОРИЯ · МОДУЛЬ 2',name:'Путь команды и картинки',desc:'На воротах шаги цепочки. Пролети их по порядку: от стика до мотора, от камеры до очков.',keep:true,
+    learn:['взлететь на 1,5 метра','прочитать задание вверху экрана','пролететь ворота по порядку: верные загораются зелёным с номером','ошибся — ворота мигнут красным, ищи другой шаг','3 задания, потом сесть на H'],
+    setup:T=>{if(!T.sets){T.sets=[ORDER_M2[0],ORDER_M2[3],ORDER_M2[2]];T.ri=0;T.err=0;T.wait=0;}orderShow(T);},
+    steps:T=>[sArm(),sUp(1.5),{text:()=>orderText(T),tick:dt=>orderTick(T,dt),check:()=>T.ri>=T.sets.length},sGo(H_UP,'площадке H',1.5),sLand(PAD_A,'площадку H'),sDisarm()],
+    result:T=>({val:T.err,stars:T.err===0?3:T.err<=3?2:1,label:T.err?`Ошибок в порядке: ${T.err}`:'Без единой ошибки!'}),
+    better:(a,b)=>a<b, fmtBest:v=>'лучшее: ошибок '+v};
+  out.lab3={loc:'lab',tag:'ЛАБОРАТОРИЯ · МОДУЛЬ 2',name:'Разложи по системам',desc:'Вверху деталь дрона. Лети в ворота её системы: Полёт, Управление, Видео или Питание.',keep:true,
+    learn:['взлететь на 1,5 метра','прочитать деталь вверху экрана','лететь в ворота нужной системы: А Полёт, Б Управление, В Видео, Г Питание','8 деталей, нужно 6 верных, потом сесть на H'],
+    setup:T=>{if(!T.qs){T.qs=shuffle(SORT_M2).slice(0,8).map(([name,cat,e])=>({q:`Какая это система: «${name}»?`,a:SORT_CATS,right:cat,e}));T.qi=0;T.right=0;T.wait=0;T.wrong=[];}showQuiz(T);},
+    steps:T=>[sArm(),sUp(1.5),{text:()=>quizText(T),target:()=>T.qi<T.qs.length?qgates[1].pos:null,tick:dt=>quizTick(T,dt),check:()=>T.qi>=T.qs.length},sGo(H_UP,'площадке H',1.5),sLand(PAD_A,'площадку H'),sDisarm()],
+    result:T=>{const n=T.right,N=T.qs.length;return n>=6?{val:n,stars:n===N?3:n>=7?2:1,label:`${n} из ${N} верно`}:{val:n,stars:0,label:`${n} из ${N} верно`,fail:'Нужно хотя бы 6 из 8. Посмотри плакат «4 системы дрона» на левой стене.'};},
+    better:(a,b)=>a>b, fmtBest:v=>'лучший результат: '+v+' из 8'};
+  out.lab4={loc:'lab',tag:'ЛАБОРАТОРИЯ · МОДУЛЬ 2',name:'Круг вокруг макета',desc:'3 круга вокруг большого дрона в центре на ровной высоте 1,5–2,5 м.',
+    learn:['взлететь на 2 метра','облететь макет по 8 маякам, 3 круга','держать высоту между 1,5 и 2,5 м: правый стик ведёт, левый понемногу поворачивает','сесть на H'],
+    steps:T=>{T.out=0;const R=5.2,list=[sArm(),sUp(2)];
+      for(let lap=0;lap<3;lap++)for(let j=0;j<8;j++){const a=Math.PI/2-j*Math.PI/4,p=V3(WHOOP.x+Math.sin(a)*R,2,WHOOP.z+Math.cos(a)*R);
+        const s=sGo(p,'',1.8);s.text=()=>`Круг <b>${lap+1}</b> из 3 · маяк ${j+1} из 8. Держи высоту 1,5–2,5 м (сейчас ${D.pos.y.toFixed(1)} м)`+(T.out>0.5?`<br><small>Вне коридора: ${T.out.toFixed(1)} с</small>`:'');
+        const ck=s.check;s.check=()=>{const ok=ck();if(ok&&lap===0&&j===0)T.t0=T.t;if(ok&&lap===2&&j===7)T.lap=T.t-T.t0;return ok;};list.push(s);}
+      list.push(sGo(H_UP,'площадке H',1.5),sLand(PAD_A,'площадку H'),sDisarm());return list;},
+    tick:(T,dt)=>{if(T.si>=3&&T.si<26&&D.armed&&(D.pos.y<1.5||D.pos.y>2.5))T.out+=dt;},
+    result:T=>({val:T.lap,stars:T.crashes?1:T.out<3?3:T.out<10?2:1,label:`3 круга за ${T.lap.toFixed(1)} с, вне коридора ${T.out.toFixed(1)} с`}),
+    better:(a,b)=>a<b, fmtBest:v=>'лучшее: '+v.toFixed(1)+' с'};
+  out.quiz2={loc:'lab',tag:'ИТОГ МОДУЛЯ 2 · ЭКЗАМЕН',name:'Экзамен в лаборатории',desc:'10 вопросов модуля 2 про устройство дрона. Отвечай полётом через ворота. Нужно 8 из 10.',keep:true,
+    learn:['взлететь на 1,5 метра','прочитать вопрос вверху экрана, ответы А, Б, В над воротами','пролететь в ворота с правильным ответом','после 10 вопросов сесть на H и снять взвод'],
+    setup:T=>{if(!T.qs){T.qs=pickQuiz(QUIZ_M2,10);T.qi=0;T.right=0;T.wait=0;T.wrong=[];}showQuiz(T);}};
+  ['steps','result','better','fmtBest'].forEach(k=>out.quiz2[k]=LESSONS.quiz1[k]);
+  out.freeLab={loc:'lab',tag:'СВОБОДНО',name:'Свободный полёт в лаборатории',desc:'Полетай между стендами как хочешь.',learn:['летать без задания'],steps:()=>[],free:true};
+  return out;
 }
 const crashStars=n=>n===0?3:n<3?2:1;
 const H_UP=V3(PAD_A.x,1.2,PAD_A.z);
@@ -1081,14 +1321,15 @@ const LESSONS={
     better:(a,b)=>a>b, fmtBest:v=>'лучший результат: '+v+' из 10'},
   free:{tag:'СВОБОДНО',name:'Свободный полёт',desc:'Полетай по ангару как хочешь. Попробуй режимы Angle и Acro.',learn:['летать без задания','менять камеру и режим (клавиша M или в настройках)'],steps:()=>[],free:true},
 };
-const ORDER=['tut','hover','circle','land','quiz1','gates','bat'];
-function unlocked(id){const i=ORDER.indexOf(id);return i<=0||S.unlockAll||(S.stars[id]||0)>0||(S.stars[ORDER[i-1]]||0)>0;}
+Object.assign(LESSONS,lessonsLab());
+const ORDER=['tut','hover','circle','land','quiz1','gates','bat','lab1','lab2','lab3','lab4','quiz2'];
+function unlocked(id){const i=ORDER.indexOf(id),pre=LESSONS[id].after||ORDER[i-1];return i<=0||S.unlockAll||(S.stars[id]||0)>0||(S.stars[pre]||0)>0;}
 function nextLesson(id){const i=ORDER.indexOf(id);return i>=0&&i<ORDER.length-1?ORDER[i+1]:null;}
 function paintGates(n){gates.forEach((x,i)=>{const c=i===n?0x30ff6a:i===n+1?0xffc030:i<n?0x1d3a52:0x3a7bd5;x.led.color.setHex(c).multiplyScalar(i===n||i===n+1?3:1.4);x.mat.emissive.setHex(i===n?0x0b4a1c:0);});}
 
 let task=null, playing=false, curTask='tut';
 function startTask(id){
-  const L=LESSONS[id];curTask=id;
+  const L=LESSONS[id];curTask=id;setLoc(L.loc||'hangar');
   for(const g of gates.concat(qgates))g.g.visible=false;
   hoverZone.visible=false;beacon.visible=false;
   resetDrone();
@@ -1098,7 +1339,7 @@ function startTask(id){
   task.steps=L.steps(task);
   task.tick=dt=>{
     if(task.restart&&!D.crashed){task.restart=false;L.setup&&L.setup(task);task.steps=L.steps(task);task.si=0;toast(L.keep?'Взлетай снова: вопрос тот же, ответы сохранены':'Начнём этот урок с первого шага','bad');}
-    L.tick&&L.tick(task);
+    L.tick&&L.tick(task,dt);
     if(task.failed&&!task.done)return finish(L.result(task));
     const st=task.steps[task.si];
     if(!st){setTaskText(L.free?'':'');guide(null);highlight(null);return;}
@@ -1158,7 +1399,7 @@ function finish(r){
 function exitToMenu(){playing=false;D.armed=false;updArm();guide(null);highlight(null);$('osd').hidden=true;$('touch').hidden=true;renderMenu();showScreen('sMenu');}
 function pause(){if(!playing)return;playing=false;showScreen('sPause');}
 function brief(id){
-  const L=LESSONS[id];curTask=id;
+  const L=LESSONS[id];curTask=id;setLoc(L.loc||'hangar');
   $('bTag').textContent=L.tag;$('bName').textContent=L.name;$('bDesc').textContent=L.desc;
   $('bLearn').innerHTML=L.learn.map(s=>`<li>${s}</li>`).join('');
   const c=ctl();
@@ -1185,12 +1426,15 @@ let backTo='sMenu';
 function showScreen(id){for(const s of SCREENS)$(s).hidden=s!==id;}
 function renderMenu(){
   const list=$('taskList');list.innerHTML='';
-  for(const id of ORDER.concat('free')){
-    const t=LESSONS[id],open=id==='free'||unlocked(id),st=S.stars[id]||0;
+  let lastLoc=null;
+  for(const id of ORDER.concat('free','freeLab').sort((a,b)=>(LESSONS[a].loc==='lab')-(LESSONS[b].loc==='lab'))){
+    const loc=LESSONS[id].loc||'hangar';
+    if(loc!==lastLoc){lastLoc=loc;const h=document.createElement('div');h.className='lochead';h.textContent=LOCS[loc].name+(loc==='lab'?' · модуль 2':' · модули 1–4');list.appendChild(h);}
+    const t=LESSONS[id],open=id==='free'||(t.free?unlocked('lab1'):unlocked(id)),st=S.stars[id]||0;
     const b=document.createElement('button');b.className='task'+(open?'':' locked');
     const best=S.best[id]!=null&&t.fmtBest?t.fmtBest(S.best[id]):'';
-    b.innerHTML=`<span class="tag">${t.tag}</span><b>${open?'':'🔒 '}${t.name}</b><span>${open?t.desc:'Откроется после урока «'+LESSONS[ORDER[ORDER.indexOf(id)-1]].name+'»'}</span>`+
-      (id==='free'?'':`<span class="st">${'★'.repeat(st)}<i>${'★'.repeat(3-st)}</i></span>`)+`<span class="best">${best}</span>`;
+    b.innerHTML=`<span class="tag">${t.tag}</span><b>${open?'':'🔒 '}${t.name}</b><span>${open?t.desc:'Откроется после урока «'+LESSONS[t.after||ORDER[ORDER.indexOf(id)-1]||'quiz1'].name+'»'}</span>`+
+      (t.free?'':`<span class="st">${'★'.repeat(st)}<i>${'★'.repeat(3-st)}</i></span>`)+`<span class="best">${best}</span>`;
     b.onclick=()=>{if(!open){toast('Сначала пройди предыдущий урок','bad');return;}audioInit();brief(id);};list.appendChild(b);
   }
   padInfo();
@@ -1262,7 +1506,7 @@ function frame(now){
   drone.position.copy(D.pos);drone.quaternion.copy(D.q);
   placeCameras(dt);
   let cam=S.cam==='fpv'?camFPV:camExt;
-  if(!playing&&$('osd').hidden){const a=now/9000;camExt.position.set(Math.sin(a)*18,5,Math.cos(a)*13);camExt.fov=60;camExt.updateProjectionMatrix();camExt.lookAt(0,1.5,0);cam=camExt;drone.visible=true;}
+  if(!playing&&$('osd').hidden){const a=now/9000,o=LOCS[locId].orbit;camExt.position.set(Math.sin(a)*o[0],o[1],Math.cos(a)*o[2]);camExt.fov=60;camExt.updateProjectionMatrix();camExt.lookAt(0,1.5,0);cam=camExt;drone.visible=true;}
   if(playing||!$('osd').hidden)drone.visible=S.cam!=='fpv';
   updFx(dt,now);
   if(composer){renderPass.camera=cam;composer.render(dt);}else renderer.render(scene,cam);
@@ -1271,13 +1515,15 @@ function frame(now){
 }
 
 /* ---------- Boot ---------- */
-buildHangar();buildMarks();buildGates();buildQuizGates();buildDrone();
+scene.add(sun);
+buildLoc('hangar',g=>{buildHangar(g);buildMarks(g);});buildLoc('lab',buildLab);setLoc('hangar');
+buildGates();buildQuizGates();buildDrone();
 setupStick($('stL'),'L');setupStick($('stR'),'R');
 applyQuality();resetDrone();renderMenu();showScreen('sMenu');
 $('ocam').textContent=CAMN[S.cam];
 // menu backdrop: slow orbit around the hangar
 camExt.position.set(12,4,16);camExt.lookAt(0,1.5,0);
 requestAnimationFrame(frame);
-window.__F={D,inp,S,startTask,toggleArm,step,get task(){return task;},touchSt,LESSONS,brief,scene,qgates};
+window.__F={D,inp,S,startTask,toggleArm,step,get task(){return task;},touchSt,LESSONS,brief,scene,qgates,STANDS,setLoc};
 </script>
 </body></html>
