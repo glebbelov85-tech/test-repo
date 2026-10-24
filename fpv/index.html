@@ -87,6 +87,18 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 #bBat{left:max(14px,env(safe-area-inset-left,0px));top:calc(86px + env(safe-area-inset-top,0px))}
 @media (pointer:fine){#touch .stick{display:none}}
 @media (pointer:coarse){#sticks{display:none}}
+/* lessons: highlighted control, step label, target pointer, lesson cards */
+.hl{animation:hl 1s ease-in-out infinite;border-color:var(--hazard)!important}
+@keyframes hl{50%{box-shadow:0 0 0 6px rgba(242,194,48,.55),0 0 24px rgba(242,194,48,.7)}}
+@media (prefers-reduced-motion:reduce){.hl{animation:none;box-shadow:0 0 0 4px rgba(242,194,48,.7)}}
+#task .sn{display:block;font-size:.72em;letter-spacing:.2em;color:var(--hazard)}
+#task{white-space:normal;max-width:min(92vw,620px);width:max-content;line-height:1.4}
+#guide{position:absolute;transform:translate(-50%,-50%);display:grid;justify-items:center;color:var(--hazard);font-size:clamp(14px,1.8vw,18px)}
+#guide b{font-size:30px;font-weight:400;line-height:1}
+.task.locked{opacity:.45;cursor:not-allowed}
+.task .st{font-size:18px;letter-spacing:3px;color:var(--hazard)}.task .st i{font-style:normal;color:#39434c}
+#bLearn{margin:0;padding-left:22px;display:grid;gap:6px;color:#cfd6dc;line-height:1.45}
+.ctlbox{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:12px 14px;font-size:15px;line-height:1.5;color:#cfd6dc}
 #calSteps{font-size:18px;font-family:var(--display)}
 #calAxes{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:pre-wrap}
 </style>
@@ -104,6 +116,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
   <div id="hor"><i></i></div>
   <div id="cross">+</div>
   <div class="c" id="warn"></div>
+  <div id="guide" hidden><b>◇</b><span></span></div>
   <div id="task" hidden></div>
   <div class="c" id="oBC"><span id="ocam">FPV</span><div id="sticks"><div class="sbox"><i id="sL"></i></div><div class="sbox"><i id="sR"></i></div></div></div>
 </div>
@@ -134,6 +147,19 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
   </div>
 </div>
 
+<!-- Lesson briefing -->
+<div class="screen" id="sBrief" hidden>
+  <div class="card">
+    <span class="note" id="bTag" style="font-family:var(--mono);letter-spacing:.2em;color:var(--hazard)"></span>
+    <h2 id="bName"></h2>
+    <p id="bDesc"></p>
+    <div><p style="margin-bottom:6px">Что ты сделаешь:</p><ol id="bLearn"></ol></div>
+    <div class="ctlbox" id="bCtl"></div>
+    <p class="note">Режим полёта: <b id="bMode"></b>. Подсказка с текущим шагом всегда вверху экрана, а жёлтая стрелка показывает, куда лететь.</p>
+    <div class="btns"><button id="bGo">Начать</button><button class="ghost" id="bModeBtn">Сменить режим</button><button class="ghost" id="bBack">Назад</button></div>
+  </div>
+</div>
+
 <!-- Settings -->
 <div class="screen" id="sSet" hidden>
   <div class="card">
@@ -145,6 +171,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
     <div class="row"><label>Скорость вращения (Acro): <span id="vRate"></span>°/с</label><input type="range" min="200" max="900" step="10" data-k="rate"></div>
     <div class="row"><label>Экспо стиков: <span id="vExpo"></span></label><input type="range" min="0" max="0.8" step="0.05" data-k="expo"></div>
     <div class="row"><label>Графика</label><div class="seg" data-k="q"><button data-v="0">Низкая</button><button data-v="1">Средняя</button><button data-v="2">Высокая</button></div></div>
+    <div class="row"><label>Все уроки сразу</label><div class="seg" data-k="unlockAll"><button data-v="1">Открыть</button><button data-v="">По порядку</button></div></div>
     <div class="row"><label>Помехи видео</label><div class="seg" data-k="fx"><button data-v="1">Вкл</button><button data-v="0">Выкл</button></div></div>
     <div class="btns"><button id="setBack">Готово</button></div>
   </div>
@@ -194,7 +221,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
     <div class="stars" id="rStars"></div>
     <div class="big" id="rVal"></div>
     <p id="rText"></p>
-    <div class="btns"><button id="rAgain">Ещё раз</button><button class="ghost" id="rMenu">В меню</button></div>
+    <div class="btns"><button id="rNext" hidden>Следующий урок</button><button class="ghost" id="rAgain">Ещё раз</button><button class="ghost" id="rMenu">В меню</button></div>
   </div>
 </div>
 
@@ -208,14 +235,16 @@ const G=9.81;
 
 /* ---------- Saved settings and results ---------- */
 const KEY='fpvAcademy.v1';
-const DEF={mode:'nov',cam:'fpv',tilt:20,rate:560,expo:0.35,q:(matchMedia('(pointer:coarse)').matches?'0':'1'),fx:'1',pad:null,best:{}};
+const DEF={mode:'nov',cam:'fpv',tilt:20,rate:560,expo:0.35,q:(matchMedia('(pointer:coarse)').matches?'0':'1'),fx:'1',pad:null,best:{},stars:{},unlockAll:''};
 let S=Object.assign({},DEF);
-try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)S=Object.assign({},DEF,s,{best:Object.assign({},s.best||{})});}catch(e){}
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)S=Object.assign({},DEF,s,{best:Object.assign({},s.best||{}),stars:Object.assign({},s.stars||{})});}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 
 /* ---------- Renderer, scene, cameras ---------- */
 const renderer=new THREE.WebGLRenderer({antialias:S.q!=='0',powerPreference:'high-performance'});
 renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 $('game').appendChild(renderer.domElement);
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x0b0f13);
@@ -225,8 +254,10 @@ const camExt=new THREE.PerspectiveCamera(60,1,0.05,200);
 function applyQuality(){
   const q=+S.q;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,[1,1.5,2][q]));
-  renderer.shadowMap.enabled=q>=2;
-  sun.castShadow=q>=2;
+  renderer.shadowMap.enabled=q>=1;
+  sun.castShadow=q>=1;
+  const ms=q>=2?2048:1024;if(sun.shadow.mapSize.x!==ms){sun.shadow.mapSize.set(ms,ms);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
+  for(const o of fxHi)o.visible=q>=1;
   resize();
 }
 function resize(){
@@ -278,12 +309,22 @@ const texRules=canvasTex(512,512,(g,w,h)=>{
   g.font='28px Arial';['1. Взводи только с газом внизу','2. Над людьми не летаем','3. Не видишь дрон — садись','4. АКБ 3.5 В на банку — домой','5. Авария — сразу снять взвод'].forEach((s,i)=>g.fillText(s,30,130+i*66));
 });
 
+const texDoor=canvasTex(512,256,(g,w,h)=>{
+  g.fillStyle='#3d464d';g.fillRect(0,0,w,h);
+  for(let x=0;x<w;x+=64){g.fillStyle='#343c42';g.fillRect(x,0,30,h);g.fillStyle='#4a545c';g.fillRect(x+30,0,4,h);}
+  g.fillStyle='#e8b520';g.fillRect(0,h-18,w,18);g.fillStyle='#111';for(let x=0;x<w;x+=28){g.beginPath();g.moveTo(x,h);g.lineTo(x+14,h);g.lineTo(x+28,h-18);g.lineTo(x+14,h-18);g.fill();}
+  g.fillStyle='#fff';g.font='bold 34px Arial';g.fillText('ВОРОТА 2',20,48);
+});
+const texDoorGlow=canvasTex(512,256,(g,w,h)=>{g.fillStyle='#000';g.fillRect(0,0,w,h);g.fillStyle='#fff4dc';g.fillRect(w/2-2,0,4,h);g.fillRect(0,0,w,3);for(let x=0;x<w;x+=64)g.fillRect(x+30,4,1,h*.6);});
+const texGlow=canvasTex(128,128,(g,w,h)=>{const r=g.createRadialGradient(64,64,0,64,64,64);r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(.25,'rgba(255,240,210,.55)');r.addColorStop(1,'rgba(255,240,210,0)');g.fillStyle=r;g.fillRect(0,0,w,h);});
+const texBlob=canvasTex(128,128,(g,w,h)=>{const r=g.createRadialGradient(64,64,0,64,64,64);r.addColorStop(0,'rgba(0,0,0,.85)');r.addColorStop(.6,'rgba(0,0,0,.35)');r.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=r;g.fillRect(0,0,w,h);});
+
 /* ---------- Hangar ---------- */
 const HX=30,HZ=20,HY=12;           // half sizes and height, metres
 const boxes=[];                     // solid AABBs for collisions: {min:Vector3,max:Vector3}
 function solid(x,y,z,sx,sy,sz){boxes.push({min:new THREE.Vector3(x-sx/2,y-sy/2,z-sz/2),max:new THREE.Vector3(x+sx/2,y+sy/2,z+sz/2)});}
 const M={
-  floor:new THREE.MeshStandardMaterial({map:texFloor,roughness:.9}),
+  floor:new THREE.MeshStandardMaterial({map:texFloor,roughness:.62,metalness:.15,envMapIntensity:.6}),
   wall:new THREE.MeshStandardMaterial({map:texWall,roughness:.8,metalness:.3,side:THREE.BackSide}),
   haz:new THREE.MeshStandardMaterial({map:texHaz,roughness:.7}),
   crate:new THREE.MeshStandardMaterial({color:0x5c4a2e,roughness:.85}),
@@ -291,9 +332,10 @@ const M={
   lamp:new THREE.MeshBasicMaterial({color:0xfff4d8}),
 };
 const sun=new THREE.DirectionalLight(0xfff0dd,0.9);
+const fxHi=[];                      // atmosphere objects hidden on low quality
 function buildHangar(){
   scene.add(new THREE.HemisphereLight(0xbfd4e6,0x303030,0.75));
-  sun.position.set(-12,24,8);sun.shadow.mapSize.set(2048,2048);
+  sun.position.set(-12,24,8);sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-0.0006;sun.shadow.normalBias=0.03;
   Object.assign(sun.shadow.camera,{left:-32,right:32,top:24,bottom:-24,near:1,far:60});
   scene.add(sun);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(HX*2,HZ*2),M.floor);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
@@ -325,11 +367,31 @@ function buildHangar(){
   for(const x of [-9,9]){const p=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.5,5,12),new THREE.MeshStandardMaterial({color:0xe06a1c,roughness:.6}));p.position.set(x,2.5,-4);p.castShadow=true;scene.add(p);solid(x,2.5,-4,0.8,5,0.8);}
   // parked drone shelf (decor)
   const shelf=new THREE.Mesh(new THREE.BoxGeometry(6,1,1.2),M.steel);shelf.position.set(18,0.5,-17.5);scene.add(shelf);solid(18,0.5,-17.5,6,1,1.2);
+  for(let i=0;i<3;i++){const d=new THREE.Group();const b=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.08,0.3),new THREE.MeshStandardMaterial({color:[0xf2c230,0x2f7fe0,0xe0262b][i],roughness:.5}));d.add(b);d.position.set(16+i*2,1.05,-17.5);scene.add(d);}
+  // big hangar door on the east wall: daylight leaks through the seams
+  const door=new THREE.Mesh(new THREE.PlaneGeometry(22,9),new THREE.MeshStandardMaterial({map:texDoor,roughness:.7,metalness:.4,emissiveMap:texDoorGlow,emissive:0xffffff,emissiveIntensity:1.2}));
+  door.position.set(HX-0.03,4.5,0);door.rotation.y=-Math.PI/2;scene.add(door);
+  // high windows on the north and south walls
+  const winM=new THREE.MeshBasicMaterial({color:0xbfe2ff});
+  for(let x=-24;x<=24;x+=8)for(const z of [-HZ+0.04,HZ-0.04]){const w=new THREE.Mesh(new THREE.PlaneGeometry(5,1.3),winM);w.position.set(x,10,z);w.rotation.y=z>0?Math.PI:0;scene.add(w);}
+  // lamp halos and soft light cones (cheap fake volumetrics)
+  const halo=new THREE.SpriteMaterial({map:texGlow,color:0xfff0cc,transparent:true,opacity:.7,depthWrite:false,blending:THREE.AdditiveBlending});
+  const coneM=new THREE.MeshBasicMaterial({color:0xffe9c0,transparent:true,opacity:.035,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
+  for(let x=-24;x<=24;x+=12)for(let z=-12;z<=12;z+=12){
+    const h=new THREE.Sprite(halo);h.position.set(x,HY-0.9,z);h.scale.set(3.2,3.2,1);scene.add(h);
+    const c=new THREE.Mesh(new THREE.ConeGeometry(3.4,HY-1,24,1,true),coneM);c.position.set(x,(HY-1)/2,z);scene.add(c);fxHi.push(c);
+  }
+  // floating dust in the light
+  const n=500,pos=new Float32Array(n*3);for(let i=0;i<n;i++){pos[i*3]=(Math.random()*2-1)*HX;pos[i*3+1]=Math.random()*HY;pos[i*3+2]=(Math.random()*2-1)*HZ;}
+  const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  dust=new THREE.Points(dg,new THREE.PointsMaterial({color:0xfff2d8,size:0.05,transparent:true,opacity:.55,depthWrite:false,blending:THREE.AdditiveBlending}));scene.add(dust);fxHi.push(dust);
 }
+let dust=null;
 
 /* ---------- Pads, hover zone, gates ---------- */
 const PAD_A=new THREE.Vector3(0,0,10), PAD_B=new THREE.Vector3(0,0,-12);
-function pad(pos,label,col){const m=new THREE.Mesh(new THREE.CircleGeometry(1.2,40),new THREE.MeshStandardMaterial({map:padTex(label,col),roughness:.8}));m.rotation.x=-Math.PI/2;m.position.set(pos.x,0.01,pos.z);m.receiveShadow=true;scene.add(m);return m;}
+function pad(pos,label,col){const m=new THREE.Mesh(new THREE.CircleGeometry(1.2,40),new THREE.MeshStandardMaterial({map:padTex(label,col),roughness:.8}));m.rotation.x=-Math.PI/2;m.position.set(pos.x,0.01,pos.z);m.receiveShadow=true;scene.add(m);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.32,0.035,6,48),new THREE.MeshBasicMaterial({color:new THREE.Color(col)}));ring.rotation.x=Math.PI/2;ring.position.set(pos.x,0.03,pos.z);scene.add(ring);return m;}
 let padB;
 const hoverZone=new THREE.Group();
 function buildMarks(){
@@ -343,6 +405,7 @@ function buildMarks(){
 // Gate course: a figure eight around the pylons, then back home.
 const GATES=[[0,2,4,0],[-9,2.2,-11,Math.PI/2],[-16,2.2,-4,0],[-9,2.2,3,Math.PI/2],[0,2,-4,0],[9,2.2,-11,Math.PI/2],[16,2.2,-4,0],[9,2.2,3,Math.PI/2]];
 const gates=[];
+function numTex(n){return canvasTex(64,64,(g)=>{g.fillStyle='#111';g.beginPath();g.arc(32,32,30,0,7);g.fill();g.fillStyle='#fff';g.font='bold 38px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(String(n),32,34);});}
 const GW=2.4,GH=2;
 function buildGates(){
   const frameMat=()=>new THREE.MeshStandardMaterial({color:0x555b60,emissive:0x000000,roughness:.5});
@@ -351,13 +414,17 @@ function buildGates(){
     const t=0.14;
     const parts=[[0,GH/2+t/2,GW+2*t,t],[0,-GH/2-t/2,GW+2*t,t],[-GW/2-t/2,0,t,GH],[GW/2+t/2,0,t,GH]];
     for(const [px,py,w,h] of parts){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,t),mat);m.position.set(px,py,0);m.castShadow=true;g.add(m);}
+    // LED strip along the inner edge, both faces
+    const led=new THREE.MeshBasicMaterial({color:0x3a7bd5});
+    for(const zf of [t/2+0.004,-t/2-0.004])for(const [px,py,w,h] of [[0,GH/2,GW,0.05],[0,-GH/2,GW,0.05],[-GW/2,0,0.05,GH],[GW/2,0,0.05,GH]]){const l=new THREE.Mesh(new THREE.PlaneGeometry(w,h),led);l.position.set(px,py,zf);if(zf<0)l.rotation.y=Math.PI;g.add(l);}
+    const num=new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.5),new THREE.MeshBasicMaterial({map:numTex(gates.length+1),transparent:true}));num.position.set(0,GH/2+0.4,t/2+0.01);g.add(num);const num2=num.clone();num2.position.z=-t/2-0.01;num2.rotation.y=Math.PI;g.add(num2);
     const leg=new THREE.Mesh(new THREE.BoxGeometry(t,y-GH/2-t,t),M.steel);leg.position.set(0,-(y-GH/2-t)/2-GH/2-t,0);g.add(leg);
     g.position.set(x,y,z);g.rotation.y=ry;g.visible=false;scene.add(g);
     // world-space solids for the frame bars
     const c=Math.cos(ry),s=Math.sin(ry);
     const bar=(lx,ly,w,h)=>{const wx=x+lx*c,wz=z-lx*s;const sx=Math.abs(w*c)+Math.abs(t*s),sz=Math.abs(w*s)+Math.abs(t*c);return {min:new THREE.Vector3(wx-sx/2,y+ly-h/2,wz-sz/2),max:new THREE.Vector3(wx+sx/2,y+ly+h/2,wz+sz/2)};};
     const solids=parts.map(p=>bar(p[0],p[1],p[2],p[3]));
-    gates.push({g,mat,pos:new THREE.Vector3(x,y,z),ry,n:new THREE.Vector3(s,0,c),solids});
+    gates.push({g,mat,led,pos:new THREE.Vector3(x,y,z),ry,n:new THREE.Vector3(s,0,c),solids});
   }
 }
 
@@ -365,22 +432,59 @@ function buildGates(){
 const drone=new THREE.Group();
 const props=[];
 function buildDrone(){
-  const carbon=new THREE.MeshStandardMaterial({color:0x1b1d20,roughness:.6,metalness:.3});
-  const arm=new THREE.BoxGeometry(0.03,0.012,0.26);
+  const carbon=new THREE.MeshStandardMaterial({color:0x1b1d20,roughness:.45,metalness:.4});
+  const arm=new THREE.BoxGeometry(0.032,0.01,0.27);
   for(const a of [Math.PI/4,-Math.PI/4]){const m=new THREE.Mesh(arm,carbon);m.rotation.y=a;m.castShadow=true;drone.add(m);}
-  const body=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.035,0.11),new THREE.MeshStandardMaterial({color:0xf2c230,roughness:.5}));body.position.y=0.022;body.castShadow=true;drone.add(body);
-  const cam=new THREE.Mesh(new THREE.BoxGeometry(0.025,0.025,0.02),carbon);cam.position.set(0,0.03,-0.06);drone.add(cam);
-  const ledF=new THREE.Mesh(new THREE.SphereGeometry(0.008,8,6),new THREE.MeshBasicMaterial({color:0xffffff}));ledF.position.set(0,0.03,-0.072);drone.add(ledF);
-  const motorM=new THREE.MeshStandardMaterial({color:0x8a9096,metalness:.8,roughness:.3});
-  const propM=[new THREE.MeshBasicMaterial({color:0xff3a2a,transparent:true,opacity:.55,side:THREE.DoubleSide}),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:.55,side:THREE.DoubleSide})];
-  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz],i)=>{
-    const x=sx*0.092,z=sz*0.092;
-    const mo=new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.014,0.02,12),motorM);mo.position.set(x,0.012,z);drone.add(mo);
-    const p=new THREE.Mesh(new THREE.CircleGeometry(0.064,20),propM[sz<0?0:1]);p.rotation.x=-Math.PI/2;p.position.set(x,0.026,z);drone.add(p);props.push(p);
+  const plate=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.006,0.12),carbon);plate.position.y=0.04;drone.add(plate);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.03,0.09),new THREE.MeshStandardMaterial({color:0xf2c230,roughness:.4,metalness:.2}));body.position.y=0.022;body.castShadow=true;drone.add(body);
+  const bat=new THREE.Mesh(new THREE.BoxGeometry(0.036,0.026,0.075),new THREE.MeshStandardMaterial({color:0x2f7fe0,roughness:.5}));bat.position.y=0.058;bat.castShadow=true;drone.add(bat);
+  const strap=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.028,0.01),new THREE.MeshStandardMaterial({color:0x111111}));strap.position.y=0.058;drone.add(strap);
+  const cam=new THREE.Mesh(new THREE.BoxGeometry(0.024,0.024,0.02),carbon);cam.position.set(0,0.026,-0.058);cam.rotation.x=0.35;drone.add(cam);
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.006,12),new THREE.MeshStandardMaterial({color:0x0a1a2a,metalness:.9,roughness:.1}));lens.rotation.x=Math.PI/2+0.35;lens.position.set(0,0.03,-0.07);drone.add(lens);
+  const ant=new THREE.Mesh(new THREE.CylinderGeometry(0.002,0.002,0.07,6),new THREE.MeshStandardMaterial({color:0x111111}));ant.position.set(0,0.06,0.06);ant.rotation.x=-0.6;drone.add(ant);
+  const tip=new THREE.Mesh(new THREE.SphereGeometry(0.006,8,6),new THREE.MeshStandardMaterial({color:0xe0262b}));tip.position.set(0,0.088,0.08);drone.add(tip);
+  const motorM=new THREE.MeshStandardMaterial({color:0x8a9096,metalness:.85,roughness:.25});
+  const bladeM=[new THREE.MeshStandardMaterial({color:0xff3a2a,roughness:.4}),new THREE.MeshStandardMaterial({color:0x202224,roughness:.4})];
+  const discM=[new THREE.MeshBasicMaterial({color:0xff6a5a,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}),new THREE.MeshBasicMaterial({color:0x9aa0a6,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false})];
+  const blade=new THREE.BoxGeometry(0.125,0.003,0.016);
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>{
+    const x=sx*0.095,z=sz*0.095,k=sz<0?0:1;
+    const mo=new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.016,0.022,14),motorM);mo.position.set(x,0.012,z);mo.castShadow=true;drone.add(mo);
+    const p=new THREE.Group();p.position.set(x,0.027,z);
+    const b1=new THREE.Mesh(blade,bladeM[k]);b1.castShadow=true;const b2=b1.clone();b2.rotation.y=Math.PI/2;p.add(b1,b2);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(0.064,24),discM[k]);disc.rotation.x=-Math.PI/2;disc.position.set(x,0.028,z);drone.add(disc);
+    drone.add(p);props.push({p,disc,blades:[b1,b2]});
   });
+  // navigation lights: green at the front, red at the back
+  for(const [z,c] of [[-0.075,0x30ff6a],[0.06,0xff3020]]){const l=new THREE.Mesh(new THREE.SphereGeometry(0.007,8,6),new THREE.MeshBasicMaterial({color:c}));l.position.set(0,0.03,z);drone.add(l);}
   drone.scale.setScalar(1.6); // reads better on screen; physics uses its own radius
   drone.add(camFPV);
   scene.add(drone);
+  // soft blob shadow: always on, helps judge height when flying by eye
+  blob=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:texBlob,transparent:true,depthWrite:false}));blob.rotation.x=-Math.PI/2;blob.renderOrder=1;scene.add(blob);
+  // target beacon: glowing orb with a light beam down to the floor
+  const orb=new THREE.Mesh(new THREE.SphereGeometry(0.28,20,14),new THREE.MeshBasicMaterial({color:0xffd24a}));
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:0xffc030,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));glow.scale.set(2.2,2.2,1);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.75,0.03,8,40),new THREE.MeshBasicMaterial({color:0xffd24a,transparent:true,opacity:.8}));
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1,8,1,true),new THREE.MeshBasicMaterial({color:0xffc030,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}));
+  beacon.add(orb,glow,ring,beam);beacon.userData={ring,beam,glow};beacon.visible=false;scene.add(beacon);
+}
+let blob=null;
+const beacon=new THREE.Group();
+function updFx(dt,now){
+  // props: blades while slow, blurred disc when spinning
+  const sp=D.armed?20+D.thrOut*90:0;D.propSpin+=sp*dt;
+  const blur=clamp((sp-15)/40,0,1);
+  props.forEach((o,i)=>{o.p.rotation.y=D.propSpin*(i===0||i===3?1:-1);o.blades.forEach(b=>b.visible=blur<0.9);o.disc.material.opacity=blur*0.35;});
+  // blob shadow on the floor or on a crate top under the drone
+  let gy=0;for(const b of boxes)if(D.pos.x>b.min.x&&D.pos.x<b.max.x&&D.pos.z>b.min.z&&D.pos.z<b.max.z&&b.max.y<=D.pos.y+0.05)gy=Math.max(gy,b.max.y);
+  const h=D.pos.y-gy;blob.position.set(D.pos.x,gy+0.012,D.pos.z);blob.scale.setScalar(0.5+h*0.12);blob.material.opacity=clamp(1-h/8,0.15,1);
+  blob.visible=S.cam!=='fpv'||h>0.3;
+  // beacon pulse
+  if(beacon.visible){const u=beacon.userData,k=1+Math.sin(now/220)*0.12;u.ring.scale.setScalar(k);u.ring.rotation.y+=dt*1.5;u.ring.rotation.x=Math.PI/2;
+    u.beam.scale.y=Math.max(beacon.position.y,0.01);u.beam.position.y=-beacon.position.y/2;}
+  // dust drifts slowly
+  if(dust&&dust.visible){dust.rotation.y+=dt*0.004;dust.position.y=Math.sin(now/4000)*0.2;}
 }
 
 /* ---------- Input ---------- */
@@ -485,6 +589,7 @@ function resetDrone(full){
 function toggleArm(){
   if(D.crashed)return;
   if(D.armed){D.armed=false;updArm();toast('Моторы сняты с взвода');return;}
+  if(task&&task.done)return;
   const low=S.mode==='nov'?inp.ly<=0.15:inp.thr<0.08;
   if(!low){toast('Сначала газ вниз!','bad');return;}
   if(charge()<=0.01){toast('АКБ пустой. Смени АКБ','bad');return;}
@@ -581,7 +686,7 @@ function collide(){
   if(p.z>HZ-R_DRONE){p.z=HZ-R_DRONE;hit('удар о стену');}
   if(p.y>HY-0.5-R_DRONE){p.y=HY-0.5-R_DRONE;hit('удар о потолок');}
   // solids
-  const list=task&&task.gates?boxes.concat(task.solids):boxes;
+  const list=task&&task.gatesOn?boxes.concat(task.solids):boxes;
   for(const b of list){
     if(p.x>b.min.x-R_DRONE&&p.x<b.max.x+R_DRONE&&p.y>b.min.y-R_DRONE&&p.y<b.max.y+R_DRONE&&p.z>b.min.z-R_DRONE&&p.z<b.max.z+R_DRONE){
       if(sp>2.5)return crash('столкновение с препятствием');
@@ -666,87 +771,177 @@ function updOSD(dt){
   if(toastT>0){toastT-=dt;if(toastT<=0)$('toast').textContent='';}
 }
 
-/* ---------- Tasks (stage 1: hangar) ---------- */
-const TASKS={
-  free:{tag:'СВОБОДНО',name:'Свободный полёт',desc:'Полетай по ангару. Попробуй разные режимы и камеры.',best:()=>'' },
-  hover:{tag:'КУРС · МОДУЛЬ 1',name:'Висение на месте',desc:'Взлети и удержи дрон в синем кольце 30 секунд подряд.',best:()=>S.best.hover?`лучшее: ${S.best.hover.toFixed(1)} с`:'' },
-  land:{tag:'КУРС · МОДУЛЬ 1',name:'Посадка на метку',desc:'Перелети с площадки H на площадку B и сядь как можно ближе к центру.',best:()=>S.best.land!=null?`лучшее: ${S.best.land} см от центра`:'' },
-  gates:{tag:'КУРС · МОДУЛЬ 4',name:'Восьмёрка и ворота',desc:'Пролети 8 ворот по порядку вокруг двух столбов и вернись. Время круга.',best:()=>S.best.gates?`лучшее: ${S.best.gates.toFixed(2)} с`:'' },
+/* ---------- Lessons: ordered steps, each with a hint, a target to fly to and a control to highlight ---------- */
+const V3=(x,y,z)=>new THREE.Vector3(x,y,z);
+function ctl(){return inp.src==='pad'?'pad':(inp.src==='touch'||matchMedia('(pointer:coarse)').matches)?'touch':'kbd';}
+const WORDS={
+  arm:{touch:'кнопку ВЗВЕСТИ внизу',kbd:'Пробел',pad:'кнопку или тумблер на пульте'},
+  up:{touch:'левый стик вверх',kbd:'клавишу W',pad:'газ вверх'},
+  down:{touch:'левый стик вниз',kbd:'клавишу S',pad:'газ вниз'},
+  yaw:{touch:'левый стик вбок',kbd:'A или D',pad:'рыскание (левый стик вбок)'},
+  fwd:{touch:'правый стик вверх',kbd:'стрелку ↑',pad:'правый стик вверх'},
+  side:{touch:'правый стик вбок',kbd:'стрелки ← →',pad:'правый стик вбок'},
 };
-let task=null, playing=false, curTask='free';
+const say=k=>WORDS[k][ctl()];
+const upHint=()=>S.mode==='nov'?say('up'):'плавно добавь газ ('+say('up')+'), висение около 40%';
+const downHint=()=>S.mode==='nov'?say('down'):'плавно убавь газ ('+say('down')+')';
+const flat=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+// step builders
+const sArm=()=>({text:()=>`Взведи моторы: нажми ${say('arm')}`+(S.mode==='nov'?'':'. Газ должен быть внизу'),ui:'bArm',check:()=>D.armed});
+const sUp=h=>({text:()=>`Поднимись на ${h} м: ${upHint()}. Высота слева, «ВЫС»`,ui:'stL',check:()=>D.pos.y>=h});
+const sGo=(p,name,r)=>({text:()=>`Лети к ${name}: ${say('fwd')}, поворот ${say('yaw')}`,ui:'stR',target:()=>p,check:()=>D.pos.distanceTo(p)<(r||1.3)});
+const sLand=(p,name)=>{let still=0;return {text:()=>`Сядь на ${name}: ${downHint()}`,ui:'stL',target:()=>p,
+  check:dt=>{still=D.landed&&!D.crashed&&D.vel.length()<0.3&&flat(D.pos,p)<1.4?still+dt:0;return still>0.8;}};};
+const sDisarm=()=>({text:()=>`Сними взвод: ${say('arm')}. Так делают после каждой посадки`,ui:'bArm',check:()=>!D.armed});
+const crashStars=n=>n===0?3:n<3?2:1;
+const H_UP=V3(PAD_A.x,1.2,PAD_A.z);
+
+const LESSONS={
+  tut:{tag:'УРОК 1 · МОДУЛЬ 1',name:'Первый полёт',desc:'Взлёт, разворот, полёт к маяку и посадка. Начни с этого урока.',
+    learn:['взвести моторы','подняться на 2 метра','развернуться кругом','долететь до маяка и вернуться','сесть и снять взвод'],
+    steps:T=>{T.turn=0;T.lastYaw=null;const bc=V3(0,2,3);return [sArm(),sUp(2),
+      {text:()=>`Развернись кругом: ${say('yaw')}. Осталось ${Math.max(0,360-T.turn*57.3).toFixed(0)}°`,ui:'stL',
+       tick:()=>{const y=new THREE.Euler().setFromQuaternion(D.q,'YXZ').y;if(T.lastYaw!==null){let d=y-T.lastYaw;d=Math.atan2(Math.sin(d),Math.cos(d));T.turn+=Math.abs(d);}T.lastYaw=y;},
+       check:()=>T.turn>=Math.PI*2},
+      sGo(bc,'жёлтому маяку'),sGo(H_UP,'площадке H',1.5),sLand(PAD_A,'площадку H'),sDisarm()];},
+    result:T=>({val:T.t,stars:crashStars(T.crashes),label:'Урок пройден за '+fmtT(T.t)}),
+    better:(a,b)=>a<b, fmtBest:v=>'лучшее время: '+fmtT(v)},
+  hover:{tag:'УРОК 2 · МОДУЛЬ 1',name:'Висение на месте',desc:'Удержи дрон в синем столбе 30 секунд подряд.',
+    learn:['взлететь на 1 метр','залететь в синий столб перед стартом','висеть в нём 30 секунд подряд: вылетел — счёт сначала'],
+    setup:()=>{hoverZone.visible=true;},
+    steps:T=>{T.inside=0;T.bestIn=0;const c=V3(hoverZone.position.x,1.75,hoverZone.position.z);
+      const inZone=()=>D.armed&&!D.crashed&&flat(D.pos,c)<1.2&&D.pos.y>1&&D.pos.y<2.5;
+      return [sArm(),sUp(1),
+      {text:()=>`Залети в синий столб и замри`,ui:'stR',target:()=>c,check:inZone},
+      {text:()=>`Держи дрон в столбе: <b>${T.inside.toFixed(1)}</b> из 30 с. Лучшее ${T.bestIn.toFixed(1)} с`,ui:'stR',target:()=>c,
+       tick:dt=>{T.inside=inZone()?T.inside+dt:0;T.bestIn=Math.max(T.bestIn,T.inside);hoverZone.children[2].material.opacity=T.inside>0?0.2:0.08;},check:()=>T.inside>=30}];},
+    result:T=>({val:30,stars:crashStars(T.crashes),label:'30 секунд висения'}),
+    better:()=>false, fmtBest:()=>'пройдено'},
+  circle:{tag:'УРОК 3 · МОДУЛЬ 2',name:'Круг вокруг столба',desc:'Облети оранжевый столб по четырём маякам и вернись на H.',
+    learn:['подняться на 2 метра','пролететь 4 маяка вокруг столба по кругу','вернуться и сесть на H'],
+    steps:T=>{const c=V3(-9,2.5,-4),R=5;const pts=[V3(c.x,2.5,c.z+R),V3(c.x-R,2.5,c.z),V3(c.x,2.5,c.z-R),V3(c.x+R,2.5,c.z),V3(c.x,2.5,c.z+R)];
+      const list=[sArm(),sUp(2)];
+      pts.forEach((p,i)=>{const s=sGo(p,i===4?'первому маяку, круг замкнётся':`маяку ${i+1} из 4`,1.6);const ck=s.check;s.check=()=>{const ok=ck();if(ok&&i===0)T.t0=T.t;if(ok&&i===4)T.lap=T.t-T.t0;return ok;};list.push(s);});
+      list.push(sGo(H_UP,'площадке H',1.5),sLand(PAD_A,'площадку H'),sDisarm());return list;},
+    result:T=>({val:T.lap,stars:Math.max(1,(T.lap<25?3:T.lap<40?2:1)-(T.crashes?1:0)),label:'Круг за '+T.lap.toFixed(1)+' с'}),
+    better:(a,b)=>a<b, fmtBest:v=>'лучший круг: '+v.toFixed(1)+' с'},
+  land:{tag:'УРОК 4 · МОДУЛЬ 1',name:'Посадка на метку',desc:'Перелети на площадку B и сядь как можно ближе к центру.',
+    learn:['взлететь','перелететь к синей площадке B','сесть как можно ближе к центру'],
+    steps:T=>{const over=V3(PAD_B.x,1.5,PAD_B.z);let still=0;return [sArm(),sUp(1),sGo(over,'синей площадке B',1.6),
+      {text:()=>`Сядь в центр B: ${downHint()}. До центра ${flat(D.pos,PAD_B).toFixed(2)} м`,ui:'stL',target:()=>PAD_B,
+       check:dt=>{still=D.landed&&!D.crashed&&D.vel.length()<0.3&&flat(D.pos,PAD_B)<3?still+dt:0;if(still>1){T.cm=Math.round(flat(D.pos,PAD_B)*100);return true;}return false;}},sDisarm()];},
+    result:T=>({val:T.cm,stars:T.cm<=30?3:T.cm<=70?2:T.cm<=150?1:0,label:T.cm+' см от центра'}),
+    better:(a,b)=>a<b, fmtBest:v=>'лучшее: '+v+' см от центра'},
+  gates:{tag:'УРОК 5 · МОДУЛЬ 4',name:'Восьмёрка и ворота',desc:'Пролети 8 ворот по порядку вокруг двух столбов. Время круга.',
+    learn:['подняться на 1,5 метра','лететь в ЗЕЛЁНЫЕ ворота, жёлтые — следующие','пролететь все 8 ворот восьмёркой'],
+    setup:T=>{for(const g of gates)g.g.visible=true;T.solids=gates.flatMap(g=>g.solids);T.gatesOn=true;},
+    steps:T=>{T.next=0;T.t0=0;T.prev=D.pos.clone();return [sArm(),sUp(1.5),
+      {text:()=>T.next===0?'Лети в зелёные ворота':`Ворота <b>${T.next}</b> из ${gates.length} · ${(T.t-T.t0).toFixed(1)} с`,ui:'stR',target:()=>gates[Math.min(T.next,gates.length-1)].pos,
+       tick:()=>{const g=gates[T.next];paintGates(T.next);if(g){const a=_v.copy(T.prev).sub(g.pos).dot(g.n),b=_v2.copy(D.pos).sub(g.pos).dot(g.n);
+         if(a*b<0&&!D.crashed){const lx=(D.pos.x-g.pos.x)*Math.cos(g.ry)-(D.pos.z-g.pos.z)*Math.sin(g.ry),ly=D.pos.y-g.pos.y;
+           if(Math.abs(lx)<GW/2&&Math.abs(ly)<GH/2){if(T.next===0)T.t0=T.t;T.next++;beep(880,0.06);if(T.next>=gates.length)T.lap=T.t-T.t0;}}}T.prev.copy(D.pos);},
+       check:()=>T.next>=gates.length}];},
+    result:T=>({val:T.lap,stars:T.crashes>0?1:T.lap<38?3:T.lap<55?2:1,label:'Круг за '+T.lap.toFixed(2)+' с'}),
+    better:(a,b)=>a<b, fmtBest:v=>'лучший круг: '+v.toFixed(2)+' с'},
+  bat:{tag:'УРОК 6 · МОДУЛЬ 3',name:'Успей домой',desc:'АКБ уже почти сел. Облети 4 маяка и сядь на H, пока банка не упала до 3,5 В.',
+    learn:['следить за «В/банка» справа вверху','облететь 4 маяка по углам ангара','сесть на H и снять взвод до 3,5 В на банку'],
+    setup:()=>{D.used=BAT.cap*0.66;},
+    steps:T=>{const pts=[V3(-15,3,-9),V3(15,3,-12),V3(20,3,4),V3(-18,3,5)];
+      const list=[sArm(),sUp(2)];pts.forEach((p,i)=>list.push(sGo(p,`маяку ${i+1} из 4`,1.8)));
+      list.push(sGo(H_UP,'площадке H',1.5),sLand(PAD_A,'площадку H'),Object.assign(sDisarm(),{check:()=>{if(!D.armed){T.vEnd=ocv(charge());return true;}return false;}}));return list;},
+    tick:T=>{if(!T.failed&&ocv(charge())<3.5&&T.si>=1&&T.si<T.steps.length){T.failed=true;}},
+    result:T=>T.failed?{val:0,stars:0,label:'АКБ сел до посадки',fail:'Банка упала ниже 3,5 В в воздухе. По правилам курса в этот момент уже надо сидеть. Лети короче и следи за вольтами.'}
+      :{val:+T.vEnd.toFixed(2),stars:T.vEnd>=3.65?3:T.vEnd>=3.55?2:1,label:'Сел с запасом: '+T.vEnd.toFixed(2)+' В на банку'},
+    better:(a,b)=>a>b, fmtBest:v=>'лучший запас: '+v+' В/банка'},
+  free:{tag:'СВОБОДНО',name:'Свободный полёт',desc:'Полетай по ангару как хочешь. Попробуй режимы Angle и Acro.',learn:['летать без задания','менять камеру и режим (клавиша M или в настройках)'],steps:()=>[],free:true},
+};
+const ORDER=['tut','hover','circle','land','gates','bat'];
+function unlocked(id){const i=ORDER.indexOf(id);return i<=0||S.unlockAll||(S.stars[ORDER[i-1]]||0)>0;}
+function nextLesson(id){const i=ORDER.indexOf(id);return i>=0&&i<ORDER.length-1?ORDER[i+1]:null;}
+function paintGates(n){gates.forEach((x,i)=>{const c=i===n?0x30ff6a:i===n+1?0xffc030:i<n?0x1d3a52:0x3a7bd5;x.led.color.setHex(c);x.mat.emissive.setHex(i===n?0x0b4a1c:0);});}
+
+let task=null, playing=false, curTask='tut';
 function startTask(id){
-  curTask=id;
+  const L=LESSONS[id];curTask=id;
   for(const g of gates)g.g.visible=false;
-  hoverZone.visible=false;
-  task={id,t:0,crashes:0,done:false};
-  task.onCrash=()=>{task.crashes++;};
-  if(id==='hover'){
-    hoverZone.visible=true;Object.assign(task,{inside:0,best:0});
-    task.tick=dt=>{
-      const dx=D.pos.x-hoverZone.position.x,dz=D.pos.z-hoverZone.position.z;
-      const ok=D.armed&&!D.crashed&&Math.hypot(dx,dz)<1.2&&D.pos.y>1&&D.pos.y<2.5;
-      task.inside=ok?task.inside+dt:0;task.best=Math.max(task.best,task.inside);
-      hoverZone.children[2].material.opacity=ok?0.18:0.08;
-      setTaskText(`Висение: <b>${task.inside.toFixed(1)}</b> / 30 с · лучшее ${task.best.toFixed(1)} с`);
-      if(task.inside>=30)finish({val:30,stars:task.crashes===0?3:task.crashes<3?2:1});
-    };
-  }else if(id==='land'){
-    Object.assign(task,{left:false,still:0});
-    task.tick=dt=>{
-      if(!D.landed||D.pos.distanceTo(PAD_A)>1.5)task.left=task.left||D.pos.y>0.5;
-      const d=Math.hypot(D.pos.x-PAD_B.x,D.pos.z-PAD_B.z);
-      if(task.left&&D.landed&&!D.crashed&&D.vel.length()<0.3&&d<3){task.still+=dt;}else task.still=0;
-      setTaskText(task.left?`До центра B: <b>${(d).toFixed(1)}</b> м${D.landed&&d<3?' · держи…':''}`:'Взлети с площадки H');
-      if(task.still>1){const cm=Math.round(d*100);finish({val:cm,stars:cm<=30?3:cm<=70?2:cm<=150?1:0});}
-    };
-  }else if(id==='gates'){
-    for(const g of gates)g.g.visible=true;
-    Object.assign(task,{gates:true,next:0,t0:0,solids:gates.flatMap(g=>g.solids),prev:new THREE.Vector3().copy(D.pos)});
-    task.tick=dt=>{
-      const g=gates[task.next];
-      gates.forEach((x,i)=>{x.mat.emissive.setHex(i===task.next?0x23c34a:i===(task.next+1)%gates.length?0x6a5410:0);x.mat.color.setHex(i===task.next?0x2fbf4a:0x555b60);});
-      // crossing test: sign change of distance to gate plane, inside the opening
-      if(g){
-        const a=_v.copy(task.prev).sub(g.pos).dot(g.n),b=_v2.copy(D.pos).sub(g.pos).dot(g.n);
-        if(a*b<0&&!D.crashed){
-          const lx=(D.pos.x-g.pos.x)*Math.cos(g.ry)-(D.pos.z-g.pos.z)*Math.sin(g.ry),ly=D.pos.y-g.pos.y;
-          if(Math.abs(lx)<GW/2&&Math.abs(ly)<GH/2){
-            if(task.next===0)task.t0=task.t;
-            task.next++;
-            beep(880,0.06);
-            if(task.next>=gates.length){const lap=task.t-task.t0;finish({val:lap,stars:task.crashes>0?1:lap<38?3:lap<55?2:1});}
-          }
-        }
-      }
-      task.prev.copy(D.pos);
-      setTaskText(task.next===0?'Пролети первые ворота (зелёные)':`Ворота <b>${task.next}</b> / ${gates.length} · ${(task.t-task.t0).toFixed(1)} с`);
-    };
-  }else{task.tick=()=>setTaskText('');}
+  hoverZone.visible=false;beacon.visible=false;
   resetDrone();
+  task={id,L,t:0,crashes:0,done:false,si:0,failed:false};
+  task.onCrash=()=>{task.crashes++;task.restart=true;};
+  L.setup&&L.setup(task);
+  task.steps=L.steps(task);
+  task.tick=dt=>{
+    if(task.restart&&!D.crashed){task.restart=false;L.setup&&L.setup(task);task.steps=L.steps(task);task.si=0;toast('Начнём этот урок с первого шага','bad');}
+    L.tick&&L.tick(task);
+    if(task.failed&&!task.done)return finish(L.result(task));
+    const st=task.steps[task.si];
+    if(!st){setTaskText(L.free?'':'');guide(null);highlight(null);return;}
+    st.tick&&st.tick(dt);
+    if(!D.crashed&&st.check(dt)){
+      task.si++;beep(990,0.07);
+      if(task.si>=task.steps.length)return finish(L.result(task));
+      return;
+    }
+    setTaskText(`<span class="sn">ШАГ ${task.si+1} / ${task.steps.length}</span>${st.text()}`);
+    guide(st.target?st.target():null);highlight(st.ui||null);
+  };
   showScreen(null);
   $('osd').hidden=false;$('touch').hidden=false;
   playing=true;
-  toast(TASKS[id].name+': '+(S.mode==='nov'?'нажми ВЗВЕСТИ и стик газа вверх':'газ вниз, ВЗВЕСТИ, потом плавно газ'));
 }
 function setTaskText(h){const e=$('task');e.hidden=!h;if(h)e.innerHTML=h;}
+// highlight the control the current step needs
+let hlId=null;
+function highlight(id){if(id===hlId)return;if(hlId)$(hlId).classList.remove('hl');hlId=id;if(id)$(id).classList.add('hl');}
+// target marker: a beacon in the world plus an OSD pointer that also works off screen
+let guideP=null;
+function guide(p){guideP=p;beacon.visible=!!p&&!(task&&task.gatesOn);if(p)beacon.position.copy(p);}
+function updGuide(cam){
+  const el=$('guide');
+  if(!guideP||!playing){el.hidden=true;return;}
+  el.hidden=false;
+  const v=_v.copy(guideP).project(cam);
+  const behind=_v2.copy(guideP).applyMatrix4(cam.matrixWorldInverse).z>0;
+  let x=v.x,y=v.y;if(behind){x=-x;y=-y;}
+  const on=!behind&&Math.abs(x)<0.9&&Math.abs(y)<0.85;
+  const d=D.pos.distanceTo(guideP);
+  if(!on){const m=Math.max(Math.abs(x),Math.abs(y))||1;x=x/m*0.88;y=y/m*0.8;}
+  el.style.left=((x+1)/2*100)+'%';el.style.top=((1-y)/2*100)+'%';
+  el.querySelector('b').style.transform=on?'':`rotate(${Math.atan2(-y,x)}rad)`;
+  el.querySelector('b').textContent=on?'◇':'➤';
+  el.querySelector('span').textContent=d.toFixed(0)+' м';
+}
 function finish(r){
   if(task.done)return;task.done=true;
-  const id=task.id;let newBest=false;
-  if(id==='hover'){newBest=!(S.best.hover>=r.val);if(newBest)S.best.hover=r.val;}
-  if(id==='land'){newBest=S.best.land==null||r.val<S.best.land;if(newBest)S.best.land=r.val;}
-  if(id==='gates'){newBest=!S.best.gates||r.val<S.best.gates;if(newBest)S.best.gates=+r.val.toFixed(2);}
-  save();
+  const id=task.id,L=task.L;let newBest=false;
+  if(r.stars>0){
+    if(S.best[id]==null||L.better(r.val,S.best[id])){newBest=S.best[id]!=null;S.best[id]=r.val;}
+    S.stars[id]=Math.max(S.stars[id]||0,r.stars);
+  }
+  save();guide(null);highlight(null);
   setTimeout(()=>{
     playing=false;D.armed=false;updArm();
-    $('rTitle').textContent=r.stars>0?'Задание выполнено!':'Почти получилось';
+    $('rTitle').textContent=r.stars>0?'Урок пройден!':'Не получилось';
     $('rStars').innerHTML='★'.repeat(r.stars)+'<i>'+'★'.repeat(3-r.stars)+'</i>';
-    $('rVal').textContent=id==='hover'?'30 секунд висения':id==='land'?r.val+' см от центра':r.val.toFixed(2)+' с';
-    $('rText').textContent=(newBest?'Новый личный рекорд. ':'')+(task.crashes?`Аварий: ${task.crashes}. `:'Без аварий. ')+'Режим: '+MODEN[S.mode]+'.';
-    showScreen('sRes');beep(660,0.1);setTimeout(()=>beep(990,0.15),120);
-  },600);
+    $('rVal').textContent=r.label;
+    $('rText').textContent=(r.fail?r.fail+' ':'')+(newBest?'Новый личный рекорд. ':'')+(task.crashes?`Аварий: ${task.crashes}. `:'Без аварий. ')+'Режим: '+MODEN[S.mode]+'.';
+    const nx=nextLesson(id);$('rNext').hidden=!(nx&&unlocked(nx)&&r.stars>0);
+    showScreen('sRes');if(r.stars>0){beep(660,0.1);setTimeout(()=>beep(990,0.15),120);}else beep(220,0.3);
+  },500);
 }
-function exitToMenu(){playing=false;D.armed=false;updArm();$('osd').hidden=true;$('touch').hidden=true;renderMenu();showScreen('sMenu');}
+function exitToMenu(){playing=false;D.armed=false;updArm();guide(null);highlight(null);$('osd').hidden=true;$('touch').hidden=true;renderMenu();showScreen('sMenu');}
 function pause(){if(!playing)return;playing=false;showScreen('sPause');}
+function brief(id){
+  const L=LESSONS[id];curTask=id;
+  $('bTag').textContent=L.tag;$('bName').textContent=L.name;$('bDesc').textContent=L.desc;
+  $('bLearn').innerHTML=L.learn.map(s=>`<li>${s}</li>`).join('');
+  const c=ctl();
+  $('bCtl').innerHTML=c==='touch'?'Левый стик: вверх-вниз высота, вбок поворот. Правый стик: куда наклонить дрон, туда он и летит. Внизу кнопка ВЗВЕСТИ.'
+    :c==='pad'?'Пульт: левый стик газ и поворот, правый наклоны. Любая кнопка взводит моторы.'
+    :'Клавиатура: W/S высота, A/D поворот, стрелки полёт, Пробел взвести, C камера.';
+  $('bMode').textContent=MODEN[S.mode];
+  showScreen('sBrief');
+}
 
 /* ---------- Sound: motor hum and beeps (WebAudio, no files) ---------- */
 let AC=null,motorOsc=null,motorGain=null;
@@ -759,15 +954,18 @@ function beep(f,d){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain()
 function updAudio(){if(!motorGain)return;const on=playing&&D.armed;motorGain.gain.setTargetAtTime(on?0.025+D.thrOut*0.05:0,AC.currentTime,0.05);motorOsc.frequency.setTargetAtTime(90+D.thrOut*420,AC.currentTime,0.05);}
 
 /* ---------- Screens ---------- */
-const SCREENS=['sMenu','sSet','sHelp','sPad','sPause','sRes'];
+const SCREENS=['sMenu','sBrief','sSet','sHelp','sPad','sPause','sRes'];
 let backTo='sMenu';
 function showScreen(id){for(const s of SCREENS)$(s).hidden=s!==id;}
 function renderMenu(){
   const list=$('taskList');list.innerHTML='';
-  for(const [id,t] of Object.entries(TASKS)){
-    const b=document.createElement('button');b.className='task';
-    b.innerHTML=`<span class="tag">${t.tag}</span><b>${t.name}</b><span>${t.desc}</span><span class="best">${t.best()}</span>`;
-    b.onclick=()=>{audioInit();startTask(id);};list.appendChild(b);
+  for(const id of ORDER.concat('free')){
+    const t=LESSONS[id],open=id==='free'||unlocked(id),st=S.stars[id]||0;
+    const b=document.createElement('button');b.className='task'+(open?'':' locked');
+    const best=S.best[id]!=null&&t.fmtBest?t.fmtBest(S.best[id]):'';
+    b.innerHTML=`<span class="tag">${t.tag}</span><b>${open?'':'🔒 '}${t.name}</b><span>${open?t.desc:'Откроется после урока «'+LESSONS[ORDER[ORDER.indexOf(id)-1]].name+'»'}</span>`+
+      (id==='free'?'':`<span class="st">${'★'.repeat(st)}<i>${'★'.repeat(3-st)}</i></span>`)+`<span class="best">${best}</span>`;
+    b.onclick=()=>{if(!open){toast('Сначала пройди предыдущий урок','bad');return;}audioInit();brief(id);};list.appendChild(b);
   }
   padInfo();
 }
@@ -780,7 +978,7 @@ function renderSettings(){
 }
 document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=seg.dataset.k;
   if(k==='mode'&&D.armed){toast('Режим меняют без взвода','bad');return;}
-  S[k]=b.dataset.v;save();if(k==='q')applyQuality();if(k==='mode')resetDrone(false);if(k==='cam')$('ocam').textContent=CAMN[S.cam];renderSettings();}));
+  S[k]=b.dataset.v;save();if(k==='q')applyQuality();if(k==='unlockAll')renderMenu();if(k==='mode')resetDrone(false);if(k==='cam')$('ocam').textContent=CAMN[S.cam];renderSettings();}));
 document.querySelectorAll('input[type=range]').forEach(r=>r.addEventListener('input',()=>{S[r.dataset.k]=+r.value;save();renderSettings();}));
 $('mSet').onclick=()=>{backTo='sMenu';renderSettings();showScreen('sSet');};
 $('pSet').onclick=()=>{backTo='sPause';renderSettings();showScreen('sSet');};
@@ -790,7 +988,9 @@ $('mPad').onclick=()=>{padInfo();showScreen('sPad');};$('padBack').onclick=()=>{
 $('pResume').onclick=()=>{showScreen(null);playing=true;};
 $('pRestart').onclick=()=>startTask(curTask);
 $('pMenu').onclick=exitToMenu;
-$('rAgain').onclick=()=>startTask(curTask);$('rMenu').onclick=exitToMenu;
+$('rAgain').onclick=()=>startTask(curTask);$('rNext').onclick=()=>brief(nextLesson(curTask));
+$('bGo').onclick=()=>{audioInit();startTask(curTask);};$('bBack').onclick=()=>{renderMenu();showScreen('sMenu');};
+$('bModeBtn').onclick=()=>{cycleMode();$('bMode').textContent=MODEN[S.mode];};$('rMenu').onclick=exitToMenu;
 $('bArm').addEventListener('pointerdown',e=>{e.preventDefault();toggleArm();});
 $('bCam').addEventListener('pointerdown',e=>{e.preventDefault();cycleCam();});
 $('bPause').addEventListener('pointerdown',e=>{e.preventDefault();pause();});
@@ -834,13 +1034,13 @@ function frame(now){
     task.t+=dt;task.tick&&task.tick(dt);
   }
   drone.position.copy(D.pos);drone.quaternion.copy(D.q);
-  D.propSpin+=(D.armed?20+D.thrOut*90:0)*dt;props.forEach((p,i)=>p.rotation.z=D.propSpin*(i%3===0?1:-1));
   placeCameras(dt);
   let cam=S.cam==='fpv'?camFPV:camExt;
   if(!playing&&$('osd').hidden){const a=now/9000;camExt.position.set(Math.sin(a)*18,5,Math.cos(a)*13);camExt.fov=60;camExt.updateProjectionMatrix();camExt.lookAt(0,1.5,0);cam=camExt;drone.visible=true;}
   if(playing||!$('osd').hidden)drone.visible=S.cam!=='fpv';
+  updFx(dt,now);
   renderer.render(scene,cam);
-  if(playing||!$('osd').hidden){updOSD(dt);drawNoise(dt);}
+  if(playing||!$('osd').hidden){updOSD(dt);drawNoise(dt);updGuide(cam);}
   updAudio();
 }
 
@@ -852,6 +1052,6 @@ $('ocam').textContent=CAMN[S.cam];
 // menu backdrop: slow orbit around the hangar
 camExt.position.set(12,4,16);camExt.lookAt(0,1.5,0);
 requestAnimationFrame(frame);
-window.__F={D,inp,S,startTask,toggleArm,step,get task(){return task;},touchSt,TASKS};
+window.__F={D,inp,S,startTask,toggleArm,step,get task(){return task;},touchSt,LESSONS,brief};
 </script>
 </body></html>
