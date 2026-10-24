@@ -1,0 +1,8 @@
+Модели в папке models/ (машины, трактор) взяты из бесплатных наборов
+с лицензией CC0 1.0 (общественное достояние, можно использовать для чего угодно):
+- Kenney, Car Kit — https://kenney.nl/assets/car-kit
+- Quaternius — https://quaternius.com
+Файлы получены из пакета @netforge/asset-library-files (npm), где для каждого
+набора проверена лицензия CC0, и распакованы в обычный GLB.
+
+GLTFLoader.js — из three.js r128 (лицензия MIT, https://github.com/mrdoob/three.js).
