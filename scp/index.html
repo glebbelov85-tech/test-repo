@@ -134,6 +134,15 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .ring .spin{position:absolute;inset:-9px;border-radius:50%;border:3px solid transparent;border-top-color:rgba(242,194,48,.55);animation:ldspin 1.1s linear infinite;will-change:transform}
 .ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:24px;font-weight:400}
 @keyframes ldspin{to{transform:rotate(360deg)}}
+/* Phones held sideways: everything important in the menu must fit without scrolling. */
+@media (max-height:560px){
+  .card{gap:10px}.logo-row{gap:12px}.logo-row svg{width:50px;height:50px}
+  h1{font-size:clamp(28px,8vh,44px)}h1 small{margin-top:4px}h2{font-size:clamp(24px,7vh,34px)}.hz{height:6px}
+  #menu .lead,#menu .doors,#menu .keys,#menu .tonly{display:none}
+  .lead{font-size:14px;line-height:1.4}p{line-height:1.4}
+  button{padding:10px 16px;font-size:15px}.btns{gap:8px}button.gfx{margin-top:2px;padding:6px 12px;font-size:13px}
+  .netcode{font-size:40px}.screen input{font-size:16px;padding:7px 10px}.netl{margin:0}.netor{margin:4px 0}
+}
 @media (max-width:640px){#mini{width:185px;height:75px}#dossier{display:none}#vitals{width:170px}#br{min-width:130px}}
 /* Phone HUD: vitals top-left, objective under it, map top-right, joystick bottom-left, action arc bottom-right, weapon label bottom-center. */
 @media (pointer:coarse){
@@ -169,7 +178,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 @media (prefers-reduced-motion:reduce){.toast,#dossier{animation:none}}
 </style>
 
-<div id="boot"><div class="ldr"><div class="ring"><i class="spin"></i><svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="50"/><circle class="fg" cx="60" cy="60" r="50"/></svg><b>0%</b></div><div>ЗАГРУЗКА ИГРЫ</div><small>В первый раз игра может грузиться до минуты. Дальше будет быстрее.<br><span style="opacity:.6">версия 11</span></small></div></div>
+<div id="boot"><div class="ldr"><div class="ring"><i class="spin"></i><svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="50"/><circle class="fg" cx="60" cy="60" r="50"/></svg><b>0%</b></div><div>ЗАГРУЗКА ИГРЫ</div><small>В первый раз игра может грузиться до минуты. Дальше будет быстрее.<br><span style="opacity:.6">версия 12</span></small></div></div>
 <script>(function(){var t0=Date.now(),el=document.getElementById('boot'),fg=el.querySelector('.fg'),b=el.querySelector('b');window.__boot=setInterval(function(){var p=Math.round(92*(1-Math.exp(-(Date.now()-t0)/5000)));fg.style.strokeDashoffset=314.2*(1-p/100);b.textContent=p+'%'},200)
   var btns='<div class="btns" style="justify-content:center;margin-top:6px"><button type="button" onclick="location.reload()">ОБНОВИТЬ</button><button type="button" class="ghost" onclick="__bootReset()">СБРОСИТЬ И ОБНОВИТЬ</button></div>';
   window.__bootReset=function(){var go=function(){location.reload()};try{var a=[];if(navigator.serviceWorker)a.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister()}))}));if(window.caches)a.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x)}))}));Promise.all(a).then(go,go);setTimeout(go,3000)}catch(e){go()}};
