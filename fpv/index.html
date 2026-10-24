@@ -234,7 +234,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 "use strict";
 if(!window.THREE){document.body.innerHTML='<p style="padding:24px">Не загрузился 3D-движок (three.min.js). Обнови страницу.</p>';throw new Error('no three');}
 const $=id=>document.getElementById(id);
-const VERSION='3.0 от 24.10.2026'; // bump on every release so testers can tell builds apart
+const VERSION='3.1 от 24.10.2026'; // bump on every release so testers can tell builds apart
 document.querySelectorAll('.ver').forEach(e=>e.textContent='Версия '+VERSION);
 document.title='Операторы дронов · v'+VERSION.split(' ')[0];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -557,6 +557,61 @@ function buildGates(){
     const solids=parts.map(p=>bar(p[0],p[1],p[2],p[3]));
     gates.push({g,mat,led,pos:new THREE.Vector3(x,y,z),ry,n:new THREE.Vector3(s,0,c),solids});
   }
+}
+
+// Quiz gates: three answer gates with a sign each; every question moves them to the next row
+const QROWS=[{x:0,z:-2,ry:0},{x:17,z:-2,ry:Math.PI/2},{x:-17,z:-2,ry:Math.PI/2}];
+const QLET=['А','Б','В'];
+const qgates=[];
+function drawSign(G,letter,text,state){
+  const g=G.ctx,w=512,h=200;
+  const bg={idle:'#101820',ok:'#0f5a26',bad:'#6a1414',dim:'#0b0f13'}[state],fg=state==='dim'?'#55606a':'#ffffff';
+  g.fillStyle=bg;g.fillRect(0,0,w,h);
+  g.strokeStyle=state==='ok'?'#30ff6a':state==='bad'?'#ff4a3a':state==='dim'?'#26303a':'#f2c230';g.lineWidth=10;g.strokeRect(5,5,w-10,h-10);
+  g.fillStyle=state==='idle'?'#f2c230':fg;g.font='bold 110px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(letter,70,h/2+6);
+  g.fillStyle=fg;g.textAlign='left';
+  // wrap the answer into at most 3 lines, shrinking the font if needed
+  for(const fs of [40,34,29,25]){
+    g.font=`bold ${fs}px Arial`;const lines=[];let cur='';
+    for(const word of text.split(' ')){const t=cur?cur+' '+word:word;if(g.measureText(t).width>360&&cur){lines.push(cur);cur=word;}else cur=t;}
+    if(cur)lines.push(cur);
+    if(lines.length<=3||fs===25){const lh=fs*1.18,y0=h/2-(lines.length-1)*lh/2;lines.slice(0,4).forEach((s,i)=>g.fillText(s,135,y0+i*lh));break;}
+  }
+  G.tex.needsUpdate=true;
+}
+function buildQuizGates(){
+  const t=0.14;
+  for(let i=0;i<3;i++){
+    const g=new THREE.Group(),mat=new THREE.MeshStandardMaterial({color:0x555b60,roughness:.5});
+    for(const [px,py,w,h] of [[0,GH/2+t/2,GW+2*t,t],[0,-GH/2-t/2,GW+2*t,t],[-GW/2-t/2,0,t,GH],[GW/2+t/2,0,t,GH]]){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,t),mat);m.position.set(px,py,0);m.castShadow=true;g.add(m);}
+    const led=new THREE.MeshBasicMaterial({color:0xffc030});
+    for(const zf of [t/2+0.004,-t/2-0.004])for(const [px,py,w,h] of [[0,GH/2,GW,0.05],[0,-GH/2,GW,0.05],[-GW/2,0,0.05,GH],[GW/2,0,0.05,GH]]){const l=new THREE.Mesh(new THREE.PlaneGeometry(w,h),led);l.position.set(px,py,zf);if(zf<0)l.rotation.y=Math.PI;g.add(l);}
+    const c=document.createElement('canvas');c.width=512;c.height=200;
+    const tex=new THREE.CanvasTexture(c);tex.encoding=THREE.sRGBEncoding;tex.anisotropy=4;
+    const signM=new THREE.MeshBasicMaterial({map:tex,toneMapped:false});
+    for(const zf of [1,-1]){const s=new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.25),signM);s.position.set(0,GH/2+t+0.72,zf*(t/2+0.02));if(zf<0)s.rotation.y=Math.PI;g.add(s);}
+    const post=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.12,0.08),M.steel);post.position.set(0,GH/2+t+0.06,0);g.add(post);
+    const y=2.1,leg=new THREE.Mesh(new THREE.BoxGeometry(t,y-GH/2-t,t),M.steel);leg.position.set(0,-(y-GH/2-t)/2-GH/2-t,0);g.add(leg);
+    g.visible=false;scene.add(g);
+    qgates.push({g,mat,led,ctx:c.getContext('2d'),tex,pos:new THREE.Vector3(),ry:0,n:new THREE.Vector3(),solids:[]});
+  }
+}
+function placeQuizGates(row){
+  const t=0.14,y=2.1,c=Math.cos(row.ry),s=Math.sin(row.ry);
+  qgates.forEach((G,i)=>{
+    const off=(i-1)*5.5,x=row.x+off*c,z=row.z-off*s;
+    G.pos.set(x,y,z);G.ry=row.ry;G.n.set(s,0,c);G.g.position.copy(G.pos);G.g.rotation.y=row.ry;G.g.visible=true;
+    G.solids=[[0,GH/2+t/2,GW+2*t,t],[0,-GH/2-t/2,GW+2*t,t],[-GW/2-t/2,0,t,GH],[GW/2+t/2,0,t,GH],[0,GH/2+t+0.72,3.2,1.25]].map(([lx,ly,w,h])=>{
+      const wx=x+lx*c,wz=z-lx*s,sx=Math.abs(w*c)+Math.abs(t*s),sz=Math.abs(w*s)+Math.abs(t*c);
+      return {min:new THREE.Vector3(wx-sx/2,y+ly-h/2,wz-sz/2),max:new THREE.Vector3(wx+sx/2,y+ly+h/2,wz+sz/2)};});
+  });
+}
+// true when the drone went through the gate opening between the last frame and this one
+function passed(g,prev){
+  const a=_v.copy(prev).sub(g.pos).dot(g.n),b=_v2.copy(D.pos).sub(g.pos).dot(g.n);
+  if(!(a*b<0)||D.crashed)return false;
+  const lx=(D.pos.x-g.pos.x)*Math.cos(g.ry)-(D.pos.z-g.pos.z)*Math.sin(g.ry),ly=D.pos.y-g.pos.y;
+  return Math.abs(lx)<GW/2&&Math.abs(ly)<GH/2;
 }
 
 /* ---------- Drone model ---------- */
@@ -924,6 +979,36 @@ const sGo=(p,name,r)=>({text:()=>`Лети к ${name}: ${say('fwd')}, повор
 const sLand=(p,name)=>{let still=0;return {text:()=>`Сядь на ${name}: ${downHint()}`,ui:'stL',target:()=>p,
   check:dt=>{still=D.landed&&!D.crashed&&D.vel.length()<0.3&&flat(D.pos,p)<1.4?still+dt:0;return still>0.8;}};};
 const sDisarm=()=>({text:()=>`Сними взвод: ${say('arm')}. Так делают после каждой посадки`,ui:'bArm',check:()=>!D.armed});
+const QUIZ_M1=[["Кто разрешает взлёт на занятии?",["Тренер","Любой пилот","Зрители"],"На занятии запуск всегда разрешает тренер."],["Где стоят зрители?",["За сеткой или линией безопасности","Под трассой","Рядом с пилотом в очках, вплотную к дрону"],"Зрители всегда за сеткой или линией безопасности."],["Что такое дизарм?",["Выключение моторов тумблером","Включение камеры","Зарядка АКБ"],"Дизарм - выключение моторов тумблером на пульте."],["Пропало видео в очках. Что делаешь?",["Сразу дизарм","Лечу дальше по памяти","Даю полный газ вверх"],"Без видео пилот ничего не видит - сразу дизарм."],["Дрон сел. Можно сразу брать его в руки?",["Нет, сначала дизарм и отключить АКБ","Да, сразу","Да, если он маленький"],"Сначала дизарм и отключить АКБ, потом берём."],["Кто такой наблюдатель (споттер)?",["Помощник, который смотрит на дрон и людей","Тот, кто снимает видео","Судья, который ставит очки"],"Он смотрит на дрон и людей, пока пилот в очках."],["Почему нельзя ловить дрон руками?",["Винты на скорости режут кожу","Дрон испачкается","Сломается пульт"],"Винты крутятся очень быстро и режут кожу даже у маленького дрона."],["Дрон летит не туда и не слушается. Лучшее решение?",["Дизарм, пусть падает","Пытаться догнать","Ждать, пока сядет АКБ"],"Дизарм: дрон упадёт, но никого не заденет. Дрон можно починить."],["Почему тумблер дизарма надо знать \"вслепую\"?",["В очках пульт не видно, а нажать надо мгновенно","Чтобы красиво выглядело","Его нельзя трогать"],"Пилот в очках не видит пульт, а действовать нужно за долю секунды."],["К заармленному дрону...",["Не подходим","Подходим, если он стоит","Подходим сзади"],"Заармленный дрон может раскрутить винты в любой момент."],["Над кем можно летать?",["Ни над кем из людей","Над друзьями","Над тренером"],"Над людьми не летаем никогда."],["Человек вышел на площадку во время полёта. Действие?",["Сразу дизарм","Облететь его","Крикнуть и лететь дальше"],"Человек на площадке - сразу дизарм."],["Что делаем после посадки по порядку?",["Дизарм - отключить АКБ - взять дрон","Взять дрон - дизарм","Отключить пульт - взять дрон"],"Дизарм, отключить АКБ, только потом взять дрон."],["Почему наблюдатель важен, даже если пилот опытный?",["Пилот в очках не видит, что вокруг","Опытному не нужен","Чтобы хлопать"],"Любой пилот в очках не видит, что вокруг дрона."],["Где лучше всего учиться летать?",["В зале или на площадке клуба с тренером","Во дворе у дома","Над дорогой"],"В зале или на площадке клуба с тренером."],["Почему нельзя летать у ЛЭП?",["Провода плохо видно, удар опасен","Там плохой интернет","Там скучно"],"Провода почти не видны в очках, а удар о них опасен."],["Почему нельзя летать у аэродрома?",["Там летают самолёты с людьми","Там громко","Там нет розеток"],"Там летают самолёты и вертолёты, в них люди."],["Идёт дождь. Летим на улице?",["Нет, вода замкнёт электронику","Да, дрону всё равно","Да, если быстро"],"Вода может замкнуть электронику дрона."],["Главное правило клуба про место полёта?",["Летаем там, где разрешил тренер","Где угодно, если нет людей","Только ночью"],"Летаем только там, где разрешил тренер."],["Какие дроны в России ставят на учёт?",["150 г и тяжелее","Любые, даже игрушечные","Только больше 100 кг"],"Сейчас на учёт ставят дроны от 150 г."],["Почему нельзя летать над чужим двором?",["Это чужая частная жизнь, и там люди","Двор слишком маленький","Можно, если не снимать"],"Это чужая частная жизнь, и там могут быть люди."],["Почему в сильный ветер на улице не летаем на маленьком дроне?",["Ветер сносит лёгкий дрон","Ветер мешает видео","Ветер разряжает пульт"],"Ветер сносит лёгкий дрон, и пилот теряет управление."],["Над дорогой летать...",["Нельзя","Можно","Можно ночью"],"Упавший дрон может вызвать аварию."],["Сильный ветер на улице. Что выберешь?",["Зал или симулятор","Лететь на улице","Лететь выше"],"Ветер сносит лёгкий дрон - лучше зал или симулятор."],["Где можно летать всегда?",["В симуляторе","В парке","У школы"],"В симуляторе нет никаких рисков."],["Почему у больницы и над толпой нельзя?",["Дрон может упасть на людей","Там нет связи","Это скучно"],"Упавший дрон может ранить людей."],["Что включаем первым?",["Пульт","АКБ дрона","Очки"],"Пульт первым - тогда дрон сразу получит команды."],["Что выключаем последним?",["Пульт","АКБ","Очки"],"Пульт последним, чтобы дрон до конца был под контролем."],["Где должен быть стик газа, когда подключаешь АКБ?",["Внизу","Вверху","Посередине"],"Газ внизу - моторы не раскрутятся неожиданно."],["Что говорим перед взлётом?",["\"Взлетаю!\"","Ничего","\"Сажусь!\""],"Все на площадке должны знать, что дрон взлетает."],["Какое первое действие после посадки?",["Дизарм","Выключить пульт","Взять дрон"],"Дизарм - моторы заблокированы."],["Почему нельзя включать дрон без пульта?",["Дрон не получит команд с пульта","Сядет АКБ пульта","Очки сломаются"],"Приёмник не найдёт сигнал, дрон не получит команд."],["Почему перед подключением АКБ проверяют тумблер арма?",["Иначе моторы могут сразу раскрутиться","Чтобы светился диод","Это не нужно"],"При включённом арме моторы могут раскрутиться сразу."],["Ты выключил пульт, а АКБ дрона ещё подключена. Что плохого?",["Дрон остался без управления","Ничего","Пульт зарядится"],"Дрон остался без управления. Порядок: сначала АКБ, потом пульт."],["Правильный порядок включения?",["Пульт - очки - АКБ","АКБ - пульт - очки","Очки - АКБ - пульт"],"Пульт - очки - АКБ."],["Правильный порядок выключения?",["АКБ - очки - пульт","Пульт - очки - АКБ","Как удобно"],"Наоборот: АКБ - очки - пульт."],["Что крикнуть, если надо срочно остановить моторы?",["\"Дизарм!\"","\"Ура!\"","Ничего"],"Все должны знать, что дрон сейчас упадёт."],["Почему газ должен быть внизу при подключении АКБ?",["Иначе моторы раскрутятся","Чтобы не сел пульт","Не важно"],"Иначе моторы могут сразу набрать обороты."],["Что проверяем у винтов?",["Что целые, без трещин и держатся","Только цвет","Ничего"],"Винт должен быть целым, без трещин, и крепко держаться."],["АКБ вздулась. Что делаешь?",["Не летаю, отдаю тренеру","Летаю аккуратно","Прокалываю, чтобы сдулась"],"Вздутую АКБ не используем и отдаём тренеру."],["В очках нет картинки. Летим?",["Нет, зовём тренера","Да, по памяти","Да, если низко"],"Без картинки пилот слеп."],["Что последнее проверяем перед взлётом?",["Площадку и разрешение тренера","Цвет дрона","Погоду на завтра"],"Площадку: никого нет, тренер разрешил."],["В каком положении тумблер арма перед подключением АКБ?",["Выключен","Включён","Не важно"],"Выключен - моторы не раскрутятся."],["Почему у пилотов разные видеоканалы?",["Одинаковые каналы мешают друг другу","Для красоты","Так быстрее летает"],"Одинаковые каналы мешают друг другу, картинка в очках пропадает."],["Провод торчит к винту. Чем опасно?",["Винт перерубит провод","Ничем","Провод будет мешать камере"],"Винт перерубит провод, дрон может упасть или замкнуть."],["Зачем ждать, пока АКБ остынет?",["Горячая АКБ портится и может вздуться","Она тяжелее","Незачем"],"Горячая АКБ изнашивается и может вздуться."],["Треснувший винт...",["Меняем до полёта","Пойдёт","Заклеиваем скотчем"],"Он может отломиться в полёте."],["Человек на площадке. Летим?",["Нет, ждём","Да, облетим","Да, если быстро"],"Ждём, пока площадка освободится."],["Сколько пунктов в предполётной проверке?",["5: дрон, АКБ, пульт и очки, видео, площадка","3: дрон, АКБ, пульт","7: дрон, АКБ, пульт, очки, видео, площадка, погода"],"Дрон, АКБ, пульт и очки, видео, площадка."]]; // module 1 quiz pools (levels 1-2) from kurs-fpv-dannye.json, answer [0] is right
+// Flying quiz: questions from the course, answered by flying through the gate with the right answer
+function pickQuiz(pool,n){
+  const sh=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;};
+  return sh(pool).slice(0,n).map(([q,a,e])=>{const order=sh([0,1,2]);return {q,e,a:order.map(k=>a[k]),right:order.indexOf(0)};});
+}
+function showQuiz(T){
+  T.prev=D.pos.clone();
+  if(T.qi>=T.qs.length){for(const G of qgates)G.g.visible=false;T.solids=[];T.gatesOn=false;return;}
+  const q=T.qs[T.qi];placeQuizGates(QROWS[T.qi%QROWS.length]);
+  qgates.forEach((G,i)=>{drawSign(G,QLET[i],q.a[i],'idle');G.led.color.setHex(0xffc030).multiplyScalar(2.2);});
+  T.solids=qgates.flatMap(G=>G.solids);T.gatesOn=true;
+}
+function quizTick(T,dt){
+  if(T.wait>0){T.wait-=dt;if(T.wait<=0){T.qi++;showQuiz(T);}return;}
+  const q=T.qs[T.qi];if(!q)return;
+  for(let i=0;i<3;i++)if(passed(qgates[i],T.prev)){
+    const ok=i===q.right;T.lastOk=ok;T.pick=i;T.wait=ok?1.8:4.5;
+    if(ok){T.right++;beep(880,0.08);setTimeout(()=>beep(1320,0.1),90);}else{beep(200,0.35);T.wrong.push(q);}
+    qgates.forEach((G,k)=>{const st=k===q.right?'ok':k===i?'bad':'dim';drawSign(G,QLET[k],q.a[k],st);G.led.color.setHex(st==='ok'?0x30ff6a:st==='bad'?0xff3020:0x1d3a52).multiplyScalar(st==='dim'?1:3);});
+    break;
+  }
+  T.prev.copy(D.pos);
+}
+function quizText(T){
+  const q=T.qs[T.qi];if(!q)return '';
+  const N=T.qs.length;
+  if(T.wait>0)return T.lastOk?`<b style="color:#30ff6a">Верно!</b> ${q.e}`:`<b style="color:#ff5a4a">Неверно.</b> Правильный ответ: «${q.a[q.right]}». ${q.e}`;
+  return `Вопрос ${T.qi+1} из ${N} · верно ${T.right}<br><b>${q.q}</b><br><small>${q.a.map((a,i)=>QLET[i]+': '+a).join(' · ')}</small>`;
+}
 const crashStars=n=>n===0?3:n<3?2:1;
 const H_UP=V3(PAD_A.x,1.2,PAD_A.z);
 
@@ -984,17 +1069,27 @@ const LESSONS={
     result:T=>T.failed?{val:0,stars:0,label:'АКБ сел до посадки',fail:'Банка упала ниже 3,5 В в воздухе. По правилам курса в этот момент уже надо сидеть. Лети короче и следи за вольтами.'}
       :{val:+T.vEnd.toFixed(2),stars:T.vEnd>=3.65?3:T.vEnd>=3.55?2:1,label:'Сел с запасом: '+T.vEnd.toFixed(2)+' В на банку'},
     better:(a,b)=>a>b, fmtBest:v=>'лучший запас: '+v+' В/банка'},
+  quiz1:{tag:'ИТОГ МОДУЛЯ 1 · ЭКЗАМЕН',name:'Экзамен в воздухе',desc:'10 вопросов из курса. Отвечаешь полётом: лети в ворота с правильным ответом. Нужно 8 из 10.',keep:true,
+    learn:['взлететь на 1,5 метра','прочитать вопрос вверху экрана, ответы А, Б, В написаны над воротами','пролететь в ворота с правильным ответом: загорится зелёный или красный','ворота переезжают: середина ангара, правая стена, левая стена','после 10 вопросов сесть на H и снять взвод'],
+    setup:T=>{if(!T.qs){T.qs=pickQuiz(QUIZ_M1,10);T.qi=0;T.right=0;T.wait=0;T.wrong=[];}showQuiz(T);},
+    steps:T=>[sArm(),sUp(1.5),
+      {text:()=>quizText(T),ui:null,target:()=>T.qi<T.qs.length?qgates[1].pos:null,tick:dt=>quizTick(T,dt),check:()=>T.qi>=T.qs.length},
+      sGo(H_UP,'площадке H',1.5),sLand(PAD_A,'площадку H'),sDisarm()],
+    result:T=>{const n=T.right,N=T.qs.length,miss=T.wrong.slice(0,3).map(q=>`«${q.q}» — «${q.a[q.right]}»`).join('; ');
+      return n>=Math.ceil(N*0.8)?{val:n,stars:n===N?3:n>=N-1?2:1,label:`${n} из ${N} верно`,fail:miss?'Ошибки: '+miss+'.':''}
+        :{val:n,stars:0,label:`${n} из ${N} верно`,fail:`Нужно хотя бы ${Math.ceil(N*0.8)} из ${N}, как в итоговом тесте курса. Ошибки: ${miss}.`};},
+    better:(a,b)=>a>b, fmtBest:v=>'лучший результат: '+v+' из 10'},
   free:{tag:'СВОБОДНО',name:'Свободный полёт',desc:'Полетай по ангару как хочешь. Попробуй режимы Angle и Acro.',learn:['летать без задания','менять камеру и режим (клавиша M или в настройках)'],steps:()=>[],free:true},
 };
-const ORDER=['tut','hover','circle','land','gates','bat'];
-function unlocked(id){const i=ORDER.indexOf(id);return i<=0||S.unlockAll||(S.stars[ORDER[i-1]]||0)>0;}
+const ORDER=['tut','hover','circle','land','quiz1','gates','bat'];
+function unlocked(id){const i=ORDER.indexOf(id);return i<=0||S.unlockAll||(S.stars[id]||0)>0||(S.stars[ORDER[i-1]]||0)>0;}
 function nextLesson(id){const i=ORDER.indexOf(id);return i>=0&&i<ORDER.length-1?ORDER[i+1]:null;}
 function paintGates(n){gates.forEach((x,i)=>{const c=i===n?0x30ff6a:i===n+1?0xffc030:i<n?0x1d3a52:0x3a7bd5;x.led.color.setHex(c).multiplyScalar(i===n||i===n+1?3:1.4);x.mat.emissive.setHex(i===n?0x0b4a1c:0);});}
 
 let task=null, playing=false, curTask='tut';
 function startTask(id){
   const L=LESSONS[id];curTask=id;
-  for(const g of gates)g.g.visible=false;
+  for(const g of gates.concat(qgates))g.g.visible=false;
   hoverZone.visible=false;beacon.visible=false;
   resetDrone();
   task={id,L,t:0,crashes:0,done:false,si:0,failed:false};
@@ -1002,7 +1097,7 @@ function startTask(id){
   L.setup&&L.setup(task);
   task.steps=L.steps(task);
   task.tick=dt=>{
-    if(task.restart&&!D.crashed){task.restart=false;L.setup&&L.setup(task);task.steps=L.steps(task);task.si=0;toast('Начнём этот урок с первого шага','bad');}
+    if(task.restart&&!D.crashed){task.restart=false;L.setup&&L.setup(task);task.steps=L.steps(task);task.si=0;toast(L.keep?'Взлетай снова: вопрос тот же, ответы сохранены':'Начнём этот урок с первого шага','bad');}
     L.tick&&L.tick(task);
     if(task.failed&&!task.done)return finish(L.result(task));
     const st=task.steps[task.si];
@@ -1176,13 +1271,13 @@ function frame(now){
 }
 
 /* ---------- Boot ---------- */
-buildHangar();buildMarks();buildGates();buildDrone();
+buildHangar();buildMarks();buildGates();buildQuizGates();buildDrone();
 setupStick($('stL'),'L');setupStick($('stR'),'R');
 applyQuality();resetDrone();renderMenu();showScreen('sMenu');
 $('ocam').textContent=CAMN[S.cam];
 // menu backdrop: slow orbit around the hangar
 camExt.position.set(12,4,16);camExt.lookAt(0,1.5,0);
 requestAnimationFrame(frame);
-window.__F={D,inp,S,startTask,toggleArm,step,get task(){return task;},touchSt,LESSONS,brief,scene};
+window.__F={D,inp,S,startTask,toggleArm,step,get task(){return task;},touchSt,LESSONS,brief,scene,qgates};
 </script>
 </body></html>
