@@ -86,6 +86,8 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 #bArm.on{background:rgba(40,140,60,.75)}
 #bPause{right:max(14px,env(safe-area-inset-right,0px));top:calc(86px + env(safe-area-inset-top,0px))}
 #bCam{right:max(86px,calc(env(safe-area-inset-right,0px) + 86px));top:calc(86px + env(safe-area-inset-top,0px))}
+#bBoost{left:50%;transform:translateX(-50%);bottom:calc(22px + env(safe-area-inset-bottom,0px));min-width:130px;height:56px;font-size:16px;background:rgba(60,90,20,.7)}
+#bBoost.on{background:rgba(200,224,74,.85);color:#111}
 #bBat{left:max(14px,env(safe-area-inset-left,0px));top:calc(86px + env(safe-area-inset-top,0px))}
 @media (pointer:fine){#touch .stick{display:none}}
 @media (pointer:coarse){#sticks{display:none}}
@@ -123,6 +125,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
   <button class="tb" id="bCam">КАМЕРА</button>
   <button class="tb" id="bPause">II</button>
   <button class="tb" id="bBat">АКБ</button>
+  <button class="tb" id="bBoost" hidden>УСКОР »</button>
 </div>
 
 <!-- Main menu -->
@@ -146,7 +149,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 <div class="screen" id="sSet" hidden>
   <div class="card">
     <h2>Настройки</h2>
-    <div class="row"><label>Режим полёта</label><div class="seg" data-k="mode"><button data-v="nov">Новичок</button><button data-v="angle">Angle</button><button data-v="acro">Acro</button></div></div>
+    <div class="row"><label>Режим полёта</label><div class="seg" data-k="mode"><button data-v="fly">Плавный</button><button data-v="nov">Новичок</button><button data-v="angle">Angle</button><button data-v="acro">Acro</button></div></div>
     <p class="note" id="modeNote"></p>
     <div class="row"><label>Камера</label><div class="seg" data-k="cam"><button data-v="fpv">FPV</button><button data-v="chase">Сзади</button><button data-v="los">Из угла</button></div></div>
     <div class="row"><label>Наклон камеры: <span id="vTilt"></span>°</label><input type="range" min="0" max="45" step="1" data-k="tilt"></div>
@@ -167,11 +170,11 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
     <div class="keys">
       <div><b>W</b><b>S</b>газ</div><div><b>A</b><b>D</b>поворот</div>
       <div><b>↑</b><b>↓</b>вперёд / назад</div><div><b>←</b><b>→</b>вбок</div>
-      <div><b>Пробел</b>взвести / снять</div><div><b>C</b>камера</div>
+      <div><b>Shift</b>ускорение (плавный полёт)</div><div><b>Пробел</b>взвести / снять</div><div><b>C</b>камера</div>
       <div><b>B</b>сменить АКБ (на земле)</div><div><b>R</b>на старт</div>
       <div><b>M</b>режим полёта</div><div><b>Esc</b>пауза</div>
     </div>
-    <p class="note">Взвести моторы можно только когда газ внизу. В режиме «Новичок» дрон сам держит высоту, а после удара сразу появляется в воздухе рядом.</p>
+    <p class="note">В режиме «Плавный» (он включён сразу) взводить ничего не нужно и разбиться нельзя: лети мягко, а Shift или кнопка «УСКОР» ускоряют. Режимы с настоящей физикой дрона есть в настройках. Взвести моторы там можно только когда газ внизу. В режиме «Новичок» дрон сам держит высоту, а после удара сразу появляется в воздухе рядом.</p>
     <div class="btns"><button id="helpBack">Понятно</button></div>
   </div>
 </div>
@@ -211,5 +214,5 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 
 <script src="three.min.js"></script>
 <script src="post.js"></script>
-<script src="igra.js?v=1.1"></script>
+<script src="igra.js?v=1.2"></script>
 </body></html>

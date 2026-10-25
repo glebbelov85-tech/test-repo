@@ -3,7 +3,7 @@
 // Flight model, input and OSD come from the drone game «Операторы дронов» (fpv/); the room is rebuilt from photos.
 if(!window.THREE){document.body.innerHTML='<p style="padding:24px">Не загрузился 3D-движок (three.min.js). Обнови страницу.</p>';throw new Error('no three');}
 const $=id=>document.getElementById(id);
-const VERSION='1.1 от 25.10.2026'; // bump on every release so testers can tell builds apart
+const VERSION='1.2 от 25.10.2026'; // bump on every release so testers can tell builds apart
 document.querySelectorAll('.ver').forEach(e=>e.textContent='Версия '+VERSION);
 document.title='Муха · v'+VERSION.split(' ')[0];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -18,9 +18,10 @@ const CRASH_V=7;                // hits slower than this only bounce
 
 /* ---------- Saved settings and results ---------- */
 const KEY='muha.v1';
-const DEF={mode:'nov',cam:'fpv',tilt:15,rate:560,expo:0.35,q:(matchMedia('(pointer:coarse)').matches?'0':'1'),fx:'1',pad:null,best:{},stars:{}};
+const DEF={mode:'fly',cam:'fpv',tilt:15,rate:560,expo:0.35,q:(matchMedia('(pointer:coarse)').matches?'0':'1'),fx:'1',pad:null,best:{},stars:{}};
 let S=Object.assign({},DEF);
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)S=Object.assign({},DEF,s,{best:Object.assign({},s.best||{}),stars:Object.assign({},s.stars||{})});}catch(e){}
+if(!S.v12){S.v12=1;S.mode='fly';} // v1.2: the smooth flight becomes the default once
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 
 /* ---------- Renderer, scene, cameras ---------- */
@@ -651,11 +652,12 @@ function setupStick(el,side){
   el.addEventListener('pointerdown',e=>{st.id=e.pointerId;el.setPointerCapture(e.pointerId);upd(e);srcPref='touch';});
   el.addEventListener('pointermove',e=>{if(e.pointerId===st.id)upd(e);});
   const end=e=>{if(e.pointerId!==st.id)return;st.id=null;st.x=0;
-    if(!(side==='L'&&S.mode!=='nov'))st.y=0;draw();};
+    if(!(side==='L'&&!soft()))st.y=0;draw();};
   el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
   draw();
 }
-let srcPref='kbd', padPrevAxes=null;
+let srcPref='kbd', padPrevAxes=null, touchBoost=false;
+function touchMode(){const f=S.mode==='fly';$('bArm').hidden=f;$('bBat').hidden=f;$('bBoost').hidden=!f;$('armed').style.display=f?'none':'';}
 let padIdx=-1, padPrevBtn=false;
 addEventListener('gamepadconnected',e=>{padIdx=e.gamepad.index;padInfo();});
 addEventListener('gamepaddisconnected',()=>{padIdx=-1;padInfo();});
@@ -666,7 +668,7 @@ function readInput(dt){
   if(window.__M&&__M.hold){Object.assign(inp,__M.hold);return;} // test hook
   const p=getPad();
   let src='kbd';
-  let thr,yaw,pitch,roll,ly;
+  let thr,yaw,pitch,roll,ly,boost=false;
   const usable=p&&(S.pad||p.mapping==='standard');
   if(usable){const moved=padPrevAxes&&p.axes.some((v,i)=>Math.abs(v-(padPrevAxes[i]||0))>0.25);padPrevAxes=[...p.axes];if(moved||p.buttons.some(b=>b.pressed))srcPref='pad';}
   if(usable&&srcPref==='pad'){
@@ -679,23 +681,24 @@ function readInput(dt){
       yaw=dz(p.axes[0]);ly=-dz(p.axes[1]);roll=dz(p.axes[2]);pitch=-dz(p.axes[3]);
       thr=ly>=0?0.39+ly*0.61:0.39*(1+ly);
     }
+    if(S.mode==='fly'){boost=p.buttons.some(b=>b.pressed);padPrevBtn=boost;}else{
     const b=p.buttons.some(b=>b.pressed);
     if(b&&!padPrevBtn&&playing)toggleArm();
     else if(!b&&padPrevBtn&&S.pad&&D.armed&&playing)toggleArm();
-    padPrevBtn=b;
+    padPrevBtn=b;}
   }else if(srcPref==='touch'){
     src='touch';
-    yaw=touchSt.L.x;ly=touchSt.L.y;pitch=touchSt.R.y;roll=touchSt.R.x;thr=(ly+1)/2;
+    yaw=touchSt.L.x;ly=touchSt.L.y;pitch=touchSt.R.y;roll=touchSt.R.x;thr=(ly+1)/2;boost=touchBoost;
   }else{
     const k=c=>keys.has(c)?1:0;
-    yaw=k('KeyD')-k('KeyA');pitch=k('ArrowUp')-k('ArrowDown');roll=k('ArrowRight')-k('ArrowLeft');
-    if(S.mode==='nov'){ly=k('KeyW')-k('KeyS');kbThr=(ly+1)/2;}
+    yaw=k('KeyD')-k('KeyA');pitch=k('ArrowUp')-k('ArrowDown');roll=k('ArrowRight')-k('ArrowLeft');boost=keys.has('ShiftLeft')||keys.has('ShiftRight');
+    if(soft()){ly=k('KeyW')-k('KeyS');kbThr=(ly+1)/2;}
     else{kbThr=clamp(kbThr+(k('KeyW')-k('KeyS'))*dt*0.7,0,1);ly=kbThr*2-1;}
     thr=kbThr;
     const sm=1-Math.exp(-dt*8);
     yaw=inp.yaw+(yaw-inp.yaw)*sm;pitch=inp.pitch+(pitch-inp.pitch)*sm;roll=inp.roll+(roll-inp.roll)*sm;
   }
-  Object.assign(inp,{thr,yaw,pitch,roll,ly,src});
+  Object.assign(inp,{thr,yaw,pitch,roll,ly,src,boost:!!boost});
 }
 
 /* ---------- Flight model (from the FPV game) ---------- */
@@ -703,7 +706,7 @@ const MAXACC=2.6*G;
 const R_DRONE=0.17;
 const BAT={cells:4,cap:1300};
 const D={pos:new THREE.Vector3(),vel:new THREE.Vector3(),q:new THREE.Quaternion(),w:new THREE.Vector3(),heading:0,
-  armed:false,landed:true,crashed:0,crashReason:'',used:0,amps:0,vcell:4.2,flightTime:0,thrOut:0,propSpin:0};
+  armed:false,landed:true,crashed:0,yawRate:0,boostK:0,crashReason:'',used:0,amps:0,vcell:4.2,flightTime:0,thrOut:0,propSpin:0};
 const _v=new THREE.Vector3(),_v2=new THREE.Vector3(),_q=new THREE.Quaternion(),_q2=new THREE.Quaternion(),_e=new THREE.Euler(0,0,0,'YXZ'),UP=new THREE.Vector3(0,1,0);
 function ocv(c){const pts=[[0,3.3],[.08,3.5],[.2,3.68],[.5,3.82],[.8,4.0],[1,4.2]];
   for(let i=1;i<pts.length;i++)if(c<=pts[i][0]){const [a,va]=pts[i-1],[b,vb]=pts[i];return va+(vb-va)*(c-a)/(b-a);}return 4.2;}
@@ -713,9 +716,9 @@ const START={pos:V3(2.3*K,0.731*K,3.3*K),heading:0};
 const trail=[];let trailT=0;     // recent safe positions: a novice comes back in the air after a crash
 function resetDrone(full){
   D.pos.copy(START.pos);D.vel.set(0,0,0);D.w.set(0,0,0);D.heading=START.heading;D.q.setFromEuler(_e.set(0,D.heading,0));
-  D.armed=false;D.landed=true;D.crashed=0;D.thrOut=0;trail.length=0;
+  D.armed=S.mode==='fly';D.landed=true;D.crashed=0;D.thrOut=0;D.yawRate=0;trail.length=0;
   if(full!==false){D.used=0;D.flightTime=0;}
-  kbThr=0;touchSt.L.y=S.mode==='nov'?0:-1;touchSt.L.draw&&touchSt.L.draw();
+  kbThr=0;touchSt.L.y=soft()?0:-1;touchSt.L.draw&&touchSt.L.draw();
   updArm();
 }
 function respawnAir(){
@@ -725,7 +728,7 @@ function respawnAir(){
   D.crashed=0;D.landed=false;D.armed=charge()>0.01;trail.length=0;updArm();toast('Ещё попытка: дрон снова в воздухе');
 }
 function toggleArm(){
-  if(D.crashed)return;
+  if(D.crashed||S.mode==='fly')return;
   if(D.armed){D.armed=false;updArm();toast('Моторы сняты с взвода');return;}
   const low=S.mode==='nov'?inp.ly<=0.15:inp.thr<0.08;
   if(!low){toast('Сначала газ вниз!','bad');return;}
@@ -744,7 +747,32 @@ function crash(reason){
   if(navigator.vibrate)try{navigator.vibrate(120);}catch(e){}
 }
 function tiltDeg(){_v.set(0,1,0).applyQuaternion(D.q);return Math.acos(clamp(_v.y,-1,1))*57.3;}
+// «Плавный полёт»: no drone physics. The body glides toward the stick velocity with a soft lag (a little drift),
+// banks into turns, Shift/boost button speeds it up. Bumps never crash.
+const FLY={spd:7,up:4.5,boost:2.6,grip:1.7};
+function stepFly(dt){
+  const b=inp.boost?FLY.boost:1;
+  D.boostK+=((inp.boost?1:0)-D.boostK)*(1-Math.exp(-dt*3));
+  D.yawRate+=(-inp.yaw*1.9-D.yawRate)*(1-Math.exp(-dt*5));
+  D.heading+=D.yawRate*dt;
+  const fwd=inp.pitch*FLY.spd*b,right=inp.roll*FLY.spd*b,up=inp.ly*FLY.up*Math.sqrt(b);
+  const sh=Math.sin(D.heading),ch=Math.cos(D.heading);
+  _v.set(-sh*fwd+ch*right,up,-ch*fwd-sh*right);
+  // horizontal velocity follows slower than vertical: that is the slight drift in turns
+  const kh=1-Math.exp(-dt*FLY.grip*(inp.boost?0.8:1)),kv=1-Math.exp(-dt*3);
+  D.vel.x+=(_v.x-D.vel.x)*kh;D.vel.z+=(_v.z-D.vel.z)*kh;D.vel.y+=(_v.y-D.vel.y)*kv;
+  if(D.landed&&up<=0.05)D.vel.y=Math.min(D.vel.y,0);
+  // lean: forward speed tips the nose, turning and sideways drift bank the body
+  const vf=-sh*D.vel.x-ch*D.vel.z,vr=ch*D.vel.x-sh*D.vel.z;
+  _q2.setFromEuler(_e.set(clamp(-vf*0.018,-0.35,0.35),D.heading,clamp(D.yawRate*0.22-vr*0.03,-0.5,0.5)));
+  D.q.slerp(_q2,1-Math.exp(-dt*6));D.q.normalize();
+  D.thrOut=clamp(0.35+D.vel.length()/30,0,1);D.amps=0;D.vcell=4.2;
+  D.flightTime+=dt;
+  D.pos.addScaledVector(D.vel,dt);
+  collide();
+}
 function step(dt){
+  if(S.mode==='fly'){stepFly(dt);return;}
   if(D.crashed){D.crashed-=dt;D.vel.multiplyScalar(0.9);if(D.crashed<=0)respawnAir();return;}
   const c=charge();
   D.vcell=ocv(c)-D.amps*0.008;
@@ -806,21 +834,24 @@ function collide(){
   const p=D.pos;
   if(p.y<0){
     const vy=-D.vel.y, hs=Math.hypot(D.vel.x,D.vel.z), tl=tiltDeg();
+    if(S.mode==='fly'){if(vy>2)thud(vy);p.y=0;D.vel.y=Math.max(0,D.vel.y);D.landed=true;}
+    else{
     if(vy>CRASH_V)return crash('удар о пол');
     if(tl>55&&(hs>1.5||D.armed))return crash('дрон лёг на бок');
-    p.y=0;D.vel.y=0;D.vel.x*=0.8;D.vel.z*=0.8;D.landed=true;settle();
+    p.y=0;D.vel.y=0;D.vel.x*=0.8;D.vel.z*=0.8;D.landed=true;settle();}
   }else if(p.y>0.03)D.landed=false;
   const sp=D.vel.length();
-  const top=RH*K-R_DRONE;if(p.y>top){p.y=top;if(sp>CRASH_V)return crash('удар о потолок');D.vel.y=Math.min(D.vel.y,0)*-0.3;}
+  const top=RH*K-R_DRONE;if(p.y>top){p.y=top;if(S.mode==='fly'){if(D.vel.y>2)thud(D.vel.y);}else if(sp>CRASH_V)return crash('удар о потолок');D.vel.y=Math.min(D.vel.y,0)*-0.3;}
   p.x=clamp(p.x,-6,8.3*K);p.z=clamp(p.z,-0.5*K,14.2*K);
   for(const b of boxes){
     if(p.x>b.min.x-R_DRONE&&p.x<b.max.x+R_DRONE&&p.y>b.min.y-R_DRONE&&p.y<b.max.y+R_DRONE&&p.z>b.min.z-R_DRONE&&p.z<b.max.z+R_DRONE){
       const o=[[p.x-(b.min.x-R_DRONE),'x',-1],[(b.max.x+R_DRONE)-p.x,'x',1],[p.y-(b.min.y-R_DRONE),'y',-1],[(b.max.y+R_DRONE)-p.y,'y',1],[p.z-(b.min.z-R_DRONE),'z',-1],[(b.max.z+R_DRONE)-p.z,'z',1]].sort((a,b)=>a[0]-b[0])[0];
       const vn=D.vel[o[1]]*o[2]; // speed into the surface
-      if(-vn>CRASH_V)return crash(o[1]==='y'&&o[2]>0?'жёсткая посадка':'столкновение');
+      if(S.mode==='fly'){if(-vn>2.5)thud(-vn);}
+      else if(-vn>CRASH_V)return crash(o[1]==='y'&&o[2]>0?'жёсткая посадка':'столкновение');
       p[o[1]]+=o[0]*o[2];
-      if(vn<0)D.vel[o[1]]*=-0.3;
-      if(o[1]==='y'&&o[2]>0){D.vel.y=Math.max(D.vel.y,0);D.vel.x*=0.9;D.vel.z*=0.9;D.landed=true;if(tiltDeg()<40)settle();}
+      if(vn<0)D.vel[o[1]]*=S.mode==='fly'?-0.15:-0.3;
+      if(o[1]==='y'&&o[2]>0){D.vel.y=Math.max(D.vel.y,0);D.landed=true;if(S.mode!=='fly'){D.vel.x*=0.9;D.vel.z*=0.9;if(tiltDeg()<40)settle();}}
     }
   }
 }
@@ -828,11 +859,12 @@ function collide(){
 /* ---------- Cameras ---------- */
 const CAMS=['fpv','chase','los'], CAMN={fpv:'FPV',chase:'СЗАДИ',los:'ИЗ УГЛА'};
 function cycleCam(){S.cam=CAMS[(CAMS.indexOf(S.cam)+1)%3];save();$('ocam').textContent=CAMN[S.cam];}
-const MODEN={nov:'НОВИЧОК',angle:'ANGLE',acro:'ACRO'};
+const MODEN={fly:'ПЛАВНО',nov:'НОВИЧОК',angle:'ANGLE',acro:'ACRO'};
+function soft(){return S.mode==='fly'||S.mode==='nov';}
 function cycleMode(){
-  const order=['nov','angle','acro'];
+  const order=['fly','nov','angle','acro'];
   if(D.armed){toast('Режим меняют без взвода','bad');return;}
-  S.mode=order[(order.indexOf(S.mode)+1)%3];save();resetDrone(false);toast('Режим: '+MODEN[S.mode]);
+  S.mode=order[(order.indexOf(S.mode)+1)%4];save();resetDrone(false);touchMode();toast('Режим: '+MODEN[S.mode]);
 }
 const chasePos=new THREE.Vector3(0,2,14);
 function placeCameras(dt){
@@ -872,8 +904,8 @@ function updOSD(dt){
   const c=charge();
   $('omode').textContent=MODEN[S.mode];
   $('otime').textContent=game.kind==='fire'?fmtT(game.t):fmtT(D.flightTime);
-  $('obat').textContent=(D.vcell*BAT.cells).toFixed(1)+'V';
-  const cell=$('ocell');cell.textContent=D.vcell.toFixed(2)+' В/банка';cell.className=D.vcell<3.5?'bad':D.vcell<3.65?'warnc':'';
+  const fl=S.mode==='fly';$('obat').textContent=fl?(inp.boost?'» УСКОР':''):(D.vcell*BAT.cells).toFixed(1)+'V';
+  const cell=$('ocell');cell.textContent=fl?'':D.vcell.toFixed(2)+' В/банка';cell.className=D.vcell<3.5?'bad':D.vcell<3.65?'warnc':'';
   $('ofly').textContent=game.kind==='fire'?'✦ '+game.got+'/'+FLIES.length:'';
   // altitude and speed in the real room: centimetres
   $('oalt').textContent=Math.round(D.pos.y/K*100);
@@ -886,7 +918,7 @@ function updOSD(dt){
   else if(c<=0.01)w='АКБ ПУСТОЙ';
   else if(ocv(c)<3.5)w='САДИСЬ: АКБ';
   $('warn').innerHTML=w;
-  const ly=S.mode==='nov'?inp.ly:inp.thr*2-1;
+  const ly=soft()?inp.ly:inp.thr*2-1;
   $('sL').style.left=(50+inp.yaw*45)+'%';$('sL').style.top=(50-ly*45)+'%';
   $('sR').style.left=(50+inp.roll*45)+'%';$('sR').style.top=(50-inp.pitch*45)+'%';
   if(toastT>0){toastT-=dt;if(toastT<=0)$('toast').textContent='';}
@@ -899,6 +931,7 @@ const WORDS={
   up:{touch:'левый стик вверх',kbd:'клавишу W',pad:'газ вверх'},
   fwd:{touch:'правый стик вверх',kbd:'стрелку ↑',pad:'правый стик вверх'},
   yaw:{touch:'левый стик вбок',kbd:'A или D',pad:'левый стик вбок'},
+  boost:{touch:'кнопку УСКОР',kbd:'Shift',pad:'любую кнопку на пульте'},
 };
 const say=k=>WORDS[k][ctl()];
 let hlId=null;
@@ -906,8 +939,9 @@ function highlight(id){if(id===hlId)return;if(hlId)$(hlId).classList.remove('hl'
 function hint(){
   if(D.crashed)return ['',null];
   if(!D.armed&&D.landed)return [`Взведи моторы: нажми <b>${say('arm')}</b>`+(S.mode==='nov'?'':'. Газ должен быть внизу'),'bArm'];
-  if(D.landed&&D.flightTime<20)return [S.mode==='nov'?`Взлетай: <b>${say('up')}</b>`:`Плавно добавь газ: <b>${say('up')}</b>, висение около 40%`,'stL'];
-  if(game.kind==='fire')return [`Светлячки: <b>${game.got} из ${FLIES.length}</b>. Жёлтая стрелка ведёт к ближайшему. Вперёд: ${say('fwd')}, поворот: ${say('yaw')}`,null];
+  if(D.landed&&D.flightTime<20)return [soft()?`Взлетай: <b>${say('up')}</b>`:`Плавно добавь газ: <b>${say('up')}</b>, висение около 40%`,'stL'];
+  if(game.kind==='fire')return [`Светлячки: <b>${game.got} из ${FLIES.length}</b>. Жёлтая стрелка ведёт к ближайшему. Вперёд: ${say('fwd')}, поворот: ${say('yaw')}`+(S.mode==='fly'?`, ускорение: ${say('boost')}`:''),null];
+  if(S.mode==='fly'&&D.flightTime<16)return [`Лети! Вперёд: <b>${say('fwd')}</b>, вверх: <b>${say('up')}</b>, поворот: <b>${say('yaw')}</b>, ускорение: <b>${say('boost')}</b>`,D.flightTime<6?'stL':'stR'];
   if(D.flightTime<14)return [`Лети куда хочешь! Вперёд: <b>${say('fwd')}</b>, поворот: <b>${say('yaw')}</b>. Загляни под кровать и на шкаф`,'stR'];
   return ['',null];
 }
@@ -940,7 +974,7 @@ function startGame(kind){
   game.kind=kind;game.t=0;game.got=0;game.done=false;
   for(const f of FLIES){f.userData.got=false;f.visible=kind==='fire';}
   resetDrone();playing=true;showScreen(null);
-  $('osd').hidden=false;$('touch').hidden=false;$('ocam').textContent=CAMN[S.cam];
+  $('osd').hidden=false;$('touch').hidden=false;$('ocam').textContent=CAMN[S.cam];touchMode();
   audioInit();
 }
 function gameTick(dt){
@@ -948,7 +982,7 @@ function gameTick(dt){
   if(D.armed||!D.landed)game.t+=dt;
   let best=null,bd=1e9;
   for(const f of FLIES){if(f.userData.got)continue;const d=f.position.distanceTo(D.pos);
-    if(d<1.7){f.userData.got=true;f.visible=false;game.got++;beep(1320,0.08);setTimeout(()=>beep(1760,0.1),90);
+    if(d<1.7){f.userData.got=true;f.visible=false;game.got++;chime();
       toast(game.got<FLIES.length?`Светлячок! ${game.got} из ${FLIES.length}`:'Все светлячки собраны!');continue;}
     if(d<bd){bd=d;best=f;}}
   guideP=best?best.position:null;
@@ -968,15 +1002,37 @@ function exitToMenu(){playing=false;D.armed=false;updArm();highlight(null);guide
 function pause(){if(!playing)return;playing=false;showScreen('sPause');}
 
 /* ---------- Sound: motor hum and beeps (WebAudio, no files) ---------- */
-let AC=null,motorOsc=null,motorGain=null;
+let AC=null,motorOsc=null,motorGain=null,master=null,windGain=null,windF=null,humGain=null,lastThud=0;
+function noiseBuf(sec){const b=AC.createBuffer(1,AC.sampleRate*sec,AC.sampleRate),d=b.getChannelData(0);let l=0;for(let i=0;i<d.length;i++){l=l*0.97+(Math.random()*2-1)*0.03;d[i]=l*6+(Math.random()*2-1)*0.15;}return b;}
 function audioInit(){
   if(AC)return;try{AC=new (window.AudioContext||window.webkitAudioContext)();
+  master=AC.createGain();master.gain.value=0.9;master.connect(AC.destination);
+  // motor or wing buzz
   motorOsc=AC.createOscillator();motorOsc.type='sawtooth';const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=1600;
-  motorGain=AC.createGain();motorGain.gain.value=0;motorOsc.connect(f);f.connect(motorGain);motorGain.connect(AC.destination);motorOsc.start();}catch(e){AC=null;}
+  motorGain=AC.createGain();motorGain.gain.value=0;motorOsc.connect(f);f.connect(motorGain);motorGain.connect(master);motorOsc.start();
+  // air rushing past: looped soft noise through a band-pass that opens with speed
+  const n=AC.createBufferSource();n.buffer=noiseBuf(2);n.loop=true;windF=AC.createBiquadFilter();windF.type='bandpass';windF.Q.value=0.7;windF.frequency.value=300;
+  windGain=AC.createGain();windGain.gain.value=0;n.connect(windF);windF.connect(windGain);windGain.connect(master);n.start();
+  // room tone: a quiet low hum like a fridge far away, louder near the kitchen
+  humGain=AC.createGain();humGain.gain.value=0;humGain.connect(master);
+  for(const [fr,v] of [[50,0.5],[100,0.3],[150,0.12]]){const o=AC.createOscillator();o.frequency.value=fr;const g=AC.createGain();g.gain.value=v;o.connect(g);g.connect(humGain);o.start();}
+  }catch(e){AC=null;}
 }
-function beep(f,d){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;g.gain.value=0.08;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);o.stop(AC.currentTime+d+0.02);}
-// a tiny drone whines higher than a big one: buzzing like a fly
-function updAudio(){if(!motorGain)return;const on=playing&&D.armed;motorGain.gain.setTargetAtTime(on?0.02+D.thrOut*0.04:0,AC.currentTime,0.05);motorOsc.frequency.setTargetAtTime(170+D.thrOut*520,AC.currentTime,0.05);}
+function beep(f,d){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;g.gain.value=0.08;o.connect(g);g.connect(master);o.start();g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);o.stop(AC.currentTime+d+0.02);}
+// soft bump against a wall or furniture
+function thud(v){if(!AC)return;const t=AC.currentTime;if(t-lastThud<0.25)return;lastThud=t;
+  const s=AC.createBufferSource();s.buffer=noiseBuf(0.3);const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=260;const g=AC.createGain();
+  g.gain.setValueAtTime(clamp(v/10,0.05,0.5),t);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);s.connect(f);f.connect(g);g.connect(master);s.start();
+  const o=AC.createOscillator();o.frequency.setValueAtTime(110,t);o.frequency.exponentialRampToValueAtTime(45,t+0.18);const og=AC.createGain();og.gain.setValueAtTime(clamp(v/14,0.04,0.35),t);og.gain.exponentialRampToValueAtTime(0.001,t+0.2);o.connect(og);og.connect(master);o.start();o.stop(t+0.22);
+  if(navigator.vibrate&&v>5)try{navigator.vibrate(30);}catch(e){}}
+// firefly pickup: a little rising bell chord
+function chime(){if(!AC)return;[1047,1319,1568,2093].forEach((f,i)=>setTimeout(()=>beep(f,0.25),i*70));}
+function updAudio(){if(!motorGain)return;const t=AC.currentTime,on=playing&&D.armed,sp=D.vel.length();
+  if(S.mode==='fly'){ // a soft wing hum instead of motors
+    motorOsc.type='triangle';motorGain.gain.setTargetAtTime(on?0.012+Math.min(sp,25)*0.0012:0,t,0.1);motorOsc.frequency.setTargetAtTime(150+sp*6+D.boostK*60,t,0.1);}
+  else{motorOsc.type='sawtooth';motorGain.gain.setTargetAtTime(on?0.02+D.thrOut*0.04:0,t,0.05);motorOsc.frequency.setTargetAtTime(170+D.thrOut*520,t,0.05);}
+  windGain.gain.setTargetAtTime(playing?clamp(sp/22,0,1)*0.09:0,t,0.12);windF.frequency.setTargetAtTime(250+sp*45,t,0.12);
+  const dk=Math.hypot(D.pos.x/K-7.6,D.pos.z/K-7.2);humGain.gain.setTargetAtTime(playing?0.006+clamp(1-dk/4,0,1)*0.02:0,t,0.3);}
 
 /* ---------- Screens ---------- */
 const SCREENS=['sMenu','sSet','sHelp','sPad','sPause','sRes'];
@@ -991,7 +1047,7 @@ function renderMenu(){
     b.onclick=()=>startGame(id);list.appendChild(b);}
   padInfo();
 }
-const MODENOTE={nov:'Новичок: дрон сам держит высоту и тормозит. Левый стик вверх — набор высоты, в середине — висит.',angle:'Angle: дрон сам выравнивается, но газ твой. Висение примерно на 40% газа.',acro:'Acro: как настоящий FPV. Стики задают скорость вращения, сам дрон не выравнивается.'};
+const MODENOTE={fly:'Плавный полёт: без физики дрона, летишь мягко и уверенно, как невидимое существо, с небольшим заносом в поворотах. Взводить не нужно, разбиться нельзя. Shift (или кнопка УСКОР) — ускорение.',nov:'Новичок: дрон сам держит высоту и тормозит. Левый стик вверх — набор высоты, в середине — висит.',angle:'Angle: дрон сам выравнивается, но газ твой. Висение примерно на 40% газа.',acro:'Acro: как настоящий FPV. Стики задают скорость вращения, сам дрон не выравнивается.'};
 function renderSettings(){
   document.querySelectorAll('.seg').forEach(seg=>{const k=seg.dataset.k;seg.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',String(S[k])===b.dataset.v);});});
   document.querySelectorAll('input[type=range]').forEach(r=>r.value=S[r.dataset.k]);
@@ -1000,7 +1056,7 @@ function renderSettings(){
 }
 document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=seg.dataset.k;
   if(k==='mode'&&D.armed){toast('Режим меняют без взвода','bad');return;}
-  S[k]=b.dataset.v;save();if(k==='q')applyQuality();if(k==='mode')resetDrone(false);if(k==='cam')$('ocam').textContent=CAMN[S.cam];renderSettings();}));
+  S[k]=b.dataset.v;save();if(k==='q')applyQuality();if(k==='mode'){resetDrone(false);touchMode();}if(k==='cam')$('ocam').textContent=CAMN[S.cam];renderSettings();}));
 document.querySelectorAll('input[type=range]').forEach(r=>r.addEventListener('input',()=>{S[r.dataset.k]=+r.value;save();renderSettings();}));
 $('mSet').onclick=()=>{backTo='sMenu';renderSettings();showScreen('sSet');};
 $('pSet').onclick=()=>{backTo='sPause';renderSettings();showScreen('sSet');};
@@ -1015,6 +1071,8 @@ $('bArm').addEventListener('pointerdown',e=>{e.preventDefault();toggleArm();});
 $('bCam').addEventListener('pointerdown',e=>{e.preventDefault();cycleCam();});
 $('bPause').addEventListener('pointerdown',e=>{e.preventDefault();pause();});
 $('bBat').addEventListener('pointerdown',e=>{e.preventDefault();swapBattery();});
+{const b=$('bBoost');b.addEventListener('pointerdown',e=>{e.preventDefault();touchBoost=true;srcPref='touch';b.classList.add('on');});
+ for(const ev of ['pointerup','pointercancel','pointerleave'])b.addEventListener(ev,()=>{touchBoost=false;b.classList.remove('on');});}
 
 /* ---------- Controller axis wizard ---------- */
 let cal=null;
