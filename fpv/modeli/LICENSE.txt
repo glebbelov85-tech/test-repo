@@ -1,0 +1,3 @@
+Модели в этой папке - CC0 (общественное достояние), можно использовать где угодно, указывать автора не обязательно.
+Kenney (www.kenney.nl): Space Kit - masterskaya, akkumulyatornaya, vyshka, stadion, kiosk, vhod, trener;
+City Kit (Commercial) - shkola, bashnya-asa (текстура встроена в файл).

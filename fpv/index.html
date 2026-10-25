@@ -103,6 +103,38 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 .lochead{grid-column:1/-1;font-family:var(--display);font-size:20px;color:var(--hazard);letter-spacing:.04em;margin-top:6px;border-bottom:2px solid var(--line);padding-bottom:4px}
 .ver{justify-self:start;font-family:var(--mono);font-size:14px;letter-spacing:.1em;color:#111;background:var(--hazard);border-radius:4px;padding:3px 10px}
 #calAxes{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:pre-wrap}
+/* course run: holographic task panel, module transition, coach screen, course card in the menu */
+#task.holo{background:linear-gradient(180deg,rgba(6,20,32,.78),rgba(4,10,20,.66));border:1px solid rgba(124,243,255,.35);box-shadow:0 0 18px rgba(124,243,255,.15),inset 0 0 24px rgba(124,243,255,.06);text-align:left;padding:8px 14px 10px;max-width:min(600px,calc(100vw - 330px));min-width:min(300px,calc(100vw - 330px));font-family:var(--body);text-shadow:0 1px 2px #000}
+#task.holo .sn{color:#7cf3ff;font-family:var(--mono);font-size:.68em;margin-bottom:3px}
+#task .kt{font-family:var(--display);font-size:1.08em;color:#fff;letter-spacing:.02em}
+#task .ks{color:#9fb3c2;font-size:.86em}
+#task .kh{margin-top:4px;color:#7cf3ff;font-family:var(--display);font-size:.92em}
+#task .kh::before{content:'➤ '}
+#task .kp{font-size:.9em;line-height:1.45;color:#e8f6ff;max-height:7.4em;overflow:hidden}
+#task .tz{opacity:.28}
+#task .kp.short{max-height:4.4em}
+#task{transition:opacity .25s}#task.see{opacity:.3}
+#task .card2{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start}
+#task .pic{font-size:2.1em;line-height:1;font-weight:400;color:#fff;filter:drop-shadow(0 0 8px rgba(124,243,255,.6))}
+#task .chain{margin-top:5px;font-family:var(--mono);font-size:.8em;color:#ffd36e;display:flex;flex-wrap:wrap;gap:2px 4px;align-items:center}
+#task .chain i{font-style:normal;color:#7cf3ff}
+#task .kl{margin:5px 0 0;padding-left:0;list-style:none;font-size:.82em;color:#9fb3c2;columns:2;column-gap:16px}
+#task .kl li.ok{color:#6dff9a}#task .kl li.ok::after{content:' ✓'}
+@media (max-height:480px){#task.holo{font-size:13px;padding:6px 10px}#task .kp{max-height:5.9em}#task .kl{display:none}}
+#fade{position:fixed;inset:0;z-index:40;display:grid;place-content:center;justify-items:center;gap:10px;background:radial-gradient(ellipse at 50% 50%,rgba(8,26,40,.96),#02040a 75%);opacity:0;transition:opacity .6s;pointer-events:none;--mc:#7cf3ff}
+#fade.on{opacity:1}#fade.out{opacity:0}
+#fade::before{content:'';width:min(60vw,420px);height:3px;background:var(--mc);box-shadow:0 0 18px var(--mc);animation:fl 1.6s ease-in-out infinite}
+@keyframes fl{0%{transform:scaleX(.1)}50%{transform:scaleX(1)}100%{transform:scaleX(.1)}}
+#fTag{font-family:var(--mono);letter-spacing:.35em;color:var(--mc);font-size:15px}
+#fName{font-family:var(--display);font-size:clamp(26px,5vw,48px);text-align:center;max-width:90vw;text-shadow:0 0 22px var(--mc)}
+.hero{display:grid;gap:10px;text-align:left;background:linear-gradient(135deg,rgba(18,40,70,.9),rgba(40,16,60,.85));border:2px solid rgba(124,243,255,.45);border-radius:14px;padding:16px 18px;box-shadow:0 0 30px rgba(124,243,255,.12)}
+.hero .tag{font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:#7cf3ff}
+.hero b{font-family:var(--display);font-weight:400;font-size:24px}
+.hero .bar{height:8px;border-radius:4px;background:#1a2433;overflow:hidden}.hero .bar i{display:block;height:100%;background:linear-gradient(90deg,#7cf3ff,#ff7ce0)}
+.hero .mods{display:flex;gap:6px;flex-wrap:wrap}.hero .mods span{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:4px;background:#1a2433;color:#93a0ab}
+.hero .mods span.done{background:#164a2c;color:#6dff9a}.hero .mods span.open{background:#123c52;color:#7cf3ff}
+.hero button{justify-self:start;background:#7cf3ff;box-shadow:0 3px 0 #2a8b99}
+.trainhead{font-family:var(--display);font-size:22px;color:var(--fg);margin-top:4px}
 </style>
 </head>
 <body>
@@ -123,6 +155,7 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
   <div class="c" id="oBC"><span id="ocam">FPV</span><div id="sticks"><div class="sbox"><i id="sL"></i></div><div class="sbox"><i id="sR"></i></div></div></div>
 </div>
 <div id="toast"></div>
+<div id="fade" hidden><span id="fTag"></span><span id="fName"></span></div>
 
 <div id="touch" hidden>
   <div class="stick" id="stL"><span>ГАЗ · РЫСКАНЬЕ</span><i></i></div>
@@ -136,10 +169,12 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 <!-- Main menu -->
 <div class="screen" id="sMenu">
   <div class="card">
-    <h1>Операторы дронов<small>ФОНД · УЧЕБНЫЙ АНГАР 01</small></h1>
+    <h1>Операторы дронов<small>ЛЕТАЮЩИЙ ГОРОД ВЗЛЁТ</small></h1>
     <span class="ver"></span>
     <div class="hz"></div>
-    <p>После прорыва в комплексе людей в опасные зоны больше не пускают. Туда летят дроны. Ты курсант школы операторов: сначала учишься в безопасном ангаре, потом получаешь допуск в зоны.</p>
+    <p>Над облаками висит летающий город Взлёт. Каждое его здание — модуль курса юного пилота FPV. Взлетай, лети по стрелкам к модулю, влетай внутрь: там голос расскажет главное, а ворота с ответами проверят, что ты запомнил.</p>
+    <div class="hero" id="hero"></div>
+    <div class="trainhead">Тренировки</div>
     <div class="tasks" id="taskList"></div>
     <div class="btns">
       <button class="ghost" id="mSet">Настройки</button>
@@ -173,8 +208,10 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
     <div class="row"><label>Наклон камеры: <span id="vTilt"></span>°</label><input type="range" min="0" max="45" step="1" data-k="tilt"></div>
     <div class="row"><label>Скорость вращения (Acro): <span id="vRate"></span>°/с</label><input type="range" min="200" max="900" step="10" data-k="rate"></div>
     <div class="row"><label>Экспо стиков: <span id="vExpo"></span></label><input type="range" min="0" max="0.8" step="0.05" data-k="expo"></div>
-    <div class="row"><label>Графика</label><div class="seg" data-k="q"><button data-v="0">Низкая</button><button data-v="1">Средняя</button><button data-v="2">Высокая</button></div></div>
+    <div class="row"><label>Графика</label><div class="seg" data-k="q"><button data-v="0">Низкая</button><button data-v="1">Средняя</button><button data-v="2">Высокая</button><button data-v="3">Ультра (ПК)</button></div></div>
     <div class="row"><label>Все уроки сразу</label><div class="seg" data-k="unlockAll"><button data-v="1">Открыть</button><button data-v="">По порядку</button></div></div>
+    <div class="row"><label>Голос</label><div class="seg" data-k="voice"><button data-v="1">Вкл</button><button data-v="0">Выкл</button></div></div>
+    <div class="row"><label>Какой голос</label><select id="voiceSel" style="font:inherit;padding:8px;background:#1a2128;color:var(--fg);border:2px solid var(--line);border-radius:6px;max-width:100%"></select></div>
     <div class="row"><label>Помехи видео</label><div class="seg" data-k="fx"><button data-v="1">Вкл</button><button data-v="0">Выкл</button></div></div>
     <div class="btns"><button id="setBack">Готово</button></div>
   </div>
@@ -218,6 +255,17 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
   </div>
 </div>
 
+<!-- Coach check (course «coach» steps): an adult confirms -->
+<div class="screen" id="sCoach" hidden>
+  <div class="card">
+    <span class="note" style="font-family:var(--mono);letter-spacing:.2em;color:#7cf3ff">ЗАДАНИЕ С ТРЕНЕРОМ</span>
+    <h2>Покажи тренеру</h2>
+    <p id="cText"></p>
+    <p class="note">Тренер или взрослый смотрит, как ты это делаешь, и нажимает кнопку. Если сейчас тренера нет, нажми «Позже»: задание засчитается, когда тренер проверит.</p>
+    <div class="btns"><button id="cOk">Тренер принял ✓</button><button class="ghost" id="cLater">Позже</button></div>
+  </div>
+</div>
+
 <!-- Result -->
 <div class="screen" id="sRes" hidden>
   <div class="card">
@@ -231,11 +279,14 @@ input[type=range]{width:100%;accent-color:var(--hazard)}
 
 <script src="three.min.js"></script>
 <script src="post.js"></script>
+<script src="GLTFLoader.js?v=4.0"></script>
+<script src="kurs.js?v=4.0"></script>
+<script src="gorod.js?v=4.0"></script>
 <script>
 "use strict";
 if(!window.THREE){document.body.innerHTML='<p style="padding:24px">Не загрузился 3D-движок (three.min.js). Обнови страницу.</p>';throw new Error('no three');}
 const $=id=>document.getElementById(id);
-const VERSION='3.2 от 24.10.2026'; // bump on every release so testers can tell builds apart
+const VERSION='4.0 от 25.10.2026'; // bump on every release so testers can tell builds apart
 document.querySelectorAll('.ver').forEach(e=>e.textContent='Версия '+VERSION);
 document.title='Операторы дронов · v'+VERSION.split(' ')[0];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -243,7 +294,7 @@ const G=9.81;
 
 /* ---------- Saved settings and results ---------- */
 const KEY='fpvAcademy.v1';
-const DEF={mode:'nov',cam:'fpv',tilt:20,rate:560,expo:0.35,q:(matchMedia('(pointer:coarse)').matches?'0':'1'),fx:'1',pad:null,best:{},stars:{},unlockAll:''};
+const DEF={mode:'nov',cam:'fpv',tilt:20,rate:560,expo:0.35,q:(matchMedia('(pointer:coarse)').matches?'0':'1'),fx:'1',pad:null,best:{},stars:{},unlockAll:'',voice:'1',voiceName:'',kurs:null};
 let S=Object.assign({},DEF);
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)S=Object.assign({},DEF,s,{best:Object.assign({},s.best||{}),stars:Object.assign({},s.stars||{})});}catch(e){}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
@@ -261,10 +312,11 @@ const camFPV=new THREE.PerspectiveCamera(78,1,0.03,200);
 const camExt=new THREE.PerspectiveCamera(60,1,0.05,200);
 function applyQuality(){
   const q=+S.q;
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1,[1,1.5,2][q]));
+  // ultra (PC): render above screen resolution for crisp edges, 4K shadows, MSAA in the post chain
+  renderer.setPixelRatio(q>=3?Math.min(2,Math.max(1.5,devicePixelRatio||1)):Math.min(devicePixelRatio||1,[1,1.5,2][q]));
   renderer.shadowMap.enabled=q>=1;
   sun.castShadow=q>=1;
-  const ms=q>=2?2048:1024;if(sun.shadow.mapSize.x!==ms){sun.shadow.mapSize.set(ms,ms);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
+  const ms=q>=3?4096:q>=2?2048:1024;if(sun.shadow.mapSize.x!==ms){sun.shadow.mapSize.set(ms,ms);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}}
   for(const o of fxHi)o.visible=q>=1;
   scene.traverse(o=>{if(o.material)o.material.needsUpdate=true;}); // shadow on/off needs shader rebuild
   setupPost();resize();
@@ -284,10 +336,11 @@ function setupPost(){
   composer=null;setTM(THREE.ACESFilmicToneMapping);
   if(+S.q<1||!renderer.capabilities.isWebGL2||!THREE.EffectComposer||!THREE.UnrealBloomPass)return;
   try{
-    const rt=new THREE.WebGLRenderTarget(innerWidth,innerHeight,{type:THREE.HalfFloatType});
+    const q=+S.q,RT=q>=2&&THREE.WebGLMultisampleRenderTarget?THREE.WebGLMultisampleRenderTarget:THREE.WebGLRenderTarget;
+    const rt=new RT(innerWidth,innerHeight,{type:THREE.HalfFloatType});if(rt.samples!==undefined)rt.samples=q>=3?8:4;
     composer=new THREE.EffectComposer(renderer,rt);
     renderPass=new THREE.RenderPass(scene,camFPV);composer.addPass(renderPass);
-    bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth/2,innerHeight/2),0.4,0.4,1.05);composer.addPass(bloomPass);
+    bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth/(q>=3?1:2),innerHeight/(q>=3?1:2)),q>=3?0.5:0.4,0.4,1.05);composer.addPass(bloomPass);
     composer.addPass(new THREE.ShaderPass(GRADE));
     setTM(THREE.NoToneMapping); // r128 tone-maps into render targets too, GRADE does it once at the end
   }catch(e){composer=null;}
@@ -331,7 +384,7 @@ function padTex(label,col){return canvasTex(256,256,(g,w,h)=>{
 });}
 const texSign=canvasTex(1024,256,(g,w,h)=>{
   g.fillStyle='#e9e4d6';g.fillRect(0,0,w,h);
-  g.fillStyle='#1b1f22';g.font='bold 92px Arial';g.textAlign='left';g.textBaseline='middle';g.fillText('ФОНД · АНГАР 01',150,96);
+  g.fillStyle='#1b1f22';g.font='bold 92px Arial';g.textAlign='left';g.textBaseline='middle';g.fillText('ШКОЛА FPV · АНГАР 01',150,96);
   g.font='48px Arial';g.fillStyle='#8a1e1e';g.fillText('ШКОЛА ОПЕРАТОРОВ БПЛА',150,186);
   g.strokeStyle='#1b1f22';g.lineWidth=10;g.beginPath();g.arc(74,128,52,0,7);g.stroke();
   g.beginPath();g.arc(74,128,22,0,7);g.stroke();
@@ -426,9 +479,17 @@ let boxes=[];                       // solid AABBs of the current room: {min:Vec
 // Locations: each room is a group with its own size, solids and look; only the current one is visible
 const LOCS={
   hangar:{name:'Учебный ангар 01',g:new THREE.Group(),size:[30,20,12],fog:[0x0b0f13,30,95],sun:[-12,24,8,0.9],orbit:[18,5,13],
-    qrows:[{x:0,z:-2,ry:0},{x:17,z:-2,ry:Math.PI/2},{x:-17,z:-2,ry:Math.PI/2}]},
+    qrows:[{x:0,z:-2,ry:0},{x:17,z:-2,ry:Math.PI/2},{x:-17,z:-2,ry:Math.PI/2}],
+    // course run: the ring route around the hall, entry by the big door, the exit portal in the door
+    track:[...Array(20).keys()].map(k=>{const a=(k-1)/20*Math.PI*2;return new THREE.Vector3(18*Math.cos(a),[2.6,3.6,4.8,4,3,2.4,3.2,4.6,5.2,3.8][k%10],-11*Math.sin(a));}),
+    spots:[[-8,4,0],[8,4,0],[-16,-1,Math.PI/2],[16,-1,Math.PI/2],[0,-8,0]],
+    enter:{pos:new THREE.Vector3(26,0,0),heading:Math.PI/2},exit:{p:new THREE.Vector3(29.4,3.5,0),n:new THREE.Vector3(1,0,0),w:10,h:6}},
+  city:{name:'Город Взлёт',g:new THREE.Group(),size:[420,420,160],fog:[0x05060f,500,2600],sun:[60,120,40,1.1],orbit:[120,40,120],far:3200,round:true,spd:1.9,
+    qrows:[{x:0,z:60,ry:0}]},
   lab:{name:'Лаборатория 02',g:new THREE.Group(),size:[20,16,6.5],fog:[0x101a1e,25,70],sun:[-8,22,10,0.55],orbit:[12,3.6,10],
-    qrows:[{x:0,z:5,ry:0},{x:-8,z:-3,ry:Math.PI/2},{x:8,z:-3,ry:Math.PI/2}]},
+    qrows:[{x:0,z:5,ry:0},{x:-8,z:-3,ry:Math.PI/2},{x:8,z:-3,ry:Math.PI/2}],
+    track:[...Array(16).keys()].map(k=>{const a=(k-1)/16*Math.PI*2;return new THREE.Vector3(-9.5*Math.sin(a),[2.2,3,3.8,2.8,1.9,2.6,3.6,3][k%8],-2+7.5*Math.cos(a));}),
+    enter:{pos:new THREE.Vector3(0,0,12.5),heading:0},exit:{p:new THREE.Vector3(0,2,15.85),n:new THREE.Vector3(0,0,1),w:4,h:3}},
 };
 let locId='hangar';
 function buildLoc(id,fn){const L=LOCS[id];[HX,HZ,HY]=L.size;boxes=L.boxes=[];scene.add(L.g);fn(L.g);}
@@ -436,8 +497,14 @@ function setLoc(id){
   const L=LOCS[id];locId=id;for(const k in LOCS)LOCS[k].g.visible=k===id;
   [HX,HZ,HY]=L.size;boxes=L.boxes;
   scene.background.setHex(L.fog[0]);scene.fog.color.setHex(L.fog[0]);scene.fog.near=L.fog[1];scene.fog.far=L.fog[2];
-  sun.position.set(L.sun[0],L.sun[1],L.sun[2]);sun.intensity=L.sun[3];
+  sun.position.set(L.sun[0],L.sun[1],L.sun[2]);sun.intensity=L.sun[3];sun.target.position.set(0,0,0);
+  for(const c of [camFPV,camExt]){c.far=L.far||200;c.updateProjectionMatrix();}
+  // outdoors the sun shadow follows the drone: a tight box keeps it sharp
+  const sc=sun.shadow.camera;if(L.round)Object.assign(sc,{left:-40,right:40,top:40,bottom:-40,near:1,far:400});else Object.assign(sc,{left:-32,right:32,top:24,bottom:-24,near:1,far:60});sc.updateProjectionMatrix();
 }
+// rotated box {x,z,hx,hz,ry,y0,y1} (city buildings); min/max is its axis-aligned bound for the blob shadow
+function obb(o){const c=Math.abs(Math.cos(o.ry)),s=Math.abs(Math.sin(o.ry)),ex=o.hx*c+o.hz*s,ez=o.hx*s+o.hz*c;
+  return Object.assign({obb:true,c:Math.cos(o.ry),s:Math.sin(o.ry),min:new THREE.Vector3(o.x-ex,o.y0,o.z-ez),max:new THREE.Vector3(o.x+ex,o.y1,o.z+ez)},o);}
 function solid(x,y,z,sx,sy,sz){boxes.push({min:new THREE.Vector3(x-sx/2,y-sy/2,z-sz/2),max:new THREE.Vector3(x+sx/2,y+sy/2,z+sz/2)});}
 const M={
   floor:new THREE.MeshStandardMaterial(Object.assign({roughness:1,metalness:.05,normalScale:new THREE.Vector2(.6,.6)},surfFloor)),
@@ -823,12 +890,16 @@ function updFx(dt,now){
   props.forEach((o,i)=>{o.p.rotation.y=D.propSpin*(i===0||i===3?1:-1);o.blades.forEach(b=>b.visible=blur<0.9);o.disc.material.opacity=blur*0.35;});
   // blob shadow on the floor or on a crate top under the drone
   let gy=0;for(const b of boxes)if(D.pos.x>b.min.x&&D.pos.x<b.max.x&&D.pos.z>b.min.z&&D.pos.z<b.max.z&&b.max.y<=D.pos.y+0.05)gy=Math.max(gy,b.max.y);
+  if(LOCS[locId].round&&Math.hypot(D.pos.x,D.pos.z)>CITY.R)gy=-99;
   const h=D.pos.y-gy;blob.position.set(D.pos.x,gy+0.012,D.pos.z);blob.scale.setScalar(0.5+h*0.12);blob.material.opacity=clamp(1-h/8,0.15,1);
   blob.visible=S.cam!=='fpv'||h>0.3;
   // beacon pulse
   if(beacon.visible){const u=beacon.userData,k=1+Math.sin(now/220)*0.12;u.ring.scale.setScalar(k);u.ring.rotation.y+=dt*1.5;u.ring.rotation.x=Math.PI/2;
     u.beam.scale.y=Math.max(beacon.position.y,0.01);u.beam.position.y=-beacon.position.y/2;}
   if(locId==='lab')for(const s of labSpin)s.o.rotation.y+=s.speed*dt;
+  if(locId==='city'){CITY.tick(now/1000,dt);if(CITY.ver!==cityVer)cityBoxes();
+    // the sun shadow box follows the drone
+    _v.copy(D.pos);if(!playing&&$('osd').hidden)_v.set(0,0,0);sun.target.position.copy(_v);sun.position.copy(_v).add(_v2.set(60,120,40));}
   // dust drifts slowly
   if(dust&&dust.visible){dust.rotation.y+=dt*0.004;dust.position.y=Math.sin(now/4000)*0.2;}
 }
@@ -925,8 +996,10 @@ function ocv(c){ // resting cell voltage by remaining charge 0..1
   return 4.2;
 }
 function charge(){return clamp(1-D.used/BAT.cap,0,1);}
+let spawn=null; // where the drone appears after a crash: {pos,heading}, null = pad H of the room
 function resetDrone(full){
-  D.pos.set(PAD_A.x,0,PAD_A.z);D.vel.set(0,0,0);D.w.set(0,0,0);D.heading=0;D.q.setFromEuler(_e.set(0,0,0));
+  const sp=spawn||(LOCS[locId].start)||{pos:PAD_A,heading:0};
+  D.pos.copy(sp.pos);D.vel.set(0,0,0);D.w.set(0,0,0);D.heading=sp.heading||0;D.q.setFromEuler(_e.set(0,D.heading,0));
   D.armed=false;D.landed=true;D.crashed=0;D.thrOut=0;
   if(full!==false){D.used=0;D.flightTime=0;}
   kbThr=0;touchSt.L.y=S.mode==='nov'?0:-1;touchSt.L.draw&&touchSt.L.draw();
@@ -976,8 +1049,9 @@ function step(dt){
     thrust=D.armed?clamp(inp.thr,0,1)*MAXACC*power:0;
   }else{ // novice: hold altitude and brake by itself
     D.heading-=inp.yaw*2.2*dt;
-    const vzDes=inp.ly*2.5;
-    const fwd=inp.pitch*5,right=inp.roll*5;
+    const k=LOCS[locId].spd||1; // outdoors the novice mode flies faster: the city is big
+    const vzDes=inp.ly*2.5*Math.sqrt(k);
+    const fwd=inp.pitch*5*k,right=inp.roll*5*k;
     const sh=Math.sin(D.heading),ch=Math.cos(D.heading);
     const vdx=-sh*fwd+ch*right, vdz=-ch*fwd-sh*right;
     let ax=(vdx-D.vel.x)*2.2, az=(vdz-D.vel.z)*2.2;
@@ -1010,9 +1084,11 @@ function step(dt){
   collide();
 }
 function collide(){
-  const p=D.pos;
-  // floor
-  if(p.y<0){
+  const p=D.pos,L=LOCS[locId];
+  // the flying city has no floor past the platform edge
+  const off=L.round&&Math.hypot(p.x,p.z)>CITY.R-0.3;
+  if(off&&p.y<-6)return crash('улетел за край платформы');
+  if(p.y<0&&!off){
     const vy=-D.vel.y, hs=Math.hypot(D.vel.x,D.vel.z), tl=tiltDeg();
     if(vy>3.2)return crash('удар о пол на скорости '+(vy*3.6).toFixed(0)+' км/ч');
     if(tl>55&&(hs>1.5||D.armed))return crash('дрон лёг на бок');
@@ -1026,14 +1102,29 @@ function collide(){
   // room walls and ceiling
   const sp=D.vel.length();
   const hit=(why)=>{if(sp>3.5)crash(why);else{D.vel.multiplyScalar(-0.3);}};
+  if(L.round){const r=Math.hypot(p.x,p.z),rmax=CITY.R+90;if(r>rmax){p.x*=rmax/r;p.z*=rmax/r;D.vel.multiplyScalar(0.5);}}
+  else{
   if(p.x<-HX+R_DRONE){p.x=-HX+R_DRONE;hit('удар о стену');}
   if(p.x>HX-R_DRONE){p.x=HX-R_DRONE;hit('удар о стену');}
   if(p.z<-HZ+R_DRONE){p.z=-HZ+R_DRONE;hit('удар о стену');}
   if(p.z>HZ-R_DRONE){p.z=HZ-R_DRONE;hit('удар о стену');}
-  if(p.y>HY-0.5-R_DRONE){p.y=HY-0.5-R_DRONE;hit('удар о потолок');}
+  }
+  if(p.y>HY-0.5-R_DRONE){p.y=HY-0.5-R_DRONE;hit(L.round?'выше нельзя':'удар о потолок');}
   // solids
   const list=task&&task.gatesOn?boxes.concat(task.solids):boxes;
   for(const b of list){
+    if(b.obb){ // rotated box: work in its own frame
+      if(p.y<b.y0-R_DRONE||p.y>b.y1+R_DRONE)continue;
+      const dx=p.x-b.x,dz=p.z-b.z,lx=dx*b.c-dz*b.s,lz=dx*b.s+dz*b.c;
+      if(Math.abs(lx)>b.hx+R_DRONE||Math.abs(lz)>b.hz+R_DRONE)continue;
+      if(sp>2.5)return crash(b.lock?'модуль ещё закрыт':'столкновение со зданием');
+      const o=[[b.hx+R_DRONE-lx,'x',1],[b.hx+R_DRONE+lx,'x',-1],[b.hz+R_DRONE-lz,'z',1],[b.hz+R_DRONE+lz,'z',-1],[b.y1+R_DRONE-p.y,'y',1],[p.y-(b.y0-R_DRONE),'y',-1]].sort((a,b)=>a[0]-b[0])[0];
+      if(o[1]==='y'){p.y+=o[0]*o[2];D.vel.y*=-0.3;if(o[2]>0){D.vel.y=Math.max(D.vel.y,0);D.landed=true;}continue;}
+      let nx=o[1]==='x'?lx+o[0]*o[2]:lx,nz=o[1]==='z'?lz+o[0]*o[2]:lz;
+      p.x=b.x+nx*b.c+nz*b.s;p.z=b.z-nx*b.s+nz*b.c;
+      const vn=o[1]==='x'?[b.c,-b.s]:[b.s,b.c],vd=D.vel.x*vn[0]+D.vel.z*vn[1];if(vd*o[2]<0){D.vel.x-=1.3*vd*vn[0];D.vel.z-=1.3*vd*vn[1];}
+      continue;
+    }
     if(p.x>b.min.x-R_DRONE&&p.x<b.max.x+R_DRONE&&p.y>b.min.y-R_DRONE&&p.y<b.max.y+R_DRONE&&p.z>b.min.z-R_DRONE&&p.z<b.max.z+R_DRONE){
       if(sp>2.5)return crash('столкновение с препятствием');
       // push out along the smallest overlap
@@ -1079,8 +1170,8 @@ const nctx=$('noise').getContext('2d');const nimg=nctx.createImageData(160,90);
 let noiseKick=0;
 function drawNoise(dt){
   noiseKick=Math.max(0,noiseKick-dt*0.7);
-  const d=D.pos.distanceTo(PAD_A);
-  let k=S.fx==='1'&&S.cam==='fpv'?0.05+d/220+noiseKick*0.8+(D.vcell<3.5?0.1:0):0;
+  const d=D.pos.distanceTo((LOCS[locId].start||{pos:PAD_A}).pos);
+  let k=S.fx==='1'&&S.cam==='fpv'?0.05+d/(LOCS[locId].round?1800:220)+noiseKick*0.8+(D.vcell<3.5?0.1:0):0;
   const el=$('noise');el.style.opacity=k.toFixed(3);$('scan').style.display=S.fx==='1'&&S.cam==='fpv'&&!$('osd').hidden?'':'none';
   if(k<0.01)return;
   const a=nimg.data;for(let i=0;i<a.length;i+=4){const v=Math.random()*255|0;a[i]=a[i+1]=a[i+2]=v;a[i+3]=255;}
@@ -1148,7 +1239,7 @@ function pickQuiz(pool,n){
 function showQuiz(T){
   T.prev=D.pos.clone();
   if(T.qi>=T.qs.length){for(const G of qgates)G.g.visible=false;T.solids=[];T.gatesOn=false;return;}
-  const q=T.qs[T.qi],rows=LOCS[locId].qrows;placeQuizGates(rows[T.qi%rows.length],q.a.length);
+  const q=T.qs[T.qi],rows=LOCS[locId].qrows;placeQuizGates(rows[(T.qi+(T.r0||0))%rows.length],q.a.length);
   q.a.forEach((a,i)=>{drawSign(qgates[i],QLET[i],a,'idle');qgates[i].led.color.setHex(0xffc030).multiplyScalar(2.2);});
   T.solids=qgates.flatMap(G=>G.solids);T.gatesOn=true;
 }
@@ -1158,6 +1249,7 @@ function quizTick(T,dt){
   for(let i=0;i<q.a.length;i++)if(passed(qgates[i],T.prev)){
     const ok=i===q.right;T.lastOk=ok;T.pick=i;T.wait=ok?1.8:4.5;
     if(ok){T.right++;beep(880,0.08);setTimeout(()=>beep(1320,0.1),90);}else{beep(200,0.35);T.wrong.push(q);}
+    T.onAns&&T.onAns(ok,q);
     qgates.slice(0,q.a.length).forEach((G,k)=>{const st=k===q.right?'ok':k===i?'bad':'dim';drawSign(G,QLET[k],q.a[k],st);G.led.color.setHex(st==='ok'?0x30ff6a:st==='bad'?0xff3020:0x1d3a52).multiplyScalar(st==='dim'?1:3);});
     break;
   }
@@ -1184,7 +1276,7 @@ function orderShow(T){
   const s=T.sets[T.ri];
   if(!s){for(const G of qgates)G.g.visible=false;T.solids=[];T.gatesOn=false;return;}
   const n=s.items.length;T.map=shuffle([...Array(n).keys()]);
-  placeSpots(shuffle(LAB_SPOTS).slice(0,n));
+  placeSpots(shuffle(LOCS[locId].spots||LAB_SPOTS).slice(0,n));
   qgates.forEach((G,g)=>{if(g<n)idleGate(G,s.items[T.map[g]]);});
   T.solids=qgates.slice(0,n).flatMap(G=>G.solids);T.gatesOn=true;
 }
@@ -1249,6 +1341,10 @@ function lessonsLab(){
   out.freeLab={loc:'lab',tag:'СВОБОДНО',name:'Свободный полёт в лаборатории',desc:'Полетай между стендами как хочешь.',learn:['летать без задания'],steps:()=>[],free:true};
   return out;
 }
+// city solids come in metres as rotated boxes; refreshed when a model loads or a door changes state
+let cityVer=0;
+function cityBoxes(){const L=LOCS.city;L.boxes.length=0;cityVer=CITY.ver;for(const o of CITY.solids)L.boxes.push(obb(o));}
+const KURS_MODS=KURS.mods.map(m=>({id:m.id,n:m.n,t:m.t}));
 const crashStars=n=>n===0?3:n<3?2:1;
 const H_UP=V3(PAD_A.x,1.2,PAD_A.z);
 
@@ -1319,6 +1415,7 @@ const LESSONS={
       return n>=Math.ceil(N*0.8)?{val:n,stars:n===N?3:n>=N-1?2:1,label:`${n} из ${N} верно`,fail:miss?'Ошибки: '+miss+'.':''}
         :{val:n,stars:0,label:`${n} из ${N} верно`,fail:`Нужно хотя бы ${Math.ceil(N*0.8)} из ${N}, как в итоговом тесте курса. Ошибки: ${miss}.`};},
     better:(a,b)=>a>b, fmtBest:v=>'лучший результат: '+v+' из 10'},
+  freeCity:{loc:'city',tag:'ГОРОД ВЗЛЁТ',name:'Полёт над городом',desc:'Полетай над летающим городом Взлёт.',learn:['летать без задания'],steps:()=>[],free:true},
   free:{tag:'СВОБОДНО',name:'Свободный полёт',desc:'Полетай по ангару как хочешь. Попробуй режимы Angle и Acro.',learn:['летать без задания','менять камеру и режим (клавиша M или в настройках)'],steps:()=>[],free:true},
 };
 Object.assign(LESSONS,lessonsLab());
@@ -1332,40 +1429,45 @@ function startTask(id){
   const L=LESSONS[id];curTask=id;setLoc(L.loc||'hangar');
   for(const g of gates.concat(qgates))g.g.visible=false;
   hoverZone.visible=false;beacon.visible=false;
-  resetDrone();
-  task={id,L,t:0,crashes:0,done:false,si:0,failed:false};
+  kursReset&&kursReset();
+  spawn=L.spawn?L.spawn():null;resetDrone();
+  task={id,L,t:0,crashes:0,done:false,si:0,failed:false,entered:-1};
   task.onCrash=()=>{task.crashes++;task.restart=true;};
   L.setup&&L.setup(task);
   task.steps=L.steps(task);
   task.tick=dt=>{
-    if(task.restart&&!D.crashed){task.restart=false;L.setup&&L.setup(task);task.steps=L.steps(task);task.si=0;toast(L.keep?'Взлетай снова: вопрос тот же, ответы сохранены':'Начнём этот урок с первого шага','bad');}
+    if(task.restart&&!D.crashed){task.restart=false;
+      // course runs keep their place: only take off again and carry on from the same step
+      if(L.resume){task.steps.splice(task.si,0,sArm(),sUp(task.steps[task.si]&&task.steps[task.si].upH||1.2));task.entered=task.si+2;toast('Взлетай снова и продолжай с того же места','bad');}
+      else{L.setup&&L.setup(task);task.steps=L.steps(task);task.si=0;task.entered=-1;toast(L.keep?'Взлетай снова: вопрос тот же, ответы сохранены':'Начнём этот урок с первого шага','bad');}}
     L.tick&&L.tick(task,dt);
     if(task.failed&&!task.done)return finish(L.result(task));
     const st=task.steps[task.si];
     if(!st){setTaskText(L.free?'':'');guide(null);highlight(null);return;}
+    if(task.entered<task.si){task.entered=task.si;task.noBeacon=false;st.enter&&st.enter();if(task.done||task.steps[task.si]!==st)return;}
     st.tick&&st.tick(dt);
     if(!D.crashed&&st.check(dt)){
       task.si++;beep(990,0.07);
       if(task.si>=task.steps.length)return finish(L.result(task));
       return;
     }
-    setTaskText(`<span class="sn">ШАГ ${task.si+1} / ${task.steps.length}</span>${st.text()}`);
+    setTaskText(`<span class="sn">${st.head?st.head():(L.resume?'':`ШАГ ${task.si+1} / ${task.steps.length}`)}</span>${st.text()}`);
     guide(st.target?st.target():null);highlight(st.ui||null);
   };
   showScreen(null);
   $('osd').hidden=false;$('touch').hidden=false;
   playing=true;
 }
-function setTaskText(h){const e=$('task');e.hidden=!h;if(h)e.innerHTML=h;}
+function setTaskText(h){const e=$('task');e.hidden=!h;e.classList.toggle('holo',!!(task&&task.L.resume));if(h&&e._h!==h){e._h=h;e.innerHTML=h;}}
 // highlight the control the current step needs
 let hlId=null;
 function highlight(id){if(id===hlId)return;if(hlId)$(hlId).classList.remove('hl');hlId=id;if(id)$(id).classList.add('hl');}
 // target marker: a beacon in the world plus an OSD pointer that also works off screen
 let guideP=null;
-function guide(p){guideP=p;beacon.visible=!!p&&!(task&&task.gatesOn);if(p)beacon.position.copy(p);}
+function guide(p){guideP=p;beacon.visible=!!p&&!(task&&(task.gatesOn||task.noBeacon));if(p)beacon.position.copy(p);}
 function updGuide(cam){
   const el=$('guide');
-  if(!guideP||!playing){el.hidden=true;return;}
+  if(!guideP||!playing){el.hidden=true;$('task').classList.remove('see');return;}
   el.hidden=false;
   const v=_v.copy(guideP).project(cam);
   const behind=_v2.copy(guideP).applyMatrix4(cam.matrixWorldInverse).z>0;
@@ -1374,6 +1476,8 @@ function updGuide(cam){
   const d=D.pos.distanceTo(guideP);
   if(!on){const m=Math.max(Math.abs(x),Math.abs(y))||1;x=x/m*0.88;y=y/m*0.8;}
   el.style.left=((x+1)/2*100)+'%';el.style.top=((1-y)/2*100)+'%';
+  // the target behind the task panel: make the panel see-through so the ring or gate stays visible
+  const tk=$('task');if(!tk.hidden){const r=tk.getBoundingClientRect(),sx=(x+1)/2*innerWidth,sy=(1-y)/2*innerHeight;tk.classList.toggle('see',on&&sx>r.left-30&&sx<r.right+30&&sy>r.top-30&&sy<r.bottom+40);}
   el.querySelector('b').style.transform=on?'':`rotate(${Math.atan2(-y,x)}rad)`;
   el.querySelector('b').textContent=on?'◇':'➤';
   el.querySelector('span').textContent=d.toFixed(0)+' м';
@@ -1396,8 +1500,8 @@ function finish(r){
     showScreen('sRes');if(r.stars>0){beep(660,0.1);setTimeout(()=>beep(990,0.15),120);}else beep(220,0.3);
   },500);
 }
-function exitToMenu(){playing=false;D.armed=false;updArm();guide(null);highlight(null);$('osd').hidden=true;$('touch').hidden=true;renderMenu();showScreen('sMenu');}
-function pause(){if(!playing)return;playing=false;showScreen('sPause');}
+function exitToMenu(){kursReset();playing=false;D.armed=false;updArm();guide(null);highlight(null);$('osd').hidden=true;$('touch').hidden=true;renderMenu();showScreen('sMenu');}
+function pause(){if(!playing)return;playing=false;VO.pause();showScreen('sPause');}
 function brief(id){
   const L=LESSONS[id];curTask=id;setLoc(L.loc||'hangar');
   $('bTag').textContent=L.tag;$('bName').textContent=L.name;$('bDesc').textContent=L.desc;
@@ -1410,6 +1514,392 @@ function brief(id){
   showScreen('sBrief');
 }
 
+/* ---------- Course «Взлёт» in the flying city: fly to a module building, inside fly from task to task ----------
+   Content comes from kurs.js (the club course, levels 1-2). Inside a module every task is: material read by the voice while the
+   drone flies through rings (one card per ring), then a test at the gates (quiz, sort, story, match, order), a flight exercise
+   instead of the simulator, or a coach check accepted by an adult. Failed test = «доп. задание» with other questions, as in the course. */
+const KM=Object.fromEntries(KURS.mods.map(m=>[m.id,m])), KL=KURS.lib;
+const KLOC={m1:'hangar',m2:'lab'};                 // modules with a playable interior so far
+if(!S.kurs||!S.kurs.done)S.kurs={done:{},wait:{},mods:{},seen:{}};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function modState(id){
+  if(S.kurs.mods[id])return 'done';
+  const i=KURS.mods.findIndex(m=>m.id===id);
+  if(!KLOC[id])return 'lock';
+  return i===0||S.unlockAll||S.kurs.mods[KURS.mods[i-1].id]?'open':'lock';
+}
+function nextMod(){return KURS.mods.find(m=>!S.kurs.mods[m.id])||null;}
+function kursPct(){let a=0,d=0;for(const m of KURS.mods)for(const t of m.tasks){a++;if(S.kurs.done[t]!=null)d++;}return a?d/a:0;}
+
+/* voice: the device voice reads the text (later recorded files zvuk/<name>.mp3 from the voice script take over) */
+const ZVUK=window.ZVUK||[];                         // names of recorded files that exist, e.g. ['vhod-1','mod-m1']
+const VO={
+  syn:window.speechSynthesis||null,au:null,tm:0,id:0,
+  voices(){return this.syn?this.syn.getVoices().filter(v=>/^ru/i.test(v.lang)):[];},
+  pick(){const r=this.voices(),live=r.filter(v=>/natural|online|neural|enhanced|premium|google/i.test(v.name));return r.find(v=>v.name===S.voiceName)||live[0]||r[0]||null;},
+  pause(){if(this.syn)this.syn.pause();if(this.au)this.au.pause();},
+  resume(){if(this.syn)this.syn.resume();if(this.au)this.au.play().catch(()=>{});},
+  stop(){this.id++;clearTimeout(this.tm);if(this.syn)this.syn.cancel();if(this.au){this.au.onended=this.au.onerror=null;this.au.pause();this.au=null;}},
+  // o.file: recorded file name; o.onb(chars read so far); o.onend() fires exactly once, also when the voice is off
+  say(text,o={}){
+    this.stop();const id=this.id;let ended=false;
+    const end=()=>{if(ended||id!==this.id)return;ended=true;clearTimeout(this.tm);o.onend&&o.onend();};
+    const quiet=()=>{this.tm=setTimeout(end,Math.max(1600,text.length*62));};   // no voice: about 16 letters a second to read by eye
+    if(S.voice==='0')return quiet();
+    if(o.file&&ZVUK.includes(o.file)){const au=this.au=new Audio('zvuk/'+o.file+'.mp3');au.onended=end;au.onerror=()=>{this.au=null;this.say(text,Object.assign({},o,{file:null}));};au.play().catch(au.onerror);return;}
+    if(!this.syn)return quiet();                // no voices listed yet (Android): speak anyway, the browser picks its ru voice
+    // Chrome cuts long phrases: speak sentence by sentence
+    const parts=text.match(/[^.!?]+[.!?]*\s*/g)||[text];let off=0;const v=this.pick();
+    parts.forEach((p,i)=>{const u=new SpeechSynthesisUtterance(p);u.lang='ru-RU';if(v)u.voice=v;u.rate=1.03;const o0=off;off+=p.length;
+      u.onboundary=e=>{if(id===this.id&&o.onb)o.onb(o0+e.charIndex+(e.charLength||5));};
+      if(i===parts.length-1){u.onend=end;u.onerror=end;}else u.onerror=end;
+      this.syn.speak(u);});
+    this.tm=setTimeout(end,3000+text.length*85);                     // safety: some browsers never fire onend
+  }
+};
+if(VO.syn&&VO.syn.getVoices)VO.syn.getVoices();
+
+/* rings: route checkpoints the drone flies through, one card of material per ring */
+const RINGS=[];
+function buildRings(){
+  for(let i=0;i<2;i++){
+    const g=new THREE.Group(),m=new THREE.MeshBasicMaterial({color:0x7cf3ff,transparent:true});
+    g.add(new THREE.Mesh(new THREE.TorusGeometry(1.25,0.11,12,72),m));
+    const ticks=new THREE.Group();for(let k=0;k<8;k++){const t=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.32,0.08),m);const a=k/8*Math.PI*2;t.position.set(Math.sin(a)*1.55,Math.cos(a)*1.55,0);t.rotation.z=-a;ticks.add(t);}g.add(ticks);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(1.16,48),new THREE.MeshBasicMaterial({color:0x7cf3ff,transparent:true,opacity:.08,side:THREE.DoubleSide,depthWrite:false}));g.add(disc);
+    const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow,color:0x7cf3ff,transparent:true,opacity:.45,depthWrite:false,blending:THREE.AdditiveBlending}));halo.scale.set(4.2,4.2,1);g.add(halo);
+    g.visible=false;scene.add(g);RINGS.push({g,m,disc,halo,on:false});
+  }
+}
+function ringAt(i,p,dir,on){
+  const R=RINGS[i];if(!p){R.g.visible=false;return;}
+  R.g.visible=true;R.g.position.copy(p);R.g.rotation.set(0,Math.atan2(dir.x,dir.z),0);R.on=on;
+  R.m.color.setHex(on?0x7cf3ff:0x40607a).multiplyScalar(on?1.7:1);R.m.opacity=on?1:.5;R.disc.material.opacity=on?.16:.03;R.g.children[1].visible=on;R.halo.visible=on;
+}
+function ringFx(dt,now){for(const R of RINGS)if(R.g.visible&&R.on){const k=1+Math.sin(now/180)*0.06;R.g.children[0].scale.setScalar(k);R.g.children[1].rotation.z=now/900;R.halo.material.opacity=.35+.15*Math.sin(now/150);}}
+
+/* navigator: a lane of glowing chevrons from the drone to the target; in the city it follows the main road */
+const TRAIL={pts:null,ms:[],step:3,size:0.6};
+function buildTrail(){
+  const sh=new THREE.Shape();sh.moveTo(-0.5,0);sh.lineTo(0,0.42);sh.lineTo(0.5,0);sh.lineTo(0.5,0.2);sh.lineTo(0,0.62);sh.lineTo(-0.5,0.2);sh.closePath();
+  const geo=new THREE.ShapeGeometry(sh);geo.rotateX(-0.75);   // tilted up toward the pilot behind: reads as an arrow, not a flat line
+  for(let i=0;i<34;i++){const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:new THREE.Color(0x7cf3ff).multiplyScalar(1.8),transparent:true,opacity:.8,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
+    m.visible=false;scene.add(m);TRAIL.ms.push(m);}
+}
+function trailSet(pts){TRAIL.pts=pts;if(!pts)for(const m of TRAIL.ms)m.visible=false;}
+function trailTick(now){
+  const pts=TRAIL.pts;if(!pts||!playing){for(const m of TRAIL.ms)m.visible=false;return;}
+  const city=locId==='city',step=city?8:2.6,size=city?3:0.55,lane=city?clamp(D.pos.y-1.6,1.5,60):clamp(D.pos.y-0.6,0.4,HY-1);
+  // the route from the closest point ahead of the drone
+  let best=0,bd=1e9;for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],dx=b.x-a.x,dz=b.z-a.z,l=dx*dx+dz*dz||1,u=clamp(((D.pos.x-a.x)*dx+(D.pos.z-a.z)*dz)/l,0,1),d=Math.hypot(D.pos.x-a.x-u*dx,D.pos.z-a.z-u*dz);if(d<bd){bd=d;best=i+u;}}
+  const path=[V3(D.pos.x,lane,D.pos.z)];const i0=Math.floor(best);
+  if(pts.length===1)path.push(V3(pts[0].x,pts[0].y,pts[0].z));
+  else{const a=pts[i0],b=pts[Math.min(i0+1,pts.length-1)],u=best-i0;const near=V3(a.x+(b.x-a.x)*u,lane,a.z+(b.z-a.z)*u);
+    if(bd>(city?25:6))path.push(near);for(let i=i0+1;i<pts.length;i++)path.push(V3(pts[i].x,i===pts.length-1?pts[i].y:lane,pts[i].z));}
+  let seg=0,acc=step*0.9,k=0;const ph=(now/1000*(city?9:4))%step;
+  while(k<TRAIL.ms.length&&seg<path.length-1){
+    const a=path[seg],b=path[seg+1],len=a.distanceTo(b);
+    if(acc+ph>len){acc-=len;seg++;continue;}
+    const t=(acc+ph)/len,m=TRAIL.ms[k++];m.visible=true;m.position.lerpVectors(a,b,t);
+    m.rotation.set(0,Math.atan2(-(b.x-a.x),-(b.z-a.z)),0);m.scale.setScalar(size);
+    m.material.opacity=clamp(0.95-k*0.03,0.15,0.95);acc+=step;
+  }
+  for(;k<TRAIL.ms.length;k++)TRAIL.ms[k].visible=false;
+}
+
+/* exit and entry of the module rooms: a glowing portal over the door */
+const PORTAL={g:null,m:null};
+function buildPortal(){
+  const c=document.createElement('canvas');c.width=128;c.height=256;const t=new THREE.CanvasTexture(c);
+  PORTAL.c=c;PORTAL.t=t;PORTAL.m=new THREE.MeshBasicMaterial({map:t,transparent:true,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
+  PORTAL.g=new THREE.Mesh(new THREE.PlaneGeometry(1,1),PORTAL.m);PORTAL.g.visible=false;scene.add(PORTAL.g);
+}
+function portalTick(now){
+  if(!PORTAL.g.visible)return;const x=PORTAL.c.getContext('2d'),t=now/1000;x.clearRect(0,0,128,256);
+  const g=x.createLinearGradient(0,0,128,0);g.addColorStop(0,'rgba(124,243,255,.6)');g.addColorStop(.5,'rgba(124,243,255,.12)');g.addColorStop(1,'rgba(124,243,255,.6)');x.fillStyle=g;x.fillRect(0,0,128,256);
+  x.fillStyle='#bff8ff';for(let i=0;i<10;i++){x.globalAlpha=.2+.25*Math.sin(i*2.1+t*3);x.fillRect(0,(i*31+t*70)%256,128,3);}x.globalAlpha=1;PORTAL.t.needsUpdate=true;
+}
+function portalOn(e){
+  if(PORTAL.f){scene.remove(PORTAL.f);PORTAL.f.traverse(o=>o.geometry&&o.geometry.dispose());PORTAL.f=null;}
+  if(!e){PORTAL.g.visible=false;return;}
+  PORTAL.g.visible=true;PORTAL.g.position.copy(e.p).addScaledVector(e.n,-0.05);PORTAL.g.rotation.set(0,Math.atan2(e.n.x,e.n.z),0);PORTAL.g.scale.set(e.w,e.h,1);
+  const f=PORTAL.f=new THREE.Group(),m=new THREE.MeshBasicMaterial({color:new THREE.Color(0x7cf3ff).multiplyScalar(2.4)}),t=0.16;
+  for(const [x,y,w,h] of [[0,e.h/2,e.w+2*t,t],[0,-e.h/2,e.w+2*t,t],[-e.w/2,0,t,e.h],[e.w/2,0,t,e.h]]){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,t),m);b.position.set(x,y,0);f.add(b);}
+  f.position.copy(PORTAL.g.position);f.rotation.copy(PORTAL.g.rotation);scene.add(f);
+}
+// leaving a course run (menu, another lesson): hide everything the run put in the world
+function kursReset(){VO.stop();ringAt(0,null);ringAt(1,null);trailSet(null);portalOn(null);}
+// true when the drone crossed the portal plane going out through the opening
+function through(e,prev){
+  const a=_v.copy(prev).sub(e.p).dot(e.n),b=_v2.copy(D.pos).sub(e.p).dot(e.n);
+  if(!(a<0&&b>=0)||D.crashed)return false;
+  const side=Math.abs((D.pos.x-e.p.x)*e.n.z-(D.pos.z-e.p.z)*e.n.x);
+  return side<e.w/2&&Math.abs(D.pos.y-e.p.y)<e.h/2;
+}
+
+/* full-screen transition with the module title */
+function transit(tag,title,col,mid,after){
+  const f=$('fade');$('fTag').textContent=tag;$('fName').textContent=title;f.style.setProperty('--mc',col||'#7cf3ff');
+  f.hidden=false;f.classList.remove('out');void f.offsetWidth;f.classList.add('on');
+  setTimeout(()=>{mid&&mid();setTimeout(()=>{f.classList.add('out');setTimeout(()=>{f.hidden=true;f.classList.remove('on','out');after&&after();},700);},1500);},600);
+}
+
+/* ---- steps of a module run (same step shape as the lessons: text, target, tick, check; plus enter and head) ---- */
+const KR={mid:null,tk:0,early:false,intro:null};   // current module run: track cursor, ring passed early, intro still speaking
+function track(){return LOCS[locId].track;}
+function trackPt(k){const t=track();return t[((k%t.length)+t.length)%t.length];}
+function trackDir(k){return _v2.copy(trackPt(k+1)).sub(trackPt(k-1)).setY(0).normalize().clone();}
+function floorUnder(p){return {pos:V3(p.x,0,p.z),heading:D.heading};}
+const picOf=p=>/^e:/.test(p)?p.slice(2):/^chain:/.test(p)?'⛓':p==='ochki'?'🥽':p==='sim'?'🎮':p==='mob'?'🚁':'📘';
+function chainHtml(p){return /^chain:/.test(p)?'<div class="chain">'+p.slice(6).split('>').map(esc).join('<i>→</i>')+'</div>':'';}
+function typed(s,k){k=Math.floor(clamp(k,0,s.length));return `<span>${esc(s.slice(0,k))}</span><span class="tz">${esc(s.slice(k))}</span>`;}
+function introText(ctx){const T=KL[ctx.tid];return `Задание ${ctx.ti+1}. ${T.t}. ${T.sub||''}`;}
+function introStart(ctx){
+  if(ctx.introDone||ctx.introOn)return;ctx.introOn=true;
+  VO.say(introText(ctx),{file:'zad-'+ctx.tid,onend:()=>{ctx.introDone=true;ctx.introOn=false;}});
+}
+function headOf(ctx,what){const T=KL[ctx.tid];return `ЗАДАНИЕ ${ctx.ti+1} / ${ctx.n} · ${esc(T.t.toUpperCase())}${what?' · '+what:''}`;}
+
+function sCard(ctx,card,ci,nc){
+  let ph='fly',k=0,read=0,said=false,P=null,dir=null,started=false;
+  const full=card.h+'. '+card.p;
+  const begin=()=>{ph='read';spawn=floorUnder(P);ringAt(0,null);beep(990,0.06);};
+  return {kind:'card',
+    head:()=>headOf(ctx,`МАТЕРИАЛ ${ci+1} / ${nc}`),
+    enter(){
+      KR.tk++;P=trackPt(KR.tk).clone();task.noBeacon=true;
+      // the ring faces the drone as it comes: from the previous ring, or from where the drone is now for the first one
+      dir=(ci===0?V3(P.x-D.pos.x,0,P.z-D.pos.z):V3(P.x-trackPt(KR.tk-1).x,0,P.z-trackPt(KR.tk-1).z));if(dir.lengthSq()<1)dir=trackDir(KR.tk);dir.normalize();
+      if(ci===0)introStart(ctx);
+      if(KR.early){KR.early=false;begin();}else ringAt(0,P,dir,true);
+      const N=trackPt(KR.tk+1);if(ci<nc-1)ringAt(1,N,V3(N.x-P.x,0,N.z-P.z).normalize(),false);else ringAt(1,null);
+    },
+    text:()=>{
+      if(ph==='fly'){const intro=ci===0?`<div class="kt">${esc(KL[ctx.tid].t)}</div><div class="ks">${esc(KL[ctx.tid].sub||'')}</div>`:'';
+        return intro+`<div class="kh">Лети в светящееся кольцо: там карточка «${esc(card.h)}»</div>`;}
+      return `<div class="card2"><b class="pic">${picOf(card.pic)}</b><div><div class="kt">${esc(card.h)}</div><div class="kp">${typed(card.p,k)}</div>${chainHtml(card.pic)}</div></div>`;
+    },
+    target:()=>ph==='fly'?P:null,
+    tick(dt){
+      if(ph==='fly'&&D.pos.distanceTo(P)<1.7)begin();
+      if(ph==='read'){
+        if(!started&&(ctx.introDone||!ctx.introOn)){started=true;VO.say(full,{onb:c=>{k=Math.max(k,c-card.h.length-2);},onend:()=>{said=true;}});}
+        if(started){read+=dt;k=Math.max(k,read*14);}   // the text types along with the voice; word events only push it ahead
+        // flew on to the next ring while the voice still reads: count it, the next card starts at once
+        if(RINGS[1].g.visible&&D.pos.distanceTo(RINGS[1].g.position)<1.7){KR.early=true;RINGS[1].g.visible=false;}
+      }
+    },
+    check:()=>{if(ph==='read'&&said&&read>1.2){k=card.p.length;return true;}return false;}
+  };
+}
+// wait for the task intro when the task starts without material (tests, stories)
+function sIntro(ctx){let t=0;return {kind:'intro',head:()=>headOf(ctx,''),enter(){introStart(ctx);ringAt(0,null);ringAt(1,null);},
+  text:()=>`<div class="kt">${esc(KL[ctx.tid].t)}</div><div class="ks">${esc(KL[ctx.tid].sub||'')}</div><div class="kh">Слушай задание…</div>`,
+  tick:dt=>{t+=dt;},check:()=>t>1.5&&(ctx.introDone||!ctx.introOn)};}
+
+const pickN=(a,n)=>shuffle(a).slice(0,n);
+const mixQ=([q,a,e])=>{const o=shuffle([...a.keys()]);return {q,e,a:o.map(i=>a[i]),right:o.indexOf(0)};};
+// every test becomes questions with answer gates: quiz, sort into categories, true/false story, match a pair
+function testQs(st,ctx,retry){
+  if(st.s==='quiz'){
+    let pool=retry&&st.x&&st.x.length?st.x:st.pool||[];
+    if(st.from){pool=[];for(const t of st.from)for(const s2 of KL[t].steps)if(s2.s==='quiz')pool=pool.concat(s2.pool||[],s2.x||[]);}
+    return pickN(pool,Math.min(+st.n||5,pool.length)).map(mixQ);
+  }
+  if(st.g==='sort')return pickN(st.items,Math.min(6,st.items.length)).map(([t,c,e])=>({q:`Куда отнести: «${t}»?`,a:st.cats,right:c,e}));
+  if(st.g==='story')return pickN(st.story,Math.min(6,st.story.length)).map(([t,bad,e])=>({q:`«${t}»`,a:['Верно','Ошибка'],right:bad?1:0,e}));
+  if(st.g==='match')return pickN(st.pairs,Math.min(5,st.pairs.length)).map(([l,r])=>{const wrong=pickN(st.pairs.filter(p=>p[1]!==r).map(p=>p[1]),2);const a=shuffle([r,...wrong]);return {q:`«${l}» — это…`,a,right:a.indexOf(r),e:`${l}: ${r}.`};});
+  return [];
+}
+const TESTNAME={quiz:'ПРОВЕРКА',sort:'ТРЕНАЖЁР',story:'НАЙДИ ОШИБКИ',match:'НАЙДИ ПАРУ',order:'ПО ПОРЯДКУ'};
+function sTest(ctx,st){
+  const final=!!KL[ctx.tid].final,pass=+st.pass||(final?0.8:0.7);
+  const Q={qs:[],qi:0,right:0,wait:0,wrong:[],r0:0};let tries=0,shown=-1;
+  const say0=st.s==='quiz'?'Проверь себя. Лети в ворота с правильным ответом.':st.g==='sort'?'Тренажёр. Лети в ворота нужной группы.':st.g==='story'?'Найди ошибки. Если всё сделано правильно, лети в ворота «Верно», если нет — в ворота «Ошибка».':'Найди пару. Лети в ворота с правильным ответом.';
+  const setup=()=>{Q.qs=testQs(st,ctx,tries>0);Q.qi=0;Q.right=0;Q.wrong=[];Q.wait=0;shown=-1;
+    // first row: the one farthest from the drone, so the gates never appear on top of it
+    const rows=LOCS[locId].qrows;let far=0,fd=-1;rows.forEach((r,i)=>{const d=Math.hypot(D.pos.x-r.x,D.pos.z-r.z);if(d>fd){fd=d;far=i;}});Q.r0=far;
+    showQuiz(Q);};
+  Q.onAns=(ok,q)=>VO.say((ok?'Верно! ':'Неверно. Правильно: '+q.a[q.right]+'. ')+(q.e||''));
+  return {kind:'test',dbg:Q,
+    head:()=>headOf(ctx,(final?'ИТОГОВЫЙ ТЕСТ':TESTNAME[st.g||st.s])+(tries?' · ДОП. ЗАДАНИЕ':'')),
+    enter(){ringAt(0,null);ringAt(1,null);setup();VO.say(st.h?st.h+'. '+say0:say0);},
+    text:()=>quizText(Q)+(Q.qi===0&&Q.wait<=0?`<br><small>${final?'Нужно '+Math.round(pass*100)+'% верных':'Нужно '+Math.round(pass*100)+'%: иначе доп. задание'}</small>`:''),
+    target:()=>Q.qi<Q.qs.length?qgates[Math.min(1,Q.qs[Q.qi].a.length-1)].pos:null,
+    tick(dt){quizTick(Q,dt);task.solids=Q.solids||[];task.gatesOn=!!Q.gatesOn;
+      if(Q.qi!==shown&&Q.qi<Q.qs.length&&Q.wait<=0){shown=Q.qi;if(Q.qi>0||tries>0)setTimeout(()=>{if(shown===Q.qi&&task&&!task.done)VO.say(Q.qs[Q.qi].q);},300);}
+      if(Q.gatesOn)spawn={pos:V3(D.pos.x,0,D.pos.z),heading:D.heading};},
+    check(){
+      if(Q.qi<Q.qs.length)return false;
+      const sc=Q.qs.length?Q.right/Q.qs.length:1;
+      if(sc>=pass-1e-6){ctx.score.push(sc);task.solids=[];task.gatesOn=false;return true;}
+      tries++;toast(`${Q.right} из ${Q.qs.length}. Доп. задание: ещё раз, другие вопросы`,'bad');
+      VO.say(`Верно ${Q.right} из ${Q.qs.length}. Это меньше, чем нужно. Доп. задание: попробуй ещё раз, вопросы будут другие.`);
+      setup();return false;
+    }
+  };
+}
+function sOrder(ctx,st){
+  const T={sets:pickN(st.sets,Math.min(2,st.sets.length)),ri:0,err:0,wait:0};let total=0;
+  return {kind:'order',dbg:T,head:()=>headOf(ctx,'ПО ПОРЯДКУ'),
+    enter(){ringAt(0,null);ringAt(1,null);T.sets.forEach(s=>total+=s.items.length);orderShow(T);VO.say((st.h||'По порядку')+'. Пролети ворота по порядку: с первого шага до последнего.');},
+    text:()=>orderText(T),
+    target:()=>null,
+    tick(dt){const ri=T.ri,w=T.wait;orderTick(T,dt);task.solids=T.solids||[];task.gatesOn=!!T.gatesOn;if(T.wait>0&&!(w>0)&&T.sets[ri])VO.say('Верно! '+T.sets[ri].why);},
+    check(){if(T.ri<T.sets.length)return false;ctx.score.push(clamp(1-T.err/Math.max(1,total),0.3,1));task.solids=[];task.gatesOn=false;return true;}};
+}
+// flight exercises: the game is the simulator, so the «fly in the simulator» tasks are flown right here
+function sFlyEx(ctx,st){
+  const id=ctx.tid;
+  if(locId==='hangar'){ // hover: hold the drone in the blue column for 20 s
+    let inside=0,best=0;const c=V3(hoverZone.position.x,1.75,hoverZone.position.z);
+    const inZone=()=>D.armed&&!D.crashed&&flat(D.pos,c)<1.2&&D.pos.y>1&&D.pos.y<2.5;
+    return {kind:'hover',head:()=>headOf(ctx,'ПОЛЁТ'),enter(){ringAt(0,null);ringAt(1,null);hoverZone.visible=true;VO.say('Полёт. Залети в синий столб и держи дрон в нём двадцать секунд подряд.');},
+      text:()=>inside>0?`Держи дрон в синем столбе: <b>${inside.toFixed(1)}</b> из 20 с<br><small>Лучшее ${best.toFixed(1)} с. Вылетел — счёт сначала</small>`:'Залети в синий столб перед площадкой H и замри',
+      target:()=>inside>0?null:c,
+      tick(dt){inside=inZone()?inside+dt:0;best=Math.max(best,inside);hoverZone.children[2].material.opacity=inside>0?0.2:0.08;},
+      check(){if(inside>=20){hoverZone.visible=false;ctx.score.push(1);VO.say('Отлично! Двадцать секунд висения.');return true;}return false;}};
+  }
+  // around the big whoop in the lab: 3 laps by 6 beacons
+  const R=5.2,pts=[];for(let lap=0;lap<3;lap++)for(let j=0;j<6;j++){const a=Math.PI/2-j*Math.PI/3;pts.push(V3(WHOOP.x+Math.sin(a)*R,2,WHOOP.z+Math.cos(a)*R));}
+  let k=0;
+  return {kind:'laps',head:()=>headOf(ctx,'ПОЛЁТ'),enter(){ringAt(0,null);ringAt(1,null);VO.say('Полёт. Облети большой дрон в центре три круга, не задев его. Держи высоту около двух метров.');},
+    text:()=>`Круг <b>${Math.floor(k/6)+1}</b> из 3 · маяк ${k%6+1} из 6. Высота сейчас ${D.pos.y.toFixed(1)} м`,
+    target:()=>pts[k],tick(){if(k<pts.length&&D.pos.distanceTo(pts[k])<1.8){k++;beep(880,0.05);}},
+    check(){if(k>=pts.length){ctx.score.push(1);VO.say('Три круга готово!');return true;}return false;}};
+}
+// coach check: land on H, then an adult presses «Тренер принял» (decided 24.10: no coach server for now)
+function sCoach(ctx,st){
+  let ph='land',ok=false;
+  return {kind:'coach',head:()=>headOf(ctx,'С ТРЕНЕРОМ'),
+    enter(){ringAt(0,null);ringAt(1,null);VO.say('Это задание делаем с тренером. Сядь на площадку H и сними взвод.');},
+    text:()=>ph==='land'?`Сядь на площадку H и сними взвод: дальше — с тренером<br><small>${esc(st.p)}</small>`:'Покажи тренеру…',
+    target:()=>ph==='land'?PAD_A:null,
+    check(){
+      if(ph==='land'&&D.landed&&!D.armed&&!D.crashed&&flat(D.pos,PAD_A)<2.5){ph='ask';
+        coachAsk(st,res=>{ok=true;ctx.coach=res;if(res==='ok')ctx.score.push(1);else S.kurs.wait[ctx.tid]=1;});}
+      return ok;
+    }};
+}
+function coachAsk(st,cb){
+  playing=false;VO.say('Покажи тренеру. '+st.p);
+  $('cText').textContent=st.p;showScreen('sCoach');
+  $('cOk').onclick=()=>{showScreen(null);playing=true;cb('ok');};
+  $('cLater').onclick=()=>{showScreen(null);playing=true;cb('later');};
+}
+function sTaskDone(ctx){
+  return {head:()=>headOf(ctx,''),enter(){
+      const sc=ctx.score.length?ctx.score.reduce((a,b)=>a+b,0)/ctx.score.length:1;
+      S.kurs.done[ctx.tid]=Math.round(sc*100);if(ctx.coach==='ok')delete S.kurs.wait[ctx.tid];save();
+      const pts=KL[ctx.tid].pts||10;toast(`Задание ${ctx.ti+1} пройдено! +${pts} очков`);beep(660,0.1);setTimeout(()=>beep(990,0.15),120);
+      cityKick();},
+    text:()=>'',check:()=>true};
+}
+function buildTaskSteps(mid,tid,ti,n){
+  const T=KL[tid],ctx={tid,ti,n,score:[]},list=[];
+  T.steps.forEach((st,si)=>{
+    if(st.s==='cards'){st.cards.forEach((c,ci)=>list.push(sCard(ctx,c,ci,st.cards.length)));return;}
+    if(si===0)list.push(sIntro(ctx));
+    if(st.s==='quiz'||(st.s==='game'&&['sort','story','match'].includes(st.g)))list.push(sTest(ctx,st));
+    else if(st.s==='game'&&st.g==='order')list.push(sOrder(ctx,st));
+    else if(st.s==='fly')list.push(sFlyEx(ctx,st));
+    else if(st.s==='coach')list.push(sCoach(ctx,st));
+  });
+  list.push(sTaskDone(ctx));
+  return list;
+}
+function sModuleDone(mid){
+  const m=KM[mid],ex=LOCS[locId].exit;let prev=null;
+  return {kind:'exit',head:()=>`МОДУЛЬ ${m.n} ПРОЙДЕН`,
+    enter(){S.kurs.mods[mid]=1;save();portalOn(ex);beep(660,0.1);setTimeout(()=>beep(880,0.1),130);setTimeout(()=>beep(1320,0.2),260);
+      VO.say(`Модуль ${m.n} пройден! Ты получаешь допуск. Лети к выходу: светящиеся ворота выведут обратно в город.`);prev=D.pos.clone();},
+    text:()=>`<div class="kt">Модуль ${m.n} «${esc(m.t)}» пройден! ★</div><div class="kh">Лети в светящийся выход — обратно в город</div>`,
+    target:()=>ex.p,
+    tick(){if(prev&&through(ex,prev)){prev=null;kursLeave(mid);}else if(prev)prev.copy(D.pos);},
+    check:()=>false};
+}
+function kursModuleLesson(mid){
+  const m=KM[mid],loc=KLOC[mid];
+  return {loc,tag:'МОДУЛЬ '+m.n,name:m.t,desc:m.sub,learn:[],resume:true,kurs:mid,
+    spawn:()=>LOCS[loc].enter,
+    steps:T=>{
+      KR.mid=mid;KR.tk=0;KR.early=false;
+      const list=[sArm(),sUp(1.5)];const n=m.tasks.length;
+      m.tasks.forEach((tid,ti)=>{if(S.kurs.done[tid]==null)list.push(...buildTaskSteps(mid,tid,ti,n));});
+      list.push(sModuleDone(mid));return list;}};
+}
+
+/* ---- the city: take off from H, the navigator leads along the road to the next module, fly into its gates ---- */
+function cityStates(){const st={};for(const m of KURS.mods)st[m.id]=modState(m.id);return st;}
+function cityKick(){if(CITY)CITY.setState(cityStates());}
+function sNavMod(mid){
+  const m=KM[mid];let door=null,prev=null,brief=false,briefT=0,route=null,cp=0,cpT=0;
+  return {kind:'nav',mid,head:()=>`ГОРОД ВЗЛЁТ · МОДУЛЬ ${m.n}`,
+    enter(){door=CITY.doors.find(d=>d.mid===mid);route=CITY.route(mid,4);trailSet(route);prev=D.pos.clone();},
+    text:()=>{
+      const d=Math.round(D.pos.distanceTo(door.pos));
+      if(!brief)return `<div class="kt">Модуль ${m.n}: ${esc(m.t)}</div><div class="kh">Лети по стрелкам над дорогой к воротам модуля · ${d} м</div>`;
+      const left=m.tasks.filter(t=>S.kurs.done[t]==null).length;
+      return `<div class="kt">Модуль ${m.n}: ${esc(m.t)}</div><div class="kp short">${typed(m.say,briefT*15)}</div><div class="kh">Влетай в ворота модуля · ${d} м · ${left===m.tasks.length?'внутри '+left+' заданий':'осталось '+left+' из '+m.tasks.length}</div>`;
+    },
+    target:()=>door.pos,
+    tick(dt){
+      if(!brief&&D.pos.distanceTo(door.pos)<85){brief=true;if(!S.kurs.seen[mid]){S.kurs.seen[mid]=1;save();}VO.say(`Модуль ${m.n}. ${m.t}. ${m.say} В модуле ${m.tasks.length} заданий.`,{file:'mod-'+mid});}
+      if(brief)briefT+=dt;
+      if((cpT+=dt)>1&&!D.crashed&&D.armed){cpT=0;for(let i=cp+1;i<route.length-2;i++)if(flat(D.pos,route[i])<20){cp=i;const a=route[i],b=route[i+1];spawn={pos:V3(a.x,0,a.z),heading:Math.atan2(-(b.x-a.x),-(b.z-a.z))};}}
+      const e={p:door.pos,n:_v.copy(door.nrm).negate().clone(),w:door.W,h:door.H};
+      if(prev&&through(e,prev)){prev=null;kursEnter(mid);}else if(prev)prev.copy(D.pos);
+    },
+    check:()=>false};
+}
+function kursCityLesson(){
+  return {loc:'city',tag:'ГОРОД ВЗЛЁТ',name:'Курс в летающем городе',desc:'',learn:[],resume:true,spawn:citySpawn,
+    steps:()=>{
+      cityKick();const nm=nextMod();
+      const list=[sArm(),Object.assign(sUp(3),{text:()=>`Взлетай: ${upHint()}. Над городом держись на 3–15 м`})];
+      if(!S.kurs.seen.intro){list.unshift({head:()=>'ГОРОД ВЗЛЁТ',enter(){S.kurs.seen.intro=1;save();VO.say('Добро пожаловать в учебный курс «Взлёт». Модули — это здания летающего города. Пройденное горит, а стрелки всегда покажут, куда лететь дальше.',{file:'vhod-1',onend:()=>{this.ok=true;}});},
+        text:()=>'<div class="kt">Добро пожаловать в учебный курс «Взлёт»</div><div class="kp">Модули — это здания летающего города. Пройденное горит, а стрелки всегда покажут, куда лететь дальше.</div>',check(){return this.ok;}});}
+      if(!nm)list.push({head:()=>'КУРС ПРОЙДЕН',text:()=>'<div class="kt">Все модули пройдены! ★</div><div class="kh">Летай над городом сколько хочешь</div>',check:()=>false});
+      else if(modState(nm.id)==='lock')list.push({head:()=>'ГОРОД ВЗЛЁТ',enter(){VO.say(`Модуль ${nm.n} откроется в следующей версии игры. Пока можно летать над городом.`);},
+        text:()=>`<div class="kt">Модуль ${nm.n} «${esc(nm.t)}» скоро откроется</div><div class="kh">Его делают прямо сейчас. Пока летай над городом</div>`,check:()=>false});
+      else list.push(sNavMod(nm.id));
+      return list;}};
+}
+function kursEnter(mid){
+  const m=KM[mid];D.armed=false;updArm();playing=false;VO.stop();trailSet(null);
+  transit('МОДУЛЬ '+m.n,m.t,['#7cf3ff','#ff7ce0','#ffd36e','#9dff7c','#ff9f5a','#a78bfa'][m.n-1],()=>{startTask('kurs_'+mid);playing=false;},()=>{playing=true;});
+}
+function kursLeave(mid){
+  const m=KM[mid];D.armed=false;updArm();playing=false;VO.stop();portalOn(null);
+  const d=CITY.doors.find(x=>x.mid===mid);
+  S.kurs.cityAt=mid;save();
+  transit('ГОРОД ВЗЛЁТ','Модуль '+m.n+' пройден',null,()=>{startTask('kurs_city');playing=false;},()=>{playing=true;});
+}
+function citySpawn(){
+  const mid=S.kurs.cityAt,d=mid&&CITY.doors.find(x=>x.mid===mid);
+  if(!d)return CITY.start;
+  const p=d.pos.clone().addScaledVector(d.nrm,10);p.y=0;
+  return {pos:p,heading:Math.atan2(-d.nrm.x,-d.nrm.z)};   // nose away from the building, toward the city
+}
+LESSONS.kurs_city=kursCityLesson();
+for(const id in KLOC)LESSONS['kurs_'+id]=kursModuleLesson(id);
+
+/* menu card of the course and the voice list in the settings */
+function renderHero(){
+  const nm=nextMod(),pct=Math.round(kursPct()*100),started=Object.keys(S.kurs.done).length>0;
+  $('hero').innerHTML=`<span class="tag">КУРС «ВЗЛЁТ» · ЛЕТАЮЩИЙ ГОРОД</span><b>${nm?`Модуль ${nm.n}: ${esc(nm.t)}`:'Курс пройден! ★'}</b>
+    <div class="bar"><i style="width:${pct}%"></i></div><span class="note">Пройдено ${pct}% курса · ${KURS.mods.filter(m=>S.kurs.mods[m.id]).length} из ${KURS.mods.length} модулей</span>
+    <div class="mods">${KURS.mods.map(m=>`<span class="${modState(m.id)}">${m.n}. ${esc(m.t)}${modState(m.id)==='lock'&&!KLOC[m.id]?' · скоро':''}</span>`).join('')}</div>
+    <button id="heroGo">${started?'Продолжить полёт':'Лететь в город'}</button>`;
+  $('heroGo').onclick=()=>{audioInit();VO.say(' ');startTask('kurs_city');};
+}
+function voiceList(){
+  const sel=$('voiceSel'),v=VO.voices();
+  sel.innerHTML=v.length?v.map(x=>`<option value="${esc(x.name)}">${esc(x.name)}</option>`).join(''):'<option value="">Голос устройства не найден</option>';
+  const cur=VO.pick();if(cur)sel.value=cur.name;
+}
+if(VO.syn)VO.syn.onvoiceschanged=()=>{if(!$('sSet').hidden)voiceList();};
+
 /* ---------- Sound: motor hum and beeps (WebAudio, no files) ---------- */
 let AC=null,motorOsc=null,motorGain=null;
 function audioInit(){
@@ -1421,10 +1911,11 @@ function beep(f,d){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain()
 function updAudio(){if(!motorGain)return;const on=playing&&D.armed;motorGain.gain.setTargetAtTime(on?0.025+D.thrOut*0.05:0,AC.currentTime,0.05);motorOsc.frequency.setTargetAtTime(90+D.thrOut*420,AC.currentTime,0.05);}
 
 /* ---------- Screens ---------- */
-const SCREENS=['sMenu','sBrief','sSet','sHelp','sPad','sPause','sRes'];
+const SCREENS=['sMenu','sBrief','sSet','sHelp','sPad','sPause','sRes','sCoach'];
 let backTo='sMenu';
 function showScreen(id){for(const s of SCREENS)$(s).hidden=s!==id;}
 function renderMenu(){
+  renderHero();
   const list=$('taskList');list.innerHTML='';
   let lastLoc=null;
   for(const id of ORDER.concat('free','freeLab').sort((a,b)=>(LESSONS[a].loc==='lab')-(LESSONS[b].loc==='lab'))){
@@ -1450,12 +1941,13 @@ document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
   if(k==='mode'&&D.armed){toast('Режим меняют без взвода','bad');return;}
   S[k]=b.dataset.v;save();if(k==='q')applyQuality();if(k==='unlockAll')renderMenu();if(k==='mode')resetDrone(false);if(k==='cam')$('ocam').textContent=CAMN[S.cam];renderSettings();}));
 document.querySelectorAll('input[type=range]').forEach(r=>r.addEventListener('input',()=>{S[r.dataset.k]=+r.value;save();renderSettings();}));
-$('mSet').onclick=()=>{backTo='sMenu';renderSettings();showScreen('sSet');};
-$('pSet').onclick=()=>{backTo='sPause';renderSettings();showScreen('sSet');};
+$('mSet').onclick=()=>{backTo='sMenu';renderSettings();voiceList();showScreen('sSet');};
+$('pSet').onclick=()=>{backTo='sPause';renderSettings();voiceList();showScreen('sSet');};
 $('setBack').onclick=()=>showScreen(backTo);
+$('voiceSel').onchange=e=>{S.voiceName=e.target.value;save();VO.say('Привет! Я буду рассказывать тебе материал курса.');};
 $('mHelp').onclick=()=>showScreen('sHelp');$('helpBack').onclick=()=>showScreen('sMenu');
 $('mPad').onclick=()=>{padInfo();showScreen('sPad');};$('padBack').onclick=()=>{cal=null;renderMenu();showScreen('sMenu');};
-$('pResume').onclick=()=>{showScreen(null);playing=true;};
+$('pResume').onclick=()=>{showScreen(null);playing=true;VO.resume();};
 $('pRestart').onclick=()=>startTask(curTask);
 $('pMenu').onclick=exitToMenu;
 $('rAgain').onclick=()=>startTask(curTask);$('rNext').onclick=()=>brief(nextLesson(curTask));
@@ -1493,6 +1985,13 @@ function calTick(dt){
 
 /* ---------- Main loop ---------- */
 let last=performance.now();
+// if a high level is too heavy for this device (under 28 fps for 6 s of flight), step down one level once per level
+const FPSW={t:0,n:0,tried:{}};
+function fpsWatch(dt){
+  if(!playing||+S.q<2||FPSW.tried[S.q])return;FPSW.t+=dt;FPSW.n++;
+  if(FPSW.t<6)return;const fps=FPSW.n/FPSW.t;FPSW.t=0;FPSW.n=0;
+  if(fps<28){FPSW.tried[S.q]=1;S.q=String(+S.q-1);save();applyQuality();toast('Графика снижена до «'+['Низкая','Средняя','Высокая'][+S.q]+'»: так плавнее');}
+}
 function frame(now){
   requestAnimationFrame(frame);
   let dt=Math.min((now-last)/1000,0.05);last=now;
@@ -1508,22 +2007,26 @@ function frame(now){
   let cam=S.cam==='fpv'?camFPV:camExt;
   if(!playing&&$('osd').hidden){const a=now/9000,o=LOCS[locId].orbit;camExt.position.set(Math.sin(a)*o[0],o[1],Math.cos(a)*o[2]);camExt.fov=60;camExt.updateProjectionMatrix();camExt.lookAt(0,1.5,0);cam=camExt;drone.visible=true;}
   if(playing||!$('osd').hidden)drone.visible=S.cam!=='fpv';
-  updFx(dt,now);
+  updFx(dt,now);ringFx(dt,now);trailTick(now);portalTick(now);
   if(composer){renderPass.camera=cam;composer.render(dt);}else renderer.render(scene,cam);
   if(playing||!$('osd').hidden){updOSD(dt);drawNoise(dt);updGuide(cam);}
-  updAudio();
+  updAudio();fpsWatch(dt);
 }
 
 /* ---------- Boot ---------- */
-scene.add(sun);
-buildLoc('hangar',g=>{buildHangar(g);buildMarks(g);});buildLoc('lab',buildLab);setLoc('hangar');
-buildGates();buildQuizGates();buildDrone();
+scene.add(sun);scene.add(sun.target);
+buildLoc('hangar',g=>{buildHangar(g);buildMarks(g);});buildLoc('lab',buildLab);
+let CITY=null;
+buildLoc('city',g=>{CITY=GOROD.build({mods:KURS_MODS,mob:matchMedia('(pointer:coarse)').matches,q:+S.q,progress:kursPct});g.add(CITY.g);
+  LOCS.city.start=CITY.start;LOCS.city.R=CITY.R;cityKick();cityBoxes();});
+setLoc('hangar');
+buildGates();buildQuizGates();buildDrone();buildRings();buildTrail();buildPortal();
 setupStick($('stL'),'L');setupStick($('stR'),'R');
 applyQuality();resetDrone();renderMenu();showScreen('sMenu');
 $('ocam').textContent=CAMN[S.cam];
 // menu backdrop: slow orbit around the hangar
 camExt.position.set(12,4,16);camExt.lookAt(0,1.5,0);
 requestAnimationFrame(frame);
-window.__F={D,inp,S,startTask,toggleArm,step,get task(){return task;},touchSt,LESSONS,brief,scene,qgates,STANDS,setLoc};
+window.__F={renderer,hoverZoneP:()=>hoverZone.position,locId:()=>locId,get stepNow(){return task&&task.steps[task.si];},D,inp,S,VO,KURS,KR,TRAIL,RINGS,PORTAL,get spawn(){return spawn;},startTask,camExt,camFPV,get CITY(){return CITY;},LOCS,toggleArm,step,get task(){return task;},touchSt,LESSONS,brief,scene,qgates,STANDS,setLoc};
 </script>
 </body></html>
