@@ -1,0 +1,39 @@
+plugins {
+    id 'com.android.application'
+}
+
+// version = the game's «версия N»; the CI passes it from scp/index.html
+def gameVersion = (project.findProperty('gameVersion') ?: '22') as int
+
+android {
+    namespace 'com.naumovgleb.scpescape'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.naumovgleb.scpescape'
+        minSdk 24
+        targetSdk 36
+        versionCode gameVersion
+        versionName "${gameVersion}"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // the game files (scp/) are copied to assets/www by the CI before the build
+    androidResources {
+        noCompress += ['glb', 'js', 'html', 'woff2']
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
