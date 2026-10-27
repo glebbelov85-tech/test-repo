@@ -1,4 +1,4 @@
-const CACHE='les-v15';
+const CACHE='les-v16';
 const CORE=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','three.min.js','post.js','fonts.css','fonts/pt-mono-cyrillic-400-normal.woff2','fonts/pt-mono-latin-400-normal.woff2','fonts/rubik-cyrillic-400-normal.woff2','fonts/rubik-cyrillic-500-normal.woff2','fonts/rubik-cyrillic-700-normal.woff2','fonts/rubik-latin-400-normal.woff2','fonts/rubik-latin-500-normal.woff2','fonts/rubik-latin-700-normal.woff2','fonts/russo-one-cyrillic-400-normal.woff2','fonts/russo-one-latin-400-normal.woff2'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>Promise.all(CORE.map(u=>fetch(u).then(r=>c.put(u,r)).catch(()=>{})))));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
