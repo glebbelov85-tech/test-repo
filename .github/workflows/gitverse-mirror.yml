@@ -1,0 +1,40 @@
+# Copies main to the GitVerse mirror after every push, so GitVerse Pages
+# (https://<owner>.gitverse.site/<repo>/) always shows the same games as here.
+# Needs, in Settings → Secrets and variables → Actions:
+#   secret   GITVERSE_TOKEN  – token from gitverse.ru → Настройки → Управление токенами (галочка «Репозитории»)
+#   variable GITVERSE_USER   – login on GitVerse
+#   variable GITVERSE_REPO   – repo name on GitVerse (default: test-repo)
+# Until they are set the job is skipped.
+name: Mirror to GitVerse
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: gitverse-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: vars.GITVERSE_USER != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push main to GitVerse
+        env:
+          GV_USER: ${{ vars.GITVERSE_USER }}
+          GV_REPO: ${{ vars.GITVERSE_REPO || 'test-repo' }}
+          GV_TOKEN: ${{ secrets.GITVERSE_TOKEN }}
+        run: |
+          test -n "$GV_TOKEN" || { echo "::error::Secret GITVERSE_TOKEN is not set"; exit 1; }
+          url="https://${GV_USER}:${GV_TOKEN}@gitverse.ru/${GV_USER}/${GV_REPO}.git"
+          for i in 1 2 3 4; do
+            git push --force "$url" HEAD:refs/heads/main && exit 0
+            sleep $((i * 10))
+          done
+          exit 1
