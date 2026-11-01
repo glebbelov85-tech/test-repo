@@ -3,6 +3,7 @@
 # Needs, in Settings → Secrets and variables → Actions:
 #   secret   GITVERSE_TOKEN  – token from gitverse.ru → Настройки → Управление токенами (галочка «Репозитории»)
 #   variable GITVERSE_USER   – login on GitVerse
+#   variable GITVERSE_OWNER  – owner of the repo on GitVerse, user or organization (default: GITVERSE_USER)
 #   variable GITVERSE_REPO   – repo name on GitVerse (default: test-repo)
 # Until they are set the job is skipped.
 name: Mirror to GitVerse
@@ -28,11 +29,12 @@ jobs:
       - name: Push main to GitVerse
         env:
           GV_USER: ${{ vars.GITVERSE_USER }}
+          GV_OWNER: ${{ vars.GITVERSE_OWNER || vars.GITVERSE_USER }}
           GV_REPO: ${{ vars.GITVERSE_REPO || 'test-repo' }}
           GV_TOKEN: ${{ secrets.GITVERSE_TOKEN }}
         run: |
           test -n "$GV_TOKEN" || { echo "::error::Secret GITVERSE_TOKEN is not set"; exit 1; }
-          url="https://${GV_USER}:${GV_TOKEN}@gitverse.ru/${GV_USER}/${GV_REPO}.git"
+          url="https://${GV_USER}:${GV_TOKEN}@gitverse.ru/${GV_OWNER}/${GV_REPO}.git"
           for i in 1 2 3 4; do
             git push --force "$url" HEAD:refs/heads/main && exit 0
             sleep $((i * 10))
