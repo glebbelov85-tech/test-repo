@@ -1,0 +1,43 @@
+# Turns the old github.io addresses into redirects to the GitVerse copy.
+# https://glebbelov85-tech.github.io/test-repo/scp/  →  https://<owner>.gitverse.site/<repo>/scp/
+# The games themselves stay in main untouched (GitVerse gets them via gitverse-mirror.yml);
+# GitHub Pages only gets small redirect pages built here.
+# Switch on: variable GITVERSE_PAGES_URL = https://<owner>.gitverse.site/<repo>
+# and Settings → Pages → Source: «GitHub Actions».
+name: GitHub Pages → GitVerse redirect
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: vars.GITVERSE_PAGES_URL != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build redirect pages
+        env:
+          TARGET: ${{ vars.GITVERSE_PAGES_URL }}
+        run: python3 .github/redirect/build.py "$TARGET" _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
