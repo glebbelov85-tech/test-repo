@@ -3,7 +3,7 @@
 // Flight model, input and OSD come from the drone game «Операторы дронов» (fpv/); the room is rebuilt from photos.
 if(!window.THREE){document.body.innerHTML='<p style="padding:24px">Не загрузился 3D-движок (three.min.js). Обнови страницу.</p>';throw new Error('no three');}
 const $=id=>document.getElementById(id);
-const VERSION='1.2 от 25.10.2026'; // bump on every release so testers can tell builds apart
+const VERSION='1.3 от 11.11.2026'; // bump on every release so testers can tell builds apart
 document.querySelectorAll('.ver').forEach(e=>e.textContent='Версия '+VERSION);
 document.title='Муха · v'+VERSION.split(' ')[0];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -33,7 +33,7 @@ $('game').appendChild(renderer.domElement);
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x07090b);
 scene.fog=new THREE.Fog(0x1a1712,80,330);
-const camFPV=new THREE.PerspectiveCamera(80,1,0.03,500);
+const camFPV=new THREE.PerspectiveCamera(80,1,0.06,500);
 const camExt=new THREE.PerspectiveCamera(60,1,0.05,500);
 const ANISO=Math.min(8,renderer.capabilities.getMaxAnisotropy());
 
@@ -53,6 +53,7 @@ function setupPost(){
   try{
     const q=+S.q,RT=q>=2&&THREE.WebGLMultisampleRenderTarget?THREE.WebGLMultisampleRenderTarget:THREE.WebGLRenderTarget;
     const rt=new RT(innerWidth,innerHeight,{type:THREE.HalfFloatType});if(rt.samples!==undefined)rt.samples=q>=3?8:4;
+    if(THREE.DepthTexture){const dt=new THREE.DepthTexture(innerWidth,innerHeight);dt.type=THREE.UnsignedIntType;rt.depthTexture=dt;} // 24-bit depth: the default 16-bit one z-fights at room scale
     composer=new THREE.EffectComposer(renderer,rt);
     renderPass=new THREE.RenderPass(scene,camFPV);composer.addPass(renderPass);
     composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth/(q>=3?1:2),innerHeight/(q>=3?1:2)),0.45,0.5,1.0));
@@ -71,7 +72,7 @@ addEventListener('resize',resize);
 /* ---------- Textures: photo patches from the real room + procedural ones ---------- */
 const loader=new THREE.TextureLoader();
 let loading=0;
-function photo(name,rep){loading++;const t=loader.load('tex/'+name+'.jpg?v=1.1',()=>{if(--loading<=0)$('load').hidden=true;},undefined,()=>{if(--loading<=0)$('load').hidden=true;});
+function photo(name,rep){loading++;const t=loader.load('tex/'+name+'.jpg?v=1.3',()=>{if(--loading<=0)$('load').hidden=true;},undefined,()=>{if(--loading<=0)$('load').hidden=true;});
   t.encoding=THREE.sRGBEncoding;t.anisotropy=ANISO;if(rep){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep[0],rep[1]);}return t;}
 function canvasTex(w,h,draw,rep){
   const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);
@@ -161,6 +162,7 @@ const M={
   lamp:new THREE.MeshBasicMaterial({color:new THREE.Color(0xfff6e6).multiplyScalar(6)}),
   ceiling:new THREE.MeshStandardMaterial({color:0x121820,roughness:.12,metalness:.1}),
   ceilLiv:new THREE.MeshStandardMaterial({color:0x6a5040,roughness:.12,metalness:.1}),
+  ceilKit:new THREE.MeshStandardMaterial({color:0x1d8a34,roughness:.12,metalness:.1}),
   ceilWhite:new THREE.MeshStandardMaterial({color:0xf5f5f2,roughness:.5}),
   blue:new THREE.MeshStandardMaterial({color:0x2f6fe0,roughness:.4}),
   teal:new THREE.MeshStandardMaterial({color:0x2a9a9a,roughness:.7}),
@@ -327,12 +329,18 @@ function buildRoom(){
   buildHouse();
 }
 
-/* ---------- Living room and kitchen (v1.1, rebuilt from a video) ---------- */
-// map (real metres): corridor behind the bedroom ends at z=7.6; living room south of it, kitchen east of the corridor.
-const LIV=[0.6,6.6,7.75,13.75];  // x0,x1,z0,z1
-const KIT=[4.75,8.0,3.6,7.6];
-const WDOOR=[1.6,2.45], DDOOR=[5.5,6.35]; // wooden door corridor↔living, dark door kitchen↔living (wall z 7.6..7.75)
-// floor tiles: cream tile with a brown compass star, double lines and little knots at the corners (one tile = 0.5 m)
+/* ---------- Living room, kitchen and front hall (v1.3, rebuilt from three GoPro 360° panoramas) ---------- */
+// map (real metres): the corridor behind the bedroom opens south into a niche of the living room;
+// the kitchen and the front hall lie side by side west of the living room, both with their windows on the far west wall.
+const LIV=[1.66,8.8,7.75,13.1];   // x0,x1,z0,z1
+const KIT=[-2.4,1.51,7.75,11.2];
+const HAL=[-2.65,1.51,11.35,13.45]; // front hall with the boiler
+const CDOOR=[2.0,2.92];           // corridor → living room (wall z 7.6..7.75)
+const KDOOR=[8.75,9.6], HDOOR=[11.85,12.65]; // living room west wall (x 1.51..1.66): dark door to the kitchen, oak door to the hall
+const TVBOX=[2.96,6.36,8.35];     // the TV wall juts out of the north wall: x0,x1,front z
+const LIVC=[3.06,7.16,9.25,12.25];// glossy brown middle of the two-level ceiling
+const KITC=[-1.9,1.0,8.25,10.55]; // glossy green middle of the kitchen ceiling
+// floor tiles: cream tile with a brown compass star, double lines and little knots at the corners (one tile = 0.45 m)
 const texStar=canvasTex(512,512,(g,w)=>{
   g.fillStyle='#e9dcc0';g.fillRect(0,0,w,w);
   const c=w/2;let r=g.createRadialGradient(c,c,0,c,c,w*0.33);r.addColorStop(0,'#d9c69d');r.addColorStop(.85,'#dccaa3');r.addColorStop(1,'rgba(220,202,163,0)');g.fillStyle=r;g.beginPath();g.arc(c,c,w*0.33,0,7);g.fill();
@@ -345,13 +353,59 @@ const texStar=canvasTex(512,512,(g,w)=>{
   for(const o of [w*0.015,w*0.06])g.strokeRect(o,o,w-2*o,w-2*o);
   g.fillStyle='#e9dcc0';for(const [x,y] of [[0,0],[w,0],[0,w],[w,w]]){g.save();g.translate(x,y);g.rotate(Math.PI/4);g.fillRect(-w*0.07,-w*0.07,w*0.14,w*0.14);g.strokeRect(-w*0.07,-w*0.07,w*0.14,w*0.14);g.restore();}
 },[1,1]);
+// the big brown double circles laid into the tiles (drawn on a transparent sheet just above the floor)
+function arcTex(wm,dm,circles){return canvasTex(1024,Math.round(1024*dm/wm),(g,w,h)=>{const s=w/wm;g.strokeStyle='rgba(78,58,38,.92)';
+  for(const [cx,cz,r] of circles)for(const rr of [r,r-0.09]){g.lineWidth=0.045*s;g.beginPath();g.arc(cx*s,cz*s,rr*s,0,7);g.stroke();}});}
 const texTable=canvasTex(256,256,(g,w,h)=>{g.fillStyle='#f1eef4';g.fillRect(0,0,w,h);
   for(let i=0;i<26;i++){const x=Math.random()*w,y=Math.random()*h;g.fillStyle=['#c9b4e0','#e8d36a','#b6c9e8','#d7c08a'][i%4];g.globalAlpha=.7;
     if(i%3){g.beginPath();for(let k=0;k<5;k++){const a=k*1.256;g.ellipse(x+Math.cos(a)*8,y+Math.sin(a)*8,6,4,a,0,7);}g.fill();}else g.fillRect(x,y,22,16);}g.globalAlpha=1;},[3,3]);
-const texPoster=canvasTex(128,180,(g,w,h)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#0b1a4a');gr.addColorStop(1,'#2a6ab0');g.fillStyle=gr;g.fillRect(0,0,w,h);
-  for(let i=0;i<60;i++){g.fillStyle=`rgba(255,255,255,${Math.random()})`;g.fillRect(Math.random()*w,Math.random()*h,1.5,1.5);}
-  g.fillStyle='#bfe4ff';g.beginPath();g.arc(70,95,30,0,7);g.fill();g.fillStyle='#7fb6e8';g.beginPath();g.arc(62,88,10,0,7);g.arc(82,108,7,0,7);g.fill();});
-const texSofa=canvasTex(128,128,(g,w,h)=>noiseFill(g,w,h,'#5e5651',3000,.15),[3,3]);
+const texSofa=canvasTex(128,128,(g,w,h)=>noiseFill(g,w,h,'#4a4a4e',3000,.15),[3,3]);
+const texLam=plankTex(['#6f665c','#7e7366','#615850','#86796b','#71675d','#5a524b'],[1,1]);
+const texPine=canvasTex(256,256,(g,w,h)=>{g.fillStyle='#d8c29c';g.fillRect(0,0,w,h);
+  for(let s=0;s<40;s++){g.strokeStyle=`rgba(150,110,60,${Math.random()*.25})`;g.lineWidth=1+Math.random()*2;g.beginPath();let x=Math.random()*w;g.moveTo(x,0);for(let y=0;y<=h;y+=16){x+=(Math.random()-.5)*4;g.lineTo(x,y);}g.stroke();}
+  g.fillStyle='rgba(120,90,50,.35)';for(let x=0;x<w;x+=w/4)g.fillRect(x,0,2,h);},[1,1]);
+const texCal=canvasTex(128,160,(g,w,h)=>{g.fillStyle='#f4efe2';g.fillRect(0,0,w,h);g.fillStyle='#c9a24a';g.fillRect(0,0,w,40);g.fillStyle='#555';
+  for(let r=0;r<6;r++)for(let c=0;c<7;c++)g.fillRect(8+c*16,52+r*17,9,7);});
+const texClock=canvasTex(128,128,(g,w)=>{g.fillStyle='#f4f2ee';g.fillRect(0,0,w,w);g.fillStyle='#c77fb8';for(let i=0;i<6;i++){g.beginPath();g.arc(20+i*9,18+(i%2)*8,7,0,7);g.fill();}
+  g.fillStyle='#222';g.font='bold 16px sans-serif';g.textAlign='center';for(let i=1;i<=12;i++){const a=i/12*Math.PI*2;g.fillText(i,64+Math.sin(a)*46,70-Math.cos(a)*46);}
+  g.strokeStyle='#222';g.lineWidth=4;g.beginPath();g.moveTo(64,64);g.lineTo(64,32);g.moveTo(64,64);g.lineTo(88,72);g.stroke();});
+
+// a wall: flat plane facing dir ('+x','-x','+z','-z' = the side the room is on) at coordinate c, from a0 to a1 along the other axis.
+// holes are [h0,h1,y0,y1] in world coordinates along the wall.
+function wall(dir,c,a0,a1,mat,holes){const w=a1-a0,hs=(holes||[]).map(([h0,h1,y0,y1])=>(dir==='+z'||dir==='-x')?[h0-a0,y0,h1-a0,y1]:[a1-h1,y0,a1-h0,y1]);
+  const g=wallGeo(w,RH,hs);
+  if(dir==='+z')return add(g,mat,a0,0,c,{noCast:true});
+  if(dir==='-z')return add(g,mat,a1,0,c,{ry:Math.PI,noCast:true});
+  if(dir==='+x')return add(g,mat,c,0,a1,{ry:Math.PI/2,noCast:true});
+  return add(g,mat,c,0,a0,{ry:-Math.PI/2,noCast:true});}
+// solid wall slab between c0..c1 (thickness axis) and a0..a1, with holes [h0,h1,y0,y1]
+function slab(ax,c0,c1,a0,a1,holes){const S=(p0,p1,y0,y1)=>ax==='x'?solid(c0,c1,y0,y1,p0,p1):solid(p0,p1,y0,y1,c0,c1);
+  let p=a0;for(const [h0,h1,y0,y1] of (holes||[]).slice().sort((a,b)=>a[0]-b[0])){if(h0>p)S(p,h0,0,RH);if(y0>0)S(h0,h1,0,y0);if(y1<RH)S(h0,h1,y1,RH);p=h1;}
+  if(a1>p)S(p,a1,0,RH);}
+// doorway through a wall: jambs + casings on both faces + an open leaf standing in the room on side `leafSide` (+1/-1 along the thickness axis), hinged at `hinge` end
+function doorway(ax,c0,c1,h0,h1,mat,top,leaf){top=top||2.05;
+  const B=(a0,a1,y0,y1,t0,t1,m,o)=>ax==='x'?box(t0,t1,y0,y1,a0,a1,m,o):box(a0,a1,y0,y1,t0,t1,m,o);
+  B(h0-0.02,h0,0,top+0.02,c0,c1,mat,{solid:false});B(h1,h1+0.02,0,top+0.02,c0,c1,mat,{solid:false});B(h0-0.02,h1+0.02,top,top+0.02,c0,c1,mat,{solid:false});
+  for(const t of [c0-0.015,c1]){B(h0-0.07,h0,0,top+0.07,t,t+0.015,mat,{noCast:true});B(h1,h1+0.07,0,top+0.07,t,t+0.015,mat,{noCast:true});B(h0-0.07,h1+0.07,top,top+0.07,t,t+0.015,mat,{noCast:true});}
+  if(!leaf)return;
+  const lw=h1-h0-0.04,t=leaf.side>0?c1+0.02:c0-0.02,a=leaf.hinge>0?h1-0.03:h0+0.03;
+  const l=B(Math.min(a,a+0.04*-leaf.hinge),Math.max(a,a+0.04*-leaf.hinge),0.01,top-0.01,Math.min(t,t+lw*leaf.side),Math.max(t,t+lw*leaf.side),mat);
+  return {a,t,lw};}
+function winFrame(x0,y0,x1,y1,zg,dir,mul,ax){ // white PVC frame; zg = glass plane, dir = +1 if the room is at larger coordinate
+  const f0=zg-0.03*dir,f1=zg+0.04*dir,a=Math.min(f0,f1),b=Math.max(f0,f1),fw=0.06;
+  const B=(p0,p1,q0,q1)=>ax==='x'?box(a,b,q0,q1,p0,p1,M.pvc):box(p0,p1,q0,q1,a,b,M.pvc);
+  B(x0,x1,y0,y0+fw);B(x0,x1,y1-fw,y1);B(x0,x0+fw,y0,y1);B(x1-fw,x1,y0,y1);
+  for(const m of mul)B(m-0.035,m+0.035,y0,y1);
+  if(ax==='x')add(new THREE.PlaneGeometry(x1-x0,y1-y0),M.glass,zg,(y0+y1)/2,(x0+x1)/2,{ry:Math.PI/2,noCast:true});
+  else add(new THREE.PlaneGeometry(x1-x0,y1-y0),M.glass,(x0+x1)/2,(y0+y1)/2,zg,{noCast:true});}
+// two-level ceiling: white band (box frame) around a glossy middle; downlights in the band
+function ceilBand(R,C,by,spotMat,step){const [x0,x1,z0,z1]=R,[cx0,cx1,cz0,cz1]=C;
+  const T=RH-0.004;box(x0,x1,by,T,z0,cz0,M.ceilWhite,{noCast:true,solid:false});box(x0,x1,by,T,cz1,z1,M.ceilWhite,{noCast:true,solid:false});
+  box(x0,cx0,by,T,cz0,cz1,M.ceilWhite,{noCast:true,solid:false});box(cx1,x1,by,T,cz0,cz1,M.ceilWhite,{noCast:true,solid:false});
+  solid(x0,x1,by,RH,z0,cz0);solid(x0,x1,by,RH,cz1,z1);solid(x0,cx0,by,RH,cz0,cz1);solid(cx1,x1,by,RH,cz0,cz1);
+  const sp=[];for(let x=x0+0.5;x<x1-0.3;x+=step)sp.push([x,(z0+cz0)/2],[x,(cz1+z1)/2]);for(let z=cz0+0.5;z<cz1-0.3;z+=step)sp.push([(x0+cx0)/2,z],[(cx1+x1)/2,z]);
+  for(const [x,z] of sp)add(new THREE.CylinderGeometry(0.035,0.035,0.01,12),spotMat,x,by-0.004,z,{noCast:true});}
+
 function buildHouse(){
   const Z={
     zal:new THREE.MeshStandardMaterial({map:photo('oboi_zal',[1/1.8,1/1.55]),roughness:.8}),
@@ -360,162 +414,262 @@ function buildHouse(){
     marble:new THREE.MeshStandardMaterial({map:photo('mramor'),roughness:.15,metalness:.1}),
     tile:new THREE.MeshStandardMaterial({map:texStar,roughness:.25}),
     tile2:new THREE.MeshStandardMaterial({map:texStar.clone(),roughness:.25}),
-    darkwood:new THREE.MeshStandardMaterial({color:0x3a2219,roughness:.45}),
+    lam:new THREE.MeshStandardMaterial({map:texLam,roughness:.55}),
+    darkwood:new THREE.MeshStandardMaterial({color:0x2e1c15,roughness:.4}),
     oak:new THREE.MeshStandardMaterial({color:0xb8732f,roughness:.45}),
+    pine:new THREE.MeshStandardMaterial({map:texPine,roughness:.6}),
     sofa:new THREE.MeshStandardMaterial({map:texSofa,roughness:1}),
     gloss:new THREE.MeshStandardMaterial({color:0x0c0a0a,roughness:.15,metalness:.3}),
-    panel:new THREE.MeshStandardMaterial({color:0xdcd0c8,roughness:.6}),
+    panel:new THREE.MeshStandardMaterial({color:0xd9cdc2,roughness:.6}),
     kwhite:new THREE.MeshStandardMaterial({color:0xf0efeb,roughness:.45}),
     top:new THREE.MeshStandardMaterial({color:0xb7b0a6,roughness:.5}),
     steel:new THREE.MeshStandardMaterial({color:0xc4c8cc,roughness:.25,metalness:.85}),
+    flex:new THREE.MeshStandardMaterial({color:0xc9cdd2,roughness:.35,metalness:.35}),
     green:new THREE.MeshStandardMaterial({color:0x86a54c,roughness:.9,side:THREE.DoubleSide}),
-    beigeBlind:new THREE.MeshStandardMaterial({color:0xc9a27a,roughness:.9,side:THREE.DoubleSide}),
+    beigeBlind:new THREE.MeshStandardMaterial({color:0xc9b8a0,roughness:.9,side:THREE.DoubleSide}),
     leather:new THREE.MeshStandardMaterial({color:0xd8cfc0,roughness:.55}),
     cloth:new THREE.MeshStandardMaterial({map:texTable,roughness:.7}),
     tent:new THREE.MeshStandardMaterial({color:0xf2efe8,roughness:.9,side:THREE.DoubleSide}),
-    tentTop:new THREE.MeshStandardMaterial({color:0xb4693a,roughness:.8,side:THREE.DoubleSide}),
+    tentTop:new THREE.MeshStandardMaterial({color:0xd08a45,roughness:.8,side:THREE.DoubleSide}),
     orange:new THREE.MeshStandardMaterial({color:0xe08a2a,roughness:.5}),
     kid:new THREE.MeshStandardMaterial({color:0x3f8fd8,roughness:.5}),
     yellow:new THREE.MeshStandardMaterial({color:0xf2d02a,roughness:.5}),
-    spot:new THREE.MeshBasicMaterial({color:new THREE.Color(0xffd27a).multiplyScalar(5)}),
-    ceilK:new THREE.MeshStandardMaterial({color:0xf3f1ec,roughness:.7,side:THREE.DoubleSide}),
+    pouf:new THREE.MeshStandardMaterial({color:0x8d9094,roughness:1}),
+    wallW:new THREE.MeshStandardMaterial({color:0xe9e5de,roughness:.9}),
+    water:new THREE.MeshStandardMaterial({color:0x4aa0ff,roughness:.05,metalness:.1,transparent:true,opacity:.55}),
+    redHose:new THREE.MeshStandardMaterial({color:0xb8321e,roughness:.5}),
+    brass:new THREE.MeshStandardMaterial({color:0xc9a248,roughness:.35,metalness:.8}),
+    spot:new THREE.MeshBasicMaterial({color:new THREE.Color(0xfff4e0).multiplyScalar(5)}),
+    ring:new THREE.MeshBasicMaterial({color:new THREE.Color(0xf4f8ff).multiplyScalar(3)}),
+    door:new THREE.MeshStandardMaterial({map:photo('dver'),roughness:.45}),
+    rose:new THREE.MeshStandardMaterial({map:photo('rozy'),roughness:.5}),
+    poster:new THREE.MeshStandardMaterial({map:photo('poster'),roughness:.5}),
+    cal:new THREE.MeshStandardMaterial({map:texCal,roughness:.8}),
+    clock:new THREE.MeshStandardMaterial({map:texClock,roughness:.6}),
   };
-  Z.tile.map.repeat.set((LIV[1]-LIV[0])/0.5,(LIV[3]-LIV[2]+0.15)/0.5);
-  Z.tile2.map.repeat.set((KIT[1]-KIT[0])/0.5,(KIT[3]-KIT[2])/0.5);Z.tile2.map.needsUpdate=true;
-  const [lx0,lx1,lz0,lz1]=LIV,[kx0,kx1,kz0,kz1]=KIT,DT=2.05;
-  /* shared wall z 7.6..7.75 between corridor+kitchen (north) and the living room (south) */
-  add(wallGeo(HALL[1]-HALL[0],RH,[[HALL[1]-WDOOR[1],0,HALL[1]-WDOOR[0],DT]]),M.hallWallF,HALL[1],0,7.6,{ry:Math.PI,noCast:true});
-  add(wallGeo(kx1-kx0,RH,[[kx1-DDOOR[1],0,kx1-DDOOR[0],DT]]),Z.kit,kx1,0,7.6,{ry:Math.PI,noCast:true});
-  add(wallGeo(lx1-lx0,RH,[[WDOOR[0]-lx0,0,WDOOR[1]-lx0,DT],[DDOOR[0]-lx0,0,DDOOR[1]-lx0,DT]]),Z.zal,lx0,0,lz0,{noCast:true});
-  solid(0.4,WDOOR[0],0,RH,7.6,lz0);solid(WDOOR[1],DDOOR[0],0,RH,7.6,lz0);solid(DDOOR[1],8.2,0,RH,7.6,lz0);
-  solid(WDOOR[0],WDOOR[1],DT,RH,7.6,lz0);solid(DDOOR[0],DDOOR[1],DT,RH,7.6,lz0);
-  // door jambs, casings and open leaves: light oak with glass panes to the corridor, dark brown with a glass strip to the kitchen
-  for(const [d,mat] of [[WDOOR,Z.oak],[DDOOR,Z.darkwood]]){
-    box(d[0]-0.02,d[0],0,DT+0.02,7.6,lz0,mat,{solid:false});box(d[1],d[1]+0.02,0,DT+0.02,7.6,lz0,mat,{solid:false});box(d[0]-0.02,d[1]+0.02,DT,DT+0.02,7.6,lz0,mat,{solid:false});
-    for(const z of [lz0,7.6-0.015]){box(d[0]-0.07,d[0],0,DT+0.07,z,z+0.015,mat,{noCast:true});box(d[1],d[1]+0.07,0,DT+0.07,z,z+0.015,mat,{noCast:true});box(d[0]-0.07,d[1]+0.07,DT,DT+0.07,z,z+0.015,mat,{noCast:true});}
-  }
-  // leaves opened into the living room, against the wall
-  const wl=box(WDOOR[0]+0.02,WDOOR[0]+0.06,0.01,DT-0.01,lz0+0.02,lz0+0.02+(WDOOR[1]-WDOOR[0]),Z.oak);
-  for(let r=0;r<3;r++)for(let c=0;c<2;c++)box(WDOOR[0]+0.061,WDOOR[0]+0.062,1.15+r*0.27,1.38+r*0.27,lz0+0.12+c*0.33,lz0+0.42+c*0.33,M.glass,{solid:false,noCast:true});
-  box(DDOOR[1]-0.06,DDOOR[1]-0.02,0.01,DT-0.01,lz0+0.02,lz0+0.02+(DDOOR[1]-DDOOR[0]),Z.darkwood);
-  box(DDOOR[1]-0.065,DDOOR[1]-0.064,0.3,1.9,lz0+0.32,lz0+0.48,M.glass,{solid:false,noCast:true});
+  const [lx0,lx1,lz0,lz1]=LIV,[kx0,kx1,kz0,kz1]=KIT,[hx0,hx1,hz0,hz1]=HAL,DT=2.05;
+  const floor=(x0,x1,z0,z1,mat,tile)=>{const m=mat.clone();m.map=mat.map.clone();m.map.needsUpdate=true;m.map.repeat.set((x1-x0)/tile,(z1-z0)/tile);
+    add(new THREE.PlaneGeometry(x1-x0,z1-z0),m,(x0+x1)/2,0,(z0+z1)/2,{rx:-Math.PI/2,noCast:true});};
+  const arcs=(x0,x1,z0,z1,circles)=>add(new THREE.PlaneGeometry(x1-x0,z1-z0),new THREE.MeshStandardMaterial({map:arcTex(x1-x0,z1-z0,circles),transparent:true,roughness:.25,depthWrite:false}),(x0+x1)/2,0.002,(z0+z1)/2,{rx:-Math.PI/2,noCast:true});
+
+  /* ===== walls between the rooms ===== */
+  // corridor ↔ living room (z 7.6..7.75): doorway into the niche left of the TV wall
+  wall('-z',7.6,HALL[0],HALL[1],M.hallWallF,[[CDOOR[0],CDOOR[1],0,DT]]);
+  slab('z',7.6,lz0,0.4,lx0,[]);slab('z',7.6,lz0,lx0,HALL[1]+0.2,[[CDOOR[0],CDOOR[1],0,DT]]);
+  doorway('z',7.6,lz0,CDOOR[0],CDOOR[1],M.white,DT);
+  // living room west wall (x 1.51..1.66): kitchen door and hall door
+  slab('x',kx1,lx0,kz0-0.15,hz1+0.15,[[KDOOR[0],KDOOR[1],0,DT],[HDOOR[0],HDOOR[1],0,DT]]);
+  const kd=doorway('x',kx1,lx0,KDOOR[0],KDOOR[1],Z.darkwood,DT,{side:1,hinge:1});
+  box(kd.t+0.3,kd.t+0.46,0.3,1.9,kd.a-0.046,kd.a-0.045,M.glass,{solid:false,noCast:true});
+  const hd=doorway('x',kx1,lx0,HDOOR[0],HDOOR[1],Z.oak,DT,{side:1,hinge:1});
+  for(let r=0;r<3;r++)for(let c=0;c<2;c++)box(hd.t+0.1+c*0.3,hd.t+0.36+c*0.3,1.15+r*0.27,1.38+r*0.27,hd.a-0.046,hd.a-0.045,M.glass,{solid:false,noCast:true});
+  // kitchen ↔ hall (z 11.2..11.35), solid
+  slab('z',kz1,hz0,kx0-0.2,kx1+0.15,[]);
+  // outer walls of the kitchen and the hall (colliders)
+  slab('x',kx0-0.3,kx0,kz0-0.2,kz1,[]);slab('x',hx0-0.3,hx0,hz0,hz1+0.2,[]);slab('z',kz0-0.3,kz0,kx0-0.3,HALL[0],[]);
+  slab('z',kz0-0.15,kz0,HALL[0],kx1+0.15,[]);
 
   /* ===== living room ===== */
-  add(new THREE.PlaneGeometry(lx1-lx0,lz1-7.6),Z.tile,(lx0+lx1)/2,0,(7.6+lz1)/2,{rx:-Math.PI/2,noCast:true});
-  add(wallGeo(lz1-lz0,RH),Z.zal,lx0,0,lz1,{ry:Math.PI/2,noCast:true});
-  add(wallGeo(lz1-lz0,RH),Z.zal,lx1,0,lz0,{ry:-Math.PI/2,noCast:true});
-  const LW=[3.1,0.85,4.9,2.3];  // south window: x0,y0,x1,y1
-  add(wallGeo(lx1-lx0,RH,[[lx1-LW[2],LW[1],lx1-LW[0],LW[3]]]),Z.zal,lx1,0,lz1,{ry:Math.PI,noCast:true});
-  solid(lx0-0.2,lx0,0,RH,7.6,lz1+0.2);solid(lx1,lx1+0.2,0,RH,7.6,lz1+0.2);
-  solid(lx0,LW[0],0,RH,lz1,lz1+0.5);solid(LW[2],lx1,0,RH,lz1,lz1+0.5);solid(LW[0],LW[2],0,LW[1],lz1,lz1+0.5);solid(LW[0],LW[2],LW[3],RH,lz1,lz1+0.5);
-  solid(LW[0],LW[2],LW[1],LW[3],lz1+0.12,lz1+0.5);
-  const winFrame=(x0,y0,x1,y1,zg,dir,mul)=>{ // white PVC frame; zg = glass plane, dir = +1 if the room is at larger z
-    const f0=zg-0.03*dir,f1=zg+0.04*dir,a=Math.min(f0,f1),b=Math.max(f0,f1),fw=0.06;
-    box(x0,x1,y0,y0+fw,a,b,M.pvc);box(x0,x1,y1-fw,y1,a,b,M.pvc);box(x0,x0+fw,y0,y1,a,b,M.pvc);box(x1-fw,x1,y0,y1,a,b,M.pvc);
-    for(const m of mul)box(m-0.035,m+0.035,y0,y1,a,b,M.pvc);
-    add(new THREE.PlaneGeometry(x1-x0,y1-y0),M.glass,(x0+x1)/2,(y0+y1)/2,zg,{noCast:true});};
-  winFrame(LW[0],LW[1],LW[2],LW[3],lz1+0.12,-1,[3.7,4.3]);
-  box(LW[0],LW[2],LW[1],LW[3],lz1,lz1+0.005,M.white,{solid:false,noCast:true}).visible=false;
-  for(const x of [LW[0],LW[2]])box(x-0.005,x+0.005,LW[1],LW[3],lz1,lz1+0.12,M.white,{solid:false,noCast:true});
-  box(LW[0],LW[2],LW[3]-0.005,LW[3],lz1,lz1+0.12,M.white,{solid:false,noCast:true});
-  add(new THREE.PlaneGeometry(4,2.4),M.night,(LW[0]+LW[2])/2,1.5,lz1+1.3,{ry:Math.PI,noCast:true});
-  box(LW[0]-0.08,LW[2]+0.08,LW[1]-0.03,LW[1],lz1-0.15,lz1+0.12,M.pvc);
-  box(4.32,4.88,1.72,LW[3]-0.06,lz1+0.06,lz1+0.08,Z.beigeBlind);box(4.3,4.9,LW[3]-0.06,LW[3],lz1+0.04,lz1+0.1,Z.beigeBlind);
-  // two-level ceiling: white band with warm downlights, glossy middle with a big LED lamp
-  const bw=0.6,by=2.42;
-  box(lx0,lx1,by,RH,lz0,lz0+bw,M.ceilWhite,{noCast:true});box(lx0,lx1,by,RH,lz1-bw,lz1,M.ceilWhite,{noCast:true});
-  box(lx0,lx0+bw,by,RH,lz0+bw,lz1-bw,M.ceilWhite,{noCast:true});box(lx1-bw,lx1,by,RH,lz0+bw,lz1-bw,M.ceilWhite,{noCast:true});
-  const spots=[];for(let x=lx0+0.9;x<lx1-0.5;x+=1.2)spots.push([x,lz0+0.3],[x,lz1-0.3]);for(let z=lz0+1.5;z<lz1-1;z+=1.5)spots.push([lx0+0.3,z],[lx1-0.3,z]);
-  for(const [x,z] of spots)add(new THREE.CylinderGeometry(0.035,0.035,0.01,12),Z.spot,x,by-0.004,z,{noCast:true});
-  const cx=(lx0+lx1)/2,cz=(lz0+lz1)/2;
-  box(cx-0.5,cx+0.5,RH-0.05,RH-0.01,cz-0.38,cz+0.38,M.ceilWhite,{noCast:true});
-  add(new THREE.BoxGeometry(0.9,0.012,0.66),M.lamp,cx,RH-0.056,cz,{noCast:true});
-  // corner sofa in the south-west corner
-  const sofa=(x0,x1,z0,z1,back)=>{box(x0,x1,0,0.42,z0,z1,Z.sofa);
-    if(back==='s')box(x0,x1,0.42,0.85,z1-0.25,z1,Z.sofa);if(back==='w')box(x0,x0+0.25,0.42,0.85,z0,z1,Z.sofa);};
-  sofa(lx0,3.0,lz1-0.95,lz1,'s');sofa(lx0,lx0+0.95,10.4,lz1-0.95,'w');
-  for(const [x,z] of [[3.0,lz1-0.5],[lx0+0.5,10.4]]){const r=add(new THREE.CylinderGeometry(0.22,0.22,0.95,18),Z.sofa,x,0.45,z,{rx:Math.PI/2});if(z===10.4)r.rotation.set(0,0,Math.PI/2);}
-  for(let i=0;i<4;i++)add(new THREE.SphereGeometry(0.5,16,10),Z.sofa,0.9+i*0.55,0.82,lz1-0.13,{}).scale.set(0.3,0.16,0.14);
-  const bl=softGeo(1.1,2.0,12.9,13.5,16,(x,z)=>0.43+bump(x,z,1.5,13.2,0.25,0.14));add(bl,M.pillow,0,0,0);
-  // kids table and chair by the window
-  box(3.5,4.15,0.48,0.51,lz1-1.05,lz1-0.6,Z.kid);for(const [x,z] of [[3.53,lz1-1.02],[4.12,lz1-1.02],[3.53,lz1-0.63],[4.12,lz1-0.63]])box(x-0.01,x+0.01,0,0.48,z-0.01,z+0.01,M.alu);
-  box(3.65,3.95,0.3,0.32,lz1-1.45,lz1-1.15,Z.kid);box(3.65,3.95,0.32,0.62,lz1-1.47,lz1-1.44,Z.kid);
-  for(const [x,z] of [[3.66,lz1-1.44],[3.94,lz1-1.44],[3.66,lz1-1.16],[3.94,lz1-1.16]])box(x-0.008,x+0.008,0,0.3,z-0.008,z+0.008,M.alu,{solid:false});
-  // TV wall on the east: beige panel, big black TV, long glossy black stand, wall fan, toy truck
-  box(lx1-0.12,lx1,0,2.35,9.1,11.9,Z.panel);
-  box(lx1-0.18,lx1-0.12,1.05,2.05,9.55,11.45,Z.gloss);
-  add(new THREE.PlaneGeometry(1.84,0.94),new THREE.MeshStandardMaterial({color:0x05070a,roughness:.08,metalness:.5}),lx1-0.181,1.55,10.5,{ry:-Math.PI/2,noCast:true});
-  box(lx1-0.45,lx1,0.06,0.45,8.8,12.6,Z.gloss);
-  for(let z=9.3;z<12.4;z+=0.9)box(lx1-0.452,lx1-0.45,0.3,0.31,z,z+0.3,M.alu,{solid:false,noCast:true});
-  box(lx1-0.4,lx1-0.12,0.95,0.98,10.3,10.9,Z.gloss);
-  add(new THREE.CylinderGeometry(0.15,0.15,0.03,20),M.white,lx1-0.12,1.8,12.3,{rz:Math.PI/2});solid(lx1-0.15,lx1,1.65,1.95,12.15,12.45);
-  box(lx1-0.6,lx1-0.3,0.08,0.3,12.8,13.2,Z.yellow);box(lx1-0.62,lx1-0.28,0.3,0.45,12.75,13.1,Z.kid);
-  for(const z of [12.85,13.15])add(new THREE.CylinderGeometry(0.06,0.06,0.36,12),M.black,lx1-0.45,0.06,z,{rz:Math.PI/2});
-  // west wall: poster and a microphone stand
-  add(new THREE.PlaneGeometry(0.3,0.42),new THREE.MeshStandardMaterial({map:texPoster,roughness:.5}),lx0+0.003,1.75,9.9,{ry:Math.PI/2,noCast:true});
-  add(new THREE.CylinderGeometry(0.012,0.012,1.6,8),M.black,lx0+0.35,0.8,9.5);solid(lx0+0.32,lx0+0.38,0,1.6,9.47,9.53);
-  add(new THREE.CylinderGeometry(0.008,0.008,0.5,8),M.black,lx0+0.35,1.6,9.62,{rx:1.1});
-  // teepee by the wooden door and a trampoline
-  const tp=[1.25,8.7];
+  floor(lx0,lx1,lz0,lz1,Z.tile,0.45);
+  floor(CDOOR[0],CDOOR[1],7.6,lz0,Z.tile,0.45);floor(kx1,lx0,KDOOR[0],KDOOR[1],Z.tile,0.45);floor(kx1,lx0,HDOOR[0],HDOOR[1],Z.lam,1.2);
+  arcs(lx0,lx1,lz0,lz1,[[3.4,2.75,2.45],[3.4,2.75,1.15]]);
+  wall('+z',lz0,lx0,lx1,Z.zal,[[CDOOR[0],CDOOR[1],0,DT]]);
+  wall('+x',lx0,lz0,lz1,Z.zal,[[KDOOR[0],KDOOR[1],0,DT],[HDOOR[0],HDOOR[1],0,DT]]);
+  wall('-z',lz1,lx0,lx1,Z.zal);
+  const LW=[8.75,0.55,11.15,2.3];  // east window: z0,y0,z1,y1 (three sashes)
+  wall('-x',lx1,lz0,lz1,Z.zal,[[LW[0],LW[2],LW[1],LW[3]]]);
+  slab('z',lz1,lz1+0.3,lx0-0.2,lx1+0.3,[]);slab('x',lx1,lx1+0.4,lz0-0.2,lz1+0.2,[[LW[0],LW[2],LW[1],LW[3]]]);solid(lx1+0.12,lx1+0.4,LW[1],LW[3],LW[0],LW[2]);
+  winFrame(LW[0],LW[1],LW[2],LW[3],lx1+0.12,-1,[LW[0]+0.8,LW[0]+1.6],'x');
+  for(const z of [LW[0],LW[2]])box(lx1,lx1+0.12,LW[1],LW[3],z-0.005,z+0.005,M.white,{solid:false,noCast:true});
+  box(lx1,lx1+0.12,LW[3]-0.005,LW[3],LW[0],LW[2],M.white,{solid:false,noCast:true});
+  add(new THREE.PlaneGeometry(4.2,2.6),M.night,lx1+1.3,1.4,(LW[0]+LW[2])/2,{ry:-Math.PI/2,noCast:true});
+  box(lx1-0.15,lx1+0.12,LW[1]-0.03,LW[1],LW[0]-0.08,LW[2]+0.08,M.pvc);
+  // fairy lights outside the window glass (seen in the panorama): little coloured dots
+  for(let i=0;i<40;i++){const z=LW[0]+0.1+Math.random()*(LW[2]-LW[0]-0.2),y=1.6+Math.random()*0.6;
+    add(new THREE.SphereGeometry(0.012,6,4),new THREE.MeshBasicMaterial({color:new THREE.Color(['#ff5050','#50ff70','#5090ff','#ffd040'][i%4]).multiplyScalar(2.5)}),lx1+0.2,y,z,{noCast:true});}
+  // the niche: TV wall juts out of the north wall from x 2.96 to 6.36
+  const [tb0,tb1,tbz]=TVBOX;
+  solid(tb0,tb1,0,RH,lz0,tbz);wall('+z',tbz,tb0,tb1,Z.zal);wall('-x',tb0,lz0,tbz,Z.zal);wall('+x',tb1,lz0,tbz,Z.zal);
+  box(4.62,5.62,0,2.35,tbz,tbz+0.03,Z.panel,{noCast:true});   // beige panel behind the TV
+  box(4.55,5.95,1.18,1.98,tbz+0.03,tbz+0.09,Z.gloss);
+  add(new THREE.PlaneGeometry(1.36,0.76),M.tv,5.25,1.58,tbz+0.092,{noCast:true});
+  box(4.95,5.0,1.98,2.45,tbz+0.03,tbz+0.06,M.black,{solid:false});box(4.95,5.9,2.4,2.45,tbz+0.03,tbz+0.06,M.black,{solid:false});box(5.85,5.9,2.0,2.45,tbz+0.03,tbz+0.06,M.black,{solid:false});
+  for(let x=5.05;x<5.85;x+=0.13)add(new THREE.SphereGeometry(0.018,6,4),new THREE.MeshBasicMaterial({color:new THREE.Color(0xfff3c0).multiplyScalar(3)}),x,2.32-Math.sin((x-5.05)/0.8*Math.PI)*0.06,tbz+0.07,{noCast:true});
+  // long glossy black TV stand with drawers, laptop on its west end
+  box(3.05,6.55,0.06,0.45,tbz,tbz+0.42,Z.gloss);box(3.05,6.55,0,0.06,tbz+0.03,tbz+0.38,M.black,{solid:false});
+  for(let x=3.3;x<6.4;x+=1.05)box(x,x+0.35,0.3,0.31,tbz+0.42,tbz+0.425,M.alu,{solid:false,noCast:true});
+  box(3.2,3.56,0.45,0.47,tbz+0.08,tbz+0.32,M.darkgrey);
+  const ls=add(new THREE.PlaneGeometry(0.34,0.22),M.lapScreen,3.38,0.585,tbz+0.09,{noCast:true});ls.rotation.x=-0.2;
+  box(3.2,3.56,0.47,0.7,tbz+0.06,tbz+0.08,M.darkgrey,{solid:false});
+  add(new THREE.CylinderGeometry(0.035,0.035,0.25,12),Z.flex,6.0,0.575,tbz+0.2);solid(5.96,6.04,0.45,0.7,tbz+0.16,tbz+0.24);
+  add(new THREE.CylinderGeometry(0.15,0.15,0.03,20),M.white,6.75,1.8,lz0+0.015,{rx:Math.PI/2});solid(6.6,6.9,1.65,1.95,lz0,lz0+0.05);
+  // grey bean-bag pouf in front of the stand
+  add(new THREE.SphereGeometry(0.4,16,10),Z.pouf,3.8,0.18,9.35).scale.set(1,0.48,0.9);solid(3.42,4.18,0,0.36,9.0,9.7);
+  // corner sofa in the south-east corner (dark grey, rounded backs) + kids folding table
+  const sofa=(x0,x1,z0,z1,back)=>{box(x0,x1,0,0.44,z0,z1,Z.sofa);
+    if(back==='s')box(x0,x1,0.44,0.9,z1-0.28,z1,Z.sofa);if(back==='e')box(x1-0.28,x1,0.44,0.9,z0,z1,Z.sofa);};
+  sofa(4.3,lx1,lz1-1.0,lz1,'s');sofa(lx1-1.0,lx1,11.0,lz1-1.0,'e');
+  add(new THREE.CylinderGeometry(0.22,0.22,1.0,18),Z.sofa,4.3,0.46,lz1-0.5,{rx:Math.PI/2});
+  add(new THREE.CylinderGeometry(0.22,0.22,1.0,18),Z.sofa,lx1-0.5,0.46,11.0,{rz:Math.PI/2});
+  for(let i=0;i<7;i++)add(new THREE.SphereGeometry(0.5,16,10),Z.sofa,4.75+i*0.58,0.88,lz1-0.15,{}).scale.set(0.32,0.17,0.16);
+  for(let i=0;i<3;i++)add(new THREE.SphereGeometry(0.5,16,10),Z.sofa,lx1-0.15,0.88,11.3+i*0.55,{}).scale.set(0.16,0.17,0.3);
+  box(6.1,6.75,0.5,0.53,11.55,12.0,Z.kid);for(const [x,z] of [[6.13,11.58],[6.72,11.58],[6.13,11.97],[6.72,11.97]])box(x-0.01,x+0.01,0,0.5,z-0.01,z+0.01,M.alu,{solid:false});
+  add(new THREE.PlaneGeometry(0.3,0.22),M.white,6.4,0.532,11.8,{rx:-Math.PI/2,rz:0.3,noCast:true});
+  // poster on the south wall above the sofa
+  add(new THREE.PlaneGeometry(0.33,0.47),Z.poster,6.55,1.75,lz1-0.004,{ry:Math.PI,noCast:true});
+  // west wall: picture of pink roses between the doors, a microphone stand by the hall door
+  add(new THREE.PlaneGeometry(0.62,0.44),Z.rose,lx0+0.012,1.75,10.4,{ry:Math.PI/2,noCast:true});box(lx0,lx0+0.01,1.51,1.99,10.07,10.73,M.frameW,{solid:false,noCast:true});
+  add(new THREE.CylinderGeometry(0.012,0.012,1.6,8),M.black,2.15,0.8,11.65);solid(2.12,2.18,0,1.6,11.62,11.68);
+  add(new THREE.TorusGeometry(0.2,0.008,6,24),M.black,2.15,1.55,11.65,{rx:Math.PI/2});
+  // teepee by the hall door and a trampoline with a handle bar
+  const tp=[2.8,12.65];
   add(new THREE.CylinderGeometry(0.33,0.55,0.95,16,1,true,0.6,5.3),Z.tent,tp[0],0.475,tp[1],{});
   add(new THREE.ConeGeometry(0.62,0.6,16,1,true),Z.tentTop,tp[0],1.2,tp[1]);solid(tp[0]-0.4,tp[0]+0.4,0.92,1.45,tp[1]-0.4,tp[1]+0.4);
-  const tr=[2.55,9.5];
+  const tr=[3.6,11.95];
   add(new THREE.CylinderGeometry(0.5,0.5,0.015,6),M.black,tr[0],0.3,tr[1]);
   add(new THREE.CylinderGeometry(0.56,0.56,0.02,6,1,true),Z.orange,tr[0],0.3,tr[1]);solid(tr[0]-0.5,tr[0]+0.5,0.28,0.32,tr[1]-0.45,tr[1]+0.45);
   for(let i=0;i<6;i++){const a=i*Math.PI/3;add(new THREE.CylinderGeometry(0.012,0.012,0.3,6),M.black,tr[0]+Math.cos(a)*0.52,0.15,tr[1]+Math.sin(a)*0.52);}
-  add(new THREE.CylinderGeometry(0.015,0.015,0.9,6),M.black,tr[0]-0.4,0.75,tr[1]-0.2,{rz:0.2});
-  // living room baseboards
-  box(lx0,lx1,0,0.06,lz1-0.015,lz1,M.plinth);box(lx0,lx0+0.015,0,0.06,lz0,lz1,M.plinth);
+  add(new THREE.CylinderGeometry(0.015,0.015,0.9,6),M.black,tr[0]+0.42,0.75,tr[1]-0.2,{rz:-0.2});add(new THREE.CylinderGeometry(0.015,0.015,0.4,6),M.black,tr[0]+0.33,1.18,tr[1]-0.2,{rx:Math.PI/2});
+  // a few toys on the floor
+  add(new THREE.TorusGeometry(0.12,0.02,8,20),new THREE.MeshStandardMaterial({color:0x9a50d0,roughness:.5}),4.6,0.02,10.6,{rx:Math.PI/2});
+  box(lx0,lx1,0,0.06,lz1-0.015,lz1,M.plinth,{noCast:true});box(lx1-0.015,lx1,0,0.06,lz0,lz1,M.plinth,{noCast:true});
+  // ceiling: white band with downlights, glossy brown middle (scene plane, see buildCeiling) and a looped LED chandelier
+  ceilBand(LIV,LIVC,2.45,Z.spot,1.0);
+  const cx=(LIVC[0]+LIVC[1])/2,cz=(LIVC[2]+LIVC[3])/2;
+  for(const [dx,dz,r,s] of [[0,0,0.32,1],[0.45,0.3,0.24,0.8],[-0.42,-0.28,0.24,0.8],[0.35,-0.4,0.2,0.7],[-0.38,0.38,0.2,0.7]]){
+    const m=add(new THREE.TorusGeometry(r,0.018,6,4),Z.ring,cx+dx,RH-0.12,cz+dz,{rx:Math.PI/2,noCast:true});m.rotation.z=Math.PI/4;
+    add(new THREE.CylinderGeometry(0.004,0.004,0.1,4),M.alu,cx+dx,RH-0.06,cz+dz,{noCast:true});}
 
   /* ===== kitchen ===== */
-  add(new THREE.PlaneGeometry(kx1-kx0,kz1-kz0),Z.tile2,(kx0+kx1)/2,0,(kz0+kz1)/2,{rx:-Math.PI/2,noCast:true});
-  const KW=[5.75,0.9,7.0,2.3];
-  add(wallGeo(kx1-kx0,RH,[[KW[0]-kx0,KW[1],KW[2]-kx0,KW[3]]]),Z.kit,kx0,0,kz0,{noCast:true});
-  add(wallGeo(kz1-kz0,RH),Z.kit,kx0,0,kz1,{ry:Math.PI/2,noCast:true});
-  add(wallGeo(kz1-kz0,RH),Z.tea,kx1,0,kz0,{ry:-Math.PI/2,noCast:true});
-  solid(4.6,kx0,0,RH,3.4,4.15);solid(kx1,kx1+0.2,0,RH,3.4,7.6);
-  solid(kx0,KW[0],0,RH,3.3,kz0);solid(KW[2],kx1,0,RH,3.3,kz0);solid(KW[0],KW[2],0,KW[1],3.3,kz0);solid(KW[0],KW[2],KW[3],RH,3.3,kz0);solid(KW[0],KW[2],KW[1],KW[3],3.3,kz0-0.12);
-  winFrame(KW[0],KW[1],KW[2],KW[3],kz0-0.12,1,[(KW[0]+KW[2])/2]);
-  for(const x of [KW[0],KW[2]])box(x-0.005,x+0.005,KW[1],KW[3],kz0-0.12,kz0,M.white,{solid:false,noCast:true});
-  box(KW[0],KW[2],KW[3]-0.005,KW[3],kz0-0.12,kz0,M.white,{solid:false,noCast:true});
-  add(new THREE.PlaneGeometry(3,2.4),M.night,(KW[0]+KW[2])/2,1.5,kz0-1.2,{noCast:true});
-  for(const [a,b] of [[KW[0]+0.05,(KW[0]+KW[2])/2-0.03],[(KW[0]+KW[2])/2+0.03,KW[2]-0.05]])add(new THREE.PlaneGeometry(b-a,KW[3]-KW[1]-0.12),Z.green,(a+b)/2,(KW[1]+KW[3])/2,kz0-0.08,{noCast:true});
-  box(KW[0]-0.08,KW[2]+0.08,KW[1]-0.03,KW[1],kz0-0.12,kz0+0.2,M.pvc);
-  add(new THREE.CylinderGeometry(0.055,0.055,0.24,16),M.white,6.75,KW[1]+0.12,kz0+0.08);solid(6.69,6.81,KW[1],KW[1]+0.24,kz0+0.02,kz0+0.14);
-  add(new THREE.SphereGeometry(0.12,12,8),Z.yellow,5.85,KW[1]+0.06,kz0+0.08).scale.set(1.2,0.6,0.8);
-  box(6.1,6.6,0,0.6,kz0+0.02,kz0+0.5,Z.kwhite);for(const y of [0.2,0.45])box(6.25,6.45,y,y+0.02,kz0+0.5,kz0+0.52,M.alu,{solid:false,noCast:true});
-  // kitchen run along the west wall: tall oven column by the window, base and wall cabinets, marble backsplash
-  const cz0=4.2,cz1=6.85;
-  box(kx0,kx0+0.6,0,2.2,kz0,cz0,Z.kwhite);
-  box(kx0+0.6,kx0+0.61,0.92,1.5,kz0+0.03,cz0-0.03,Z.gloss,{solid:false,noCast:true});box(kx0+0.61,kx0+0.62,1.4,1.46,kz0+0.06,cz0-0.06,Z.steel,{solid:false,noCast:true});
-  box(kx0+0.5,kx0+0.55,1.55,1.85,kz0+0.05,cz0-0.05,M.white);box(kx0+0.55,kx0+0.56,1.6,1.8,kz0+0.08,cz0-0.2,Z.gloss,{solid:false,noCast:true});
-  box(kx0,kx0+0.6,0.1,0.86,cz0,cz1,Z.kwhite);box(kx0,kx0+0.55,0,0.1,cz0,cz1,M.black);box(kx0,kx0+0.63,0.86,0.9,cz0,cz1,Z.top);
-  for(let z=cz0+0.05;z<cz1-0.2;z+=0.5){box(kx0+0.6,kx0+0.605,0.12,0.84,z,z+0.46,Z.kwhite,{solid:false});box(kx0+0.605,kx0+0.615,0.75,0.76,z+0.15,z+0.3,M.alu,{solid:false,noCast:true});}
-  box(kx0,kx0+0.35,1.5,2.2,cz0,cz1,Z.kwhite);
-  for(let z=cz0;z<cz1-0.1;z+=0.53)box(kx0+0.35,kx0+0.352,1.52,2.18,z+0.01,z+0.51,Z.kwhite,{solid:false,noCast:true});
-  box(kx0,kx0+0.5,1.42,1.5,4.9,5.5,Z.steel);
-  add(new THREE.PlaneGeometry(cz1-cz0,0.6),Z.marble,kx0+0.002,1.2,(cz0+cz1)/2,{ry:Math.PI/2,noCast:true});
-  add(new THREE.PlaneGeometry(0.5,0.5),new THREE.MeshStandardMaterial({color:0xf4f4f2,roughness:.1}),kx0+0.3,0.901,5.2,{rx:-Math.PI/2,noCast:true});
-  for(const [x,z] of [[0.18,5.05],[0.42,5.05],[0.18,5.35],[0.42,5.35]])add(new THREE.CylinderGeometry(0.035,0.035,0.012,12),M.darkgrey,kx0+x,0.906,z);
-  box(kx0+0.15,kx0+0.45,0.9,0.95,5.65,5.95,M.black);add(new THREE.CylinderGeometry(0.1,0.1,0.13,16),Z.steel,kx0+0.3,1.02,5.8);
-  add(new THREE.CylinderGeometry(0.07,0.08,0.2,14),M.glass,kx0+0.3,1.0,6.0);solid(kx0+0.22,kx0+0.38,0.9,1.1,5.92,6.08);
-  add(new THREE.PlaneGeometry(0.45,0.4),M.darkgrey,kx0+0.32,0.902,6.4,{rx:-Math.PI/2,noCast:true});
-  add(new THREE.CylinderGeometry(0.012,0.012,0.3,8),Z.steel,kx0+0.08,1.05,6.4);add(new THREE.CylinderGeometry(0.01,0.01,0.2,8),Z.steel,kx0+0.16,1.2,6.4,{rz:Math.PI/2});
-  box(kx0,kx0+0.6,0,0.85,cz1,cz1+0.6,M.white);box(kx0+0.6,kx0+0.601,0.7,0.78,cz1+0.05,cz1+0.45,M.black,{solid:false,noCast:true});
-  // corner bench, table with a cloth (and a camping gas stove on it), wooden chair, fridge, little shelf with photos
-  box(7.1,kx1,0,0.45,kz0,kz0+0.5,Z.leather);box(7.1,kx1,0.45,0.9,kz0,kz0+0.12,Z.leather);
-  box(kx1-0.5,kx1,0,0.45,kz0+0.5,5.75,Z.leather);box(kx1-0.12,kx1,0.45,0.9,kz0+0.12,5.75,Z.leather);
-  box(6.75,7.45,0.73,0.76,4.15,5.45,Z.cloth);box(6.75,7.45,0.5,0.73,4.149,4.15,Z.cloth,{solid:false});box(6.749,6.75,0.5,0.73,4.15,5.45,Z.cloth,{solid:false});
-  box(6.95,7.25,0,0.5,4.6,5.0,M.white);
-  box(6.85,7.3,0.76,0.82,4.7,5.05,Z.steel);for(const z of [4.78,4.97])add(new THREE.TorusGeometry(0.08,0.008,6,16),M.black,7.07,0.83,z,{rx:Math.PI/2});
-  add(new THREE.SphereGeometry(0.15,12,8),Z.kid,7.2,0.8,4.4).scale.set(1,0.7,1);
-  box(6.3,6.7,0.45,0.48,4.6,5.0,Z.oak);box(6.3,6.33,0.48,0.95,4.6,5.0,Z.oak);for(const [x,z] of [[6.32,4.62],[6.68,4.62],[6.32,4.98],[6.68,4.98]])box(x-0.015,x+0.015,0,0.45,z-0.015,z+0.015,Z.oak,{solid:false});
-  box(7.3,7.95,0,1.85,6.85,7.55,M.white);box(7.28,7.3,1.0,1.4,6.9,6.93,M.alu,{solid:false});
-  box(kx1-0.22,kx1,1.75,1.77,kz0+0.6,kz0+0.9,Z.oak);box(kx1-0.03,kx1-0.01,1.77,1.97,kz0+0.65,kz0+0.85,Z.oak);
-  add(new THREE.PlaneGeometry(0.16,0.16),new THREE.MeshBasicMaterial({color:0xfff2d0}),kx1-0.032,1.87,kz0+0.75,{ry:-Math.PI/2,noCast:true});
-  add(new THREE.PlaneGeometry(kx1-kx0,kz1-kz0),Z.ceilK,(kx0+kx1)/2,RH-0.002,(kz0+kz1)/2,{rx:Math.PI/2,noCast:true});
-  add(new THREE.CylinderGeometry(0.12,0.12,0.02,24),M.lamp,6.4,RH-0.012,5.5,{noCast:true});
-  box(kx0,kx1,0,0.06,kz1-0.015,kz1,M.plinth,{noCast:true});
+  floor(kx0,kx1,kz0,kz1,Z.tile2,0.45);
+  arcs(kx0,kx1,kz0,kz1,[[2.6,1.8,1.7]]);
+  wall('+z',kz0,kx0,kx1,Z.tea);
+  const KW=[9.3,0.9,10.5,2.3];   // west window: z0,y0,z1,y1
+  wall('+x',kx0,kz0,kz1,Z.kit,[[KW[0],KW[2],KW[1],KW[3]]]);
+  wall('-z',kz1,kx0,kx1,Z.kit);
+  wall('-x',kx1,kz0,kz1,Z.kit,[[KDOOR[0],KDOOR[1],0,DT]]);
+  solid(kx0-0.3,kx0-0.12,KW[1],KW[3],KW[0],KW[2]);
+  winFrame(KW[0],KW[1],KW[2],KW[3],kx0-0.12,1,[(KW[0]+KW[2])/2],'x');
+  for(const z of [KW[0],KW[2]])box(kx0-0.12,kx0,KW[1],KW[3],z-0.005,z+0.005,M.white,{solid:false,noCast:true});
+  box(kx0-0.12,kx0,KW[3]-0.005,KW[3],KW[0],KW[2],M.white,{solid:false,noCast:true});
+  add(new THREE.PlaneGeometry(3,2.4),M.night,kx0-1.2,1.5,(KW[0]+KW[2])/2,{ry:Math.PI/2,noCast:true});
+  for(const [a,b] of [[KW[0]+0.05,(KW[0]+KW[2])/2-0.03],[(KW[0]+KW[2])/2+0.03,KW[2]-0.05]])add(new THREE.PlaneGeometry(b-a,KW[3]-KW[1]-0.12),Z.green,kx0-0.08,(KW[1]+KW[3])/2,(a+b)/2,{ry:Math.PI/2,noCast:true});
+  box(kx0-0.12,kx0+0.2,KW[1]-0.03,KW[1],KW[0]-0.08,KW[2]+0.08,M.pvc);
+  add(new THREE.CylinderGeometry(0.1,0.1,0.03,16),M.white,kx0+0.1,KW[1]+0.015,10.0);
+  box(kx0+0.04,kx0+0.16,KW[1],KW[1]+0.04,9.5,9.7,M.darkgrey);
+  // kitchen run along the south wall (shared with the hall): tall oven column at the window, base units, sink, gas hob, hood, wall units, marble backsplash
+  const c0=kz1-0.6,rx0=kx0+0.6,rx1=0.85;
+  box(kx0,kx0+0.6,0,2.2,c0,kz1,Z.kwhite);
+  box(kx0+0.04,kx0+0.56,0.95,1.5,c0-0.01,c0,Z.gloss,{solid:false,noCast:true});box(kx0+0.08,kx0+0.52,1.42,1.46,c0-0.02,c0-0.01,Z.steel,{solid:false,noCast:true});
+  box(kx0+0.05,kx0+0.55,1.55,1.85,c0-0.06,c0,M.white,{solid:false});box(kx0+0.08,kx0+0.4,1.6,1.8,c0-0.07,c0-0.06,Z.gloss,{solid:false,noCast:true});
+  box(rx0,rx1,0.1,0.86,c0,kz1,Z.kwhite);box(rx0,rx1,0,0.1,c0+0.05,kz1,M.black,{solid:false});box(rx0,rx1,0.86,0.9,c0-0.03,kz1,Z.top);
+  for(let x=rx0+0.03;x<rx1-0.2;x+=0.5){box(x,x+0.46,0.12,0.84,c0-0.005,c0,Z.kwhite,{solid:false});box(x+0.15,x+0.3,0.75,0.76,c0-0.015,c0-0.005,M.alu,{solid:false,noCast:true});}
+  box(rx0,rx1,1.5,2.2,kz1-0.35,kz1,Z.kwhite);
+  for(let x=rx0;x<rx1-0.1;x+=0.5)box(x+0.01,x+0.49,1.52,2.18,kz1-0.352,kz1-0.35,Z.kwhite,{solid:false,noCast:true});
+  box(-1.15,-0.55,1.42,1.5,kz1-0.5,kz1,Z.steel);   // hood
+  add(new THREE.PlaneGeometry(rx1-rx0,0.6),Z.marble,(rx0+rx1)/2,1.2,kz1-0.002,{ry:Math.PI,noCast:true});
+  add(new THREE.PlaneGeometry(0.55,0.5),M.darkgrey,-0.85,0.902,kz1-0.3,{rx:-Math.PI/2,noCast:true});
+  for(const [x,z] of [[-1.0,0.18],[-0.7,0.18],[-1.0,0.42],[-0.7,0.42]])add(new THREE.CylinderGeometry(0.04,0.04,0.014,12),M.black,x,0.908,kz1-z);
+  box(-0.95,-0.65,0.9,0.92,kz1-0.42,kz1-0.15,M.black);add(new THREE.CylinderGeometry(0.13,0.12,0.08,16),M.black,-0.8,0.96,kz1-0.3);   // frying pan
+  add(new THREE.PlaneGeometry(0.45,0.4),Z.steel,0.25,0.902,kz1-0.3,{rx:-Math.PI/2,noCast:true});   // sink
+  add(new THREE.CylinderGeometry(0.012,0.012,0.3,8),Z.steel,0.25,1.05,kz1-0.06);add(new THREE.CylinderGeometry(0.01,0.01,0.2,8),Z.steel,0.25,1.2,kz1-0.15,{rx:Math.PI/2});
+  add(new THREE.CylinderGeometry(0.07,0.08,0.22,14),M.glass,-0.25,1.01,kz1-0.2);solid(-0.33,-0.17,0.9,1.12,kz1-0.28,kz1-0.12);   // kettle
+  add(new THREE.CylinderGeometry(0.06,0.07,0.28,12),M.white,0.65,1.04,kz1-0.2);solid(0.58,0.72,0.9,1.18,kz1-0.27,kz1-0.13);    // blender
+  // dishwasher by the door, its door open
+  box(rx1,kx1,0,0.86,c0,kz1,M.white);box(rx1+0.02,kx1-0.02,0.08,0.12,c0-0.6,c0,Z.steel);
+  box(rx1+0.03,kx1-0.03,0.12,0.15,c0-0.58,c0-0.02,M.white,{solid:false});
+  box(rx1,kx1,0.86,0.9,c0-0.03,kz1,Z.top);
+  // little round corner shelf above the dishwasher
+  add(new THREE.CylinderGeometry(0.3,0.3,0.02,16,1,false,Math.PI,Math.PI/2),M.white,kx1,1.75,kz1);add(new THREE.CylinderGeometry(0.3,0.3,0.02,16,1,false,Math.PI,Math.PI/2),M.white,kx1,2.05,kz1);
+  // clock above the door, calendar on the door wall
+  add(new THREE.PlaneGeometry(0.3,0.3),Z.clock,kx1-0.004,2.3,10.3,{ry:-Math.PI/2,noCast:true});
+  add(new THREE.PlaneGeometry(0.28,0.36),Z.cal,kx1-0.004,1.6,8.25,{ry:-Math.PI/2,noCast:true});
+  // corner bench (west + north), table with a flowery cloth, white metal chair, fridge in the north-east corner, shelf with a photo
+  box(kx0,kx0+0.5,0,0.45,kz0,9.15,Z.leather);box(kx0,kx0+0.12,0.45,0.95,kz0,9.15,Z.leather);
+  box(kx0+0.5,-0.75,0,0.45,kz0,kz0+0.5,Z.leather);box(kx0+0.5,-0.75,0.45,0.95,kz0,kz0+0.12,Z.leather);
+  box(-1.9,-0.85,0.73,0.76,8.3,9.25,Z.cloth);box(-1.9,-0.85,0.45,0.73,9.249,9.25,Z.cloth,{solid:false});box(-0.851,-0.85,0.45,0.73,8.3,9.25,Z.cloth,{solid:false});
+  box(-1.55,-1.2,0,0.5,8.6,8.95,M.white);
+  add(new THREE.CylinderGeometry(0.035,0.04,0.25,10),M.black,-1.2,0.885,8.7);add(new THREE.CylinderGeometry(0.06,0.06,0.04,12),Z.yellow,-1.5,0.78,8.9);
+  for(const [x,z] of [[-0.45,8.85],[-0.05,8.85],[-0.45,9.25],[-0.05,9.25]])box(x-0.012,x+0.012,0,0.45,z-0.012,z+0.012,M.white,{solid:false});
+  box(-0.47,-0.03,0.45,0.48,8.83,9.27,M.white);
+  add(new THREE.TorusGeometry(0.22,0.012,6,20,Math.PI),M.white,-0.25,0.72,8.84);solid(-0.48,-0.02,0.45,0.95,8.8,8.88);
+  box(0.85,kx1,0,1.85,kz0,kz0+0.68,M.white);box(0.85,0.87,1.0,1.4,kz0+0.6,kz0+0.63,M.alu,{solid:false});
+  add(new THREE.PlaneGeometry(0.5,1.3),new THREE.MeshBasicMaterial({color:0xcfe6ff,transparent:true,opacity:.25}),0.849,0.85,kz0+0.34,{ry:-Math.PI/2,noCast:true});
+  box(-2.1,-1.85,1.85,1.87,kz0,kz0+0.22,Z.oak);box(-2.08,-1.87,1.87,2.07,kz0+0.01,kz0+0.03,Z.oak);
+  add(new THREE.PlaneGeometry(0.16,0.16),new THREE.MeshBasicMaterial({color:0xfff2d0}),-1.975,1.97,kz0+0.032,{noCast:true});
+  box(kx0,kx1,0,0.06,kz0,kz0+0.015,M.plinth,{noCast:true});
+  ceilBand(KIT,KITC,2.45,Z.spot,1.0);
+  for(const [dx,dz] of [[0,0],[0.25,0.2],[-0.25,0.2],[0,-0.3]])add(new THREE.SphereGeometry(0.06,12,8),M.lamp,(KITC[0]+KITC[1])/2+dx,RH-0.12,(KITC[2]+KITC[3])/2+dz,{noCast:true});
+  add(new THREE.CylinderGeometry(0.006,0.006,0.12,4),M.alu,(KITC[0]+KITC[1])/2,RH-0.06,(KITC[2]+KITC[3])/2,{noCast:true});
+
+  /* ===== front hall: front door, gas boiler, water cooler ===== */
+  { const m=Z.lam.clone();m.map=texLam.clone();m.map.needsUpdate=true;m.map.repeat.set((hz1-hz0+0.25)/1.2,(hx1-hx0)/1.2);
+    add(new THREE.PlaneGeometry(hz1-hz0+0.25,hx1-hx0),m,(hx0+hx1)/2,0,(hz0+hz1+0.25)/2,{rx:-Math.PI/2,rz:Math.PI/2,noCast:true}); }
+  const FD=[-0.45,0.45,2.05];      // front door in the south wall: x0,x1,top; the door sits 0.25 m deep in the wall
+  wall('+z',hz0,hx0,hx1,Z.wallW);
+  wall('-z',hz1,hx0,hx1,Z.wallW,[[FD[0],FD[1],0,FD[2]]]);
+  const HW=[11.8,0.95,13.0,2.2];   // west window: z0,y0,z1,y1
+  wall('+x',hx0,hz0,hz1,Z.wallW,[[HW[0],HW[2],HW[1],HW[3]]]);
+  wall('-x',hx1,hz0,hz1,Z.wallW,[[HDOOR[0],HDOOR[1],0,DT]]);
+  add(new THREE.PlaneGeometry(hx1-hx0,hz1-hz0),new THREE.MeshStandardMaterial({color:0xf3f1ec,roughness:.6}),(hx0+hx1)/2,RH-0.002,(hz0+hz1)/2,{rx:Math.PI/2,noCast:true});
+  slab('z',hz1,hz1+0.4,hx0-0.3,hx1+0.3,[[FD[0],FD[1],0,FD[2]]]);
+  // door recess: white reveals, the dark brown steel door itself
+  box(FD[0]-0.01,FD[0],0,FD[2],hz1,hz1+0.25,Z.wallW,{solid:false,noCast:true});box(FD[1],FD[1]+0.01,0,FD[2],hz1,hz1+0.25,Z.wallW,{solid:false,noCast:true});
+  box(FD[0],FD[1],FD[2],FD[2]+0.01,hz1,hz1+0.25,Z.wallW,{solid:false,noCast:true});
+  box(FD[0],FD[1],0,FD[2],hz1+0.25,hz1+0.3,Z.darkwood);
+  add(new THREE.PlaneGeometry(FD[1]-FD[0]-0.04,FD[2]-0.04),Z.door,(FD[0]+FD[1])/2,FD[2]/2,hz1+0.249,{ry:Math.PI,noCast:true});
+  box(FD[1]-0.12,FD[1]-0.04,1.0,1.02,hz1+0.21,hz1+0.25,Z.brass,{solid:false});
+  // window with a beige roller blind and a wooden panel under the sill
+  solid(hx0-0.3,hx0-0.12,HW[1],HW[3],HW[0],HW[2]);
+  winFrame(HW[0],HW[1],HW[2],HW[3],hx0-0.12,1,[(HW[0]+HW[2])/2],'x');
+  for(const z of [HW[0],HW[2]])box(hx0-0.12,hx0,HW[1],HW[3],z-0.005,z+0.005,M.white,{solid:false,noCast:true});
+  box(hx0-0.12,hx0,HW[3]-0.005,HW[3],HW[0],HW[2],M.white,{solid:false,noCast:true});
+  add(new THREE.PlaneGeometry(3,2.4),M.night,hx0-1.2,1.5,(HW[0]+HW[2])/2,{ry:Math.PI/2,noCast:true});
+  add(new THREE.PlaneGeometry(HW[2]-HW[0]-0.1,0.95),Z.beigeBlind,hx0-0.07,HW[3]-0.53,(HW[0]+HW[2])/2,{ry:Math.PI/2,noCast:true});
+  box(hx0-0.11,hx0-0.03,HW[3]-0.08,HW[3],HW[0],HW[2],Z.beigeBlind);
+  box(hx0,hx0+0.3,0,HW[1],hz0+0.55,hz1-0.05,Z.pine);box(hx0-0.12,hx0+0.33,HW[1],HW[1]+0.03,hz0+0.5,hz1,M.pvc);
+  for(const [x,z,c,h] of [[hx0+0.15,12.2,0x2f6fe0,0.18],[hx0+0.12,12.5,0x8fd04a,0.12],[hx0+0.15,12.8,0xf2f0ea,0.1]])box(x-0.08,x+0.08,HW[1]+0.03,HW[1]+0.03+h,z-0.1,z+0.1,new THREE.MeshStandardMaterial({color:c,roughness:.7}));
+  // floor-standing gas boiler in the south-west corner with a flexible aluminium flue going up and into the wall
+  const BO=[-2.15,-1.4,12.85,hz1,0.85];
+  box(BO[0],BO[1],0.04,BO[4],BO[2],BO[3],M.white);box(BO[0]+0.02,BO[1]-0.02,0,0.04,BO[2]+0.02,BO[3]-0.02,M.darkgrey,{solid:false});
+  box(BO[0]+0.25,BO[0]+0.5,0.6,0.75,BO[2]-0.005,BO[2],M.darkgrey,{solid:false,noCast:true});
+  add(new THREE.CircleGeometry(0.02,10),new THREE.MeshBasicMaterial({color:0x40ff70}),BO[0]+0.55,0.68,BO[2]-0.006,{ry:Math.PI,noCast:true});
+  { const pts=[];for(let i=0;i<=20;i++){const t=i/20;pts.push(new THREE.Vector3(-1.85+Math.sin(t*Math.PI/2)*0.0,0.85+t*0.9,13.15+Math.pow(t,3)*0.3));}
+    const tube=add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,0.075,12,false),Z.flex,0,0,0);
+    for(let i=1;i<20;i+=2){const p=pts[i];add(new THREE.TorusGeometry(0.077,0.008,4,14),Z.flex,p.x,p.y,p.z,{rx:Math.PI/2,noCast:true});}
+    solid(-1.95,-1.75,0.85,1.8,13.05,hz1); }
+  // gas pipes, meter and valves near the corner
+  add(new THREE.CylinderGeometry(0.015,0.015,2.2,8),M.white,-2.55,1.25,hz1-0.04);add(new THREE.CylinderGeometry(0.015,0.015,1.1,8),M.white,-2.0,2.42,hz1-0.04,{rz:Math.PI/2});
+  box(-2.6,-2.35,1.3,1.6,hz1-0.15,hz1-0.02,new THREE.MeshStandardMaterial({color:0xdfe3d6,roughness:.5}));box(-2.55,-2.4,1.42,1.5,hz1-0.155,hz1-0.15,M.darkgrey,{solid:false,noCast:true});
+  add(new THREE.CylinderGeometry(0.03,0.03,0.12,10),Z.yellow,-2.48,1.15,hz1-0.06);
+  add(new THREE.CylinderGeometry(0.06,0.06,0.25,12),M.black,-2.25,1.2,hz1-0.08);solid(-2.31,-2.19,1.07,1.33,hz1-0.14,hz1-0.02);   // expansion tank
+  // small wooden chest by the hall door
+  box(0.8,1.45,0,0.78,12.95,hz1,Z.pine);box(0.8,1.45,0.78,0.8,12.93,hz1,Z.oak);
+  box(0.95,1.2,0.8,0.92,13.05,13.3,new THREE.MeshStandardMaterial({color:0xe8e4f0,roughness:.6}));box(1.22,1.38,0.8,0.9,13.1,13.3,Z.oak);
+  // long white wall counter along the north wall, pipes and red hoses under it, a water heater above
+  box(hx0+0.05,0.75,0.84,0.88,hz0,hz0+0.52,M.white);
+  for(const x of [hx0+0.4,-0.4,0.6])box(x-0.02,x+0.02,0,0.84,hz0+0.02,hz0+0.06,M.white);
+  for(let i=0;i<5;i++){const x=-1.8+i*0.18;add(new THREE.TorusGeometry(0.22,0.012,6,18,Math.PI),Z.redHose,x,0.35,hz0+0.12+i*0.03,{rz:Math.PI/2});}
+  add(new THREE.CylinderGeometry(0.02,0.02,3.2,8),M.white,-0.95,0.15,hz0+0.05,{rz:Math.PI/2});add(new THREE.CylinderGeometry(0.02,0.02,3.2,8),M.white,-0.95,0.6,hz0+0.08,{rz:Math.PI/2});
+  box(-1.0,-0.8,0,0.45,hz0+0.05,hz0+0.4,new THREE.MeshStandardMaterial({color:0x2a5ab8,roughness:.6}));   // blue filter canister
+  const wh=add(new THREE.CylinderGeometry(0.22,0.22,0.62,20),M.white,-1.1,1.75,hz0+0.24);solid(-1.32,-0.88,1.44,2.06,hz0,hz0+0.46);
+  box(-1.3,-0.9,1.52,1.98,hz0+0.4,hz0+0.47,M.black,{solid:false});
+  add(new THREE.CylinderGeometry(0.012,0.012,0.5,8),Z.steel,-0.85,1.3,hz0+0.2,{rz:0.5});
+  add(new THREE.CylinderGeometry(0.02,0.02,4.0,8),M.white,(hx0+hx1)/2,2.45,hz0+0.05,{rz:Math.PI/2});
+  // things on the counter: a black pot, a spray bottle, a bag of cat food, a big water bottle with a hand pump
+  add(new THREE.CylinderGeometry(0.13,0.12,0.18,16),M.black,-1.6,0.97,hz0+0.25);
+  add(new THREE.CylinderGeometry(0.035,0.04,0.24,10),new THREE.MeshStandardMaterial({color:0x6ad46a,roughness:.3,transparent:true,opacity:.8}),-0.35,1.0,hz0+0.25);
+  box(0.05,0.2,0.88,1.1,hz0+0.15,hz0+0.25,new THREE.MeshStandardMaterial({color:0xc03a8a,roughness:.6}));
+  add(new THREE.CylinderGeometry(0.14,0.14,0.42,18),Z.water,0.45,1.09,hz0+0.26);add(new THREE.CylinderGeometry(0.03,0.03,0.12,10),M.white,0.45,1.36,hz0+0.26);
+  box(0.43,0.47,1.4,1.45,hz0+0.26,hz0+0.36,M.white,{solid:false});solid(0.31,0.59,0.88,1.42,hz0+0.12,hz0+0.4);
+  // light wood cabinet in the corner by the doorway with the water cooler on top
+  box(0.8,1.45,0,0.8,hz0,hz0+0.55,Z.pine);box(0.8,0.81,0.4,0.42,hz0+0.15,hz0+0.4,M.alu,{solid:false,noCast:true});
+  box(1.0,1.32,0.8,1.22,hz0+0.12,hz0+0.44,M.white);
+  for(const [y,c] of [[1.05,0xd83030],[1.05,0x3060d8]])box(0.995,1.0,y,y+0.04,hz0+(c===0xd83030?0.2:0.32),hz0+(c===0xd83030?0.24:0.36),new THREE.MeshStandardMaterial({color:c}),{solid:false,noCast:true});
+  add(new THREE.CylinderGeometry(0.14,0.14,0.36,18),Z.water,1.16,1.42,hz0+0.28);add(new THREE.CylinderGeometry(0.05,0.14,0.08,18),Z.water,1.16,1.26,hz0+0.28);
+  solid(1.0,1.32,1.22,1.6,hz0+0.12,hz0+0.44);
+  box(hx0,hx1,0,0.06,hz1-0.015,hz1,M.plinth,{noCast:true});
+  add(new THREE.CylinderGeometry(0.1,0.1,0.02,20),M.lamp,-1.0,RH-0.01,12.4,{noCast:true});
 }
 
 /* glossy dark stretch ceiling: on medium+ quality the room is mirrored above it and the ceiling is see-through dark glass */
@@ -523,6 +677,7 @@ let mirror=null;
 function buildCeiling(){
   ceiling=new THREE.Mesh(new THREE.PlaneGeometry(RW*K,RD*K),M.ceiling);ceiling.rotation.x=Math.PI/2;ceiling.position.set(RW*K/2,RH*K,RD*K/2);scene.add(ceiling);
   const lc=new THREE.Mesh(new THREE.PlaneGeometry((LIV[1]-LIV[0])*K,(LIV[3]-LIV[2])*K),M.ceilLiv);lc.rotation.x=Math.PI/2;lc.position.set((LIV[0]+LIV[1])/2*K,RH*K,(LIV[2]+LIV[3])/2*K);scene.add(lc);
+  const kc=new THREE.Mesh(new THREE.PlaneGeometry((KIT[1]-KIT[0])*K,(KIT[3]-KIT[2])*K),M.ceilKit);kc.rotation.x=Math.PI/2;kc.position.set((KIT[0]+KIT[1])/2*K,RH*K,(KIT[2]+KIT[3])/2*K);scene.add(kc);
   mirror=new THREE.Group();mirror.position.y=2*RH*K;mirror.scale.y=-1;
   const c=room.clone();c.traverse(o=>{o.castShadow=false;o.receiveShadow=false;});mirror.add(c);scene.add(mirror);
 }
@@ -530,6 +685,7 @@ function applyCeiling(){
   const on=+S.q>=1;mirror.visible=on;
   Object.assign(M.ceiling,{transparent:on,opacity:on?0.78:1,depthWrite:!on});M.ceiling.color.setHex(on?0x0b1016:0x1a222b);M.ceiling.needsUpdate=true;
   Object.assign(M.ceilLiv,{transparent:on,opacity:on?0.7:1,depthWrite:!on});M.ceilLiv.color.setHex(on?0x6a5040:0x9a7e66);M.ceilLiv.needsUpdate=true;
+  Object.assign(M.ceilKit,{transparent:on,opacity:on?0.72:1,depthWrite:!on});M.ceilKit.color.setHex(on?0x1d8a34:0x2fa246);M.ceilKit.needsUpdate=true;
 }
 
 /* ---------- Lights ---------- */
@@ -540,13 +696,15 @@ const kitL=new THREE.SpotLight(0xfff6ea,1.7,5*K,1.3,0.9,1);   // kitchen lamp
 const tvL=new THREE.PointLight(0x8cc4ff,0.9,1.8*K,1.5);
 const lapL=new THREE.PointLight(0x6ab0ff,0.6,0.9*K,1.5);
 const hallL=new THREE.PointLight(0xffe2b8,0.9,4*K,1.2);
+const frontL=new THREE.PointLight(0xfff0dc,1.0,4.5*K,1.2);   // front hall lamp
 function buildLights(){
   scene.add(hemi);
   lampL.position.set(1.5*K,RH*K-0.6,1.7*K);lampL.target.position.set(1.5*K,0,1.9*K);scene.add(lampL,lampL.target);
   lampL.shadow.camera.near=4;lampL.shadow.camera.far=RH*K+20;lampL.shadow.bias=-0.0004;lampL.shadow.normalBias=0.05;
   tvL.position.set(0.45*K,0.72*K,0.75*K);lapL.position.set(2.6*K,0.9*K,3.0*K);hallL.position.set(2.8*K,2.35*K,5.9*K);
-  scene.add(tvL,lapL,hallL);
-  for(const [L,x,z] of [[livL,3.6,10.75],[kitL,6.4,5.5]]){L.position.set(x*K,RH*K-0.8,z*K);L.target.position.set(x*K,0,z*K+0.1);scene.add(L,L.target);
+  frontL.position.set(-1.0*K,2.3*K,12.4*K);
+  scene.add(tvL,lapL,hallL,frontL);
+  for(const [L,x,z] of [[livL,5.1,10.75],[kitL,-0.45,9.4]]){L.position.set(x*K,RH*K-0.8,z*K);L.target.position.set(x*K,0,z*K+0.1);scene.add(L,L.target);
     L.shadow.camera.near=4;L.shadow.camera.far=RH*K+20;L.shadow.bias=-0.0004;L.shadow.normalBias=0.05;}
 }
 const fxHi=[];
@@ -574,8 +732,9 @@ function buildDust(){
 /* ---------- Fireflies: glowing points hidden around the room ---------- */
 // real-metre spots: TV, behind the TV, under the stool, sill, behind the blind, nightstand, under the bed, synth, laptop, under the table, frame, shelf, top of the wardrobe, lamp, corridor
 const FLY_SPOTS=[[0.27,1.0,0.75],[0.1,0.7,0.6],[0.28,0.08,0.75],[1.1,0.93,0.05],[1.4,2.0,-0.02],[2.75,0.52,0.3],[2.2,0.05,1.6],[2.05,0.56,1.7],[2.6,0.8,3.05],[2.6,0.3,3.08],[2.94,2.2,2.25],[1.15,1.1,3.72],[0.7,2.55,3.7],[1.5,2.42,1.7],[3.0,1.2,6.8],
-  [1.25,0.3,8.7],[2.55,0.13,9.5],[6.45,2.2,10.5],[3.6,2.4,10.75],[0.95,0.6,13.35],[3.8,0.25,12.9],[4.0,0.98,13.65],[4.4,0.95,10.0],
-  [7.6,1.98,7.2],[7.1,0.3,4.8],[6.35,1.0,3.62],[4.95,2.32,5.5],[5.05,0.98,5.2]]; // + living room, kitchen
+  [3.6,0.13,11.95],[2.8,1.62,12.65],[5.25,2.1,8.55],[5.1,2.3,10.75],[8.4,0.62,12.7],[8.65,0.62,10.0],[6.4,0.25,11.8],[3.38,0.75,8.6],[1.75,2.05,10.4],[7.2,0.3,9.0],
+  [1.2,1.98,8.1],[-1.75,0.3,9.1],[-2.3,0.98,9.75],[-0.85,1.62,10.85],[1.3,2.15,11.0],[1.35,2.2,9.2],
+  [-1.6,1.0,12.95],[1.16,1.75,11.63],[0,1.0,13.62],[-1.1,2.15,11.6],[-2.5,1.08,12.3],[-1.2,0.3,11.6],[1.1,1.0,13.2]]; // + living room, kitchen, front hall
 const FLIES=[];
 function buildFlies(){
   const core=new THREE.SphereGeometry(0.12,10,8);
@@ -842,7 +1001,7 @@ function collide(){
   }else if(p.y>0.03)D.landed=false;
   const sp=D.vel.length();
   const top=RH*K-R_DRONE;if(p.y>top){p.y=top;if(S.mode==='fly'){if(D.vel.y>2)thud(D.vel.y);}else if(sp>CRASH_V)return crash('удар о потолок');D.vel.y=Math.min(D.vel.y,0)*-0.3;}
-  p.x=clamp(p.x,-6,8.3*K);p.z=clamp(p.z,-0.5*K,14.2*K);
+  p.x=clamp(p.x,-2.7*K,9.0*K);p.z=clamp(p.z,-0.5*K,13.8*K);
   for(const b of boxes){
     if(p.x>b.min.x-R_DRONE&&p.x<b.max.x+R_DRONE&&p.y>b.min.y-R_DRONE&&p.y<b.max.y+R_DRONE&&p.z>b.min.z-R_DRONE&&p.z<b.max.z+R_DRONE){
       const o=[[p.x-(b.min.x-R_DRONE),'x',-1],[(b.max.x+R_DRONE)-p.x,'x',1],[p.y-(b.min.y-R_DRONE),'y',-1],[(b.max.y+R_DRONE)-p.y,'y',1],[p.z-(b.min.z-R_DRONE),'z',-1],[(b.max.z+R_DRONE)-p.z,'z',1]].sort((a,b)=>a[0]-b[0])[0];
@@ -990,7 +1149,7 @@ function gameTick(dt){
 }
 function finish(){
   playing=false;D.armed=false;updArm();highlight(null);
-  const t=game.t,stars=t<480?3:t<780?2:1,prev=S.best.fire;
+  const t=game.t,stars=t<600?3:t<960?2:1,prev=S.best.fire;
   if(prev==null||t<prev)S.best.fire=t;S.stars.fire=Math.max(S.stars.fire||0,stars);save();
   $('rTitle').textContent='Все светлячки собраны!';
   $('rStars').innerHTML='★'.repeat(stars)+'<i>'+'★'.repeat(3-stars)+'</i>';
@@ -1032,7 +1191,7 @@ function updAudio(){if(!motorGain)return;const t=AC.currentTime,on=playing&&D.ar
     motorOsc.type='triangle';motorGain.gain.setTargetAtTime(on?0.012+Math.min(sp,25)*0.0012:0,t,0.1);motorOsc.frequency.setTargetAtTime(150+sp*6+D.boostK*60,t,0.1);}
   else{motorOsc.type='sawtooth';motorGain.gain.setTargetAtTime(on?0.02+D.thrOut*0.04:0,t,0.05);motorOsc.frequency.setTargetAtTime(170+D.thrOut*520,t,0.05);}
   windGain.gain.setTargetAtTime(playing?clamp(sp/22,0,1)*0.09:0,t,0.12);windF.frequency.setTargetAtTime(250+sp*45,t,0.12);
-  const dk=Math.hypot(D.pos.x/K-7.6,D.pos.z/K-7.2);humGain.gain.setTargetAtTime(playing?0.006+clamp(1-dk/4,0,1)*0.02:0,t,0.3);}
+  const dk=Math.min(Math.hypot(D.pos.x/K-1.2,D.pos.z/K-8.1),Math.hypot(D.pos.x/K+1.8,D.pos.z/K-13.1));humGain.gain.setTargetAtTime(playing?0.006+clamp(1-dk/4,0,1)*0.02:0,t,0.3);}
 
 /* ---------- Screens ---------- */
 const SCREENS=['sMenu','sSet','sHelp','sPad','sPause','sRes'];
