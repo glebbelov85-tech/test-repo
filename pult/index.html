@@ -1,0 +1,2427 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Пульт иллюзий</title>
+<style>
+  :root{
+    --bg:#07080d; --panel:#10121b; --panel2:#161927; --line:#262a3d;
+    --text:#e8eaf6; --muted:#8a90ad;
+    --cyan:#2ff3ff; --pink:#ff3fd8; --lime:#b6ff3b; --amber:#ffc23b; --violet:#9b6bff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 10% -10%,#1a1035 0%,transparent 60%),
+               radial-gradient(900px 500px at 110% 10%,#06283a 0%,transparent 55%),var(--bg);
+    color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+    min-height:100vh;padding:24px;
+  }
+  header{max-width:1400px;margin:0 auto 22px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+  header h1{font-size:30px;letter-spacing:2px;text-transform:uppercase;
+    background:linear-gradient(90deg,var(--cyan),var(--pink),var(--violet),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+  header p{color:var(--muted);font-size:14px;margin-top:4px}
+  .leds{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;font-family:monospace}
+  .led{width:9px;height:9px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime);animation:blink 2s infinite}
+  .led:nth-child(2){background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation-delay:.6s}
+  .led:nth-child(3){background:var(--pink);box-shadow:0 0 8px var(--pink);animation-delay:1.2s}
+  @keyframes blink{50%{opacity:.25}}
+
+  .section-title{max-width:1400px;margin:28px auto 12px;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);
+    display:flex;align-items:center;gap:12px}
+  .section-title::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+  .section-title b{color:var(--cyan);font-weight:600}
+
+  .grid{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+  .card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px;
+    padding:16px;display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;transition:border-color .3s, box-shadow .3s}
+  .card:hover{border-color:#3a4060;box-shadow:0 0 0 1px #3a406055,0 10px 40px #0008}
+  .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .card h2{font-size:17px;font-weight:600}
+  .card .sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .tag{font-size:10px;font-family:monospace;padding:3px 7px;border-radius:20px;border:1px solid currentColor;white-space:nowrap}
+  .t-opt{color:var(--cyan)} .t-mind{color:var(--pink)} .t-aud{color:var(--amber)}
+  .stage{border-radius:12px;background:#05060a;border:1px solid #1d2030;min-height:260px;position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center}
+  .hint{font-size:13px;color:#b8bdd8;line-height:1.45}
+  .hint b{color:var(--text)}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
+
+  .btn{background:transparent;color:var(--cyan);border:1px solid var(--cyan);border-radius:10px;padding:8px 14px;font-size:13px;
+    cursor:pointer;font-family:inherit;transition:all .2s;text-shadow:0 0 6px #2ff3ff66;box-shadow:inset 0 0 0 0 var(--cyan)}
+  .btn:hover{background:#2ff3ff18;box-shadow:0 0 14px #2ff3ff55}
+  .btn:active{transform:scale(.97)}
+  .btn:focus-visible,.full-btn:focus-visible,.topnav a:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .btn.pink{color:var(--pink);border-color:var(--pink);text-shadow:0 0 6px #ff3fd866}
+  .btn.pink:hover{background:#ff3fd818;box-shadow:0 0 14px #ff3fd855}
+  .btn.lime{color:var(--lime);border-color:var(--lime);text-shadow:0 0 6px #b6ff3b66}
+  .btn.lime:hover{background:#b6ff3b18;box-shadow:0 0 14px #b6ff3b55}
+  .btn.secret{color:var(--amber);border-color:#ffc23b88;margin-left:auto}
+  .btn.secret:hover{background:#ffc23b18;box-shadow:0 0 14px #ffc23b55}
+
+  .secret-panel{position:absolute;inset:0;background:#0b0d16f2;backdrop-filter:blur(6px);padding:22px;display:flex;flex-direction:column;gap:10px;
+    transform:translateY(100%);transition:transform .45s cubic-bezier(.2,.8,.2,1);z-index:20;overflow:auto}
+  .card.show-secret .secret-panel{transform:translateY(0)}
+  .secret-panel h3{color:var(--amber);font-size:16px;letter-spacing:1px}
+  .secret-panel p{font-size:13.5px;line-height:1.55;color:#cfd3ea}
+  @media(max-width:500px){ .secret-panel{padding:16px} .secret-panel p{font-size:13px;line-height:1.45} }
+  .secret-panel .btn{align-self:flex-start;margin-top:auto}
+
+  /* ---------- Lilac chaser ---------- */
+  .lilac-stage{background:#bdbdbd}
+  .lilac{position:relative;width:250px;height:250px}
+  .lilac .dot{position:absolute;width:44px;height:44px;border-radius:50%;background:#e14fe0;filter:blur(7px);
+    left:calc(50% - 22px);top:calc(50% - 22px);animation:lilac 1.2s infinite}
+  .lilac.sharp .dot{filter:none}
+  .lilac.paused .dot{animation-play-state:paused}
+  .lilac .cross{position:absolute;left:50%;top:50%;width:16px;height:16px;transform:translate(-50%,-50%)}
+  .lilac .cross::before,.lilac .cross::after{content:"";position:absolute;background:#000}
+  .lilac .cross::before{left:7px;top:0;width:2px;height:16px}
+  .lilac .cross::after{top:7px;left:0;height:2px;width:16px}
+  @keyframes lilac{0%,8.3%{opacity:0}8.4%,100%{opacity:1}}
+  .timer{position:absolute;bottom:8px;right:10px;font-family:monospace;font-size:12px;color:#333}
+
+  /* ---------- Waterfall ---------- */
+  .wf{display:flex;width:100%;height:260px}
+  .wf .stones{flex:1;background:
+     radial-gradient(circle at 20% 30%,#5b6070 0 9px,transparent 10px),
+     radial-gradient(circle at 70% 60%,#454a59 0 12px,transparent 13px),
+     radial-gradient(circle at 40% 85%,#62677a 0 7px,transparent 8px),
+     radial-gradient(circle at 85% 15%,#50566a 0 8px,transparent 9px),
+     #23262f;background-size:60px 60px}
+  .wf .flow{width:42%;position:relative;
+     background:repeating-linear-gradient(180deg,#d9f6ff 0 6px,#2a6f8c 6px 18px,#9fe3ff 18px 22px,#0c3446 22px 40px,#58b9da 40px 48px,#06202c 48px 60px);
+     background-size:100% 60px;box-shadow:inset 8px 0 14px #000a,inset -8px 0 14px #000a}
+  .wf .flow.run{animation:flowUp .45s linear infinite}
+  @keyframes flowUp{from{background-position:0 0}to{background-position:0 -60px}}
+  .fix{position:absolute;left:50%;top:50%;width:12px;height:12px;border-radius:50%;background:#ff3b3b;transform:translate(-50%,-50%);
+    box-shadow:0 0 10px #ff3b3b;z-index:3}
+  .wf-msg{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:92%;text-align:center;font-size:13px;font-weight:600;color:#fff;background:#000000b3;padding:5px 12px;border-radius:9px;z-index:4;pointer-events:none}
+
+  /* ---------- Zollner ---------- */
+  .zol-stage{background:#f3f3f3;cursor:crosshair}
+  .zol-stage svg{width:100%;height:260px;display:block}
+  .zol-stage .hatch{transition:opacity .4s}
+  .zol-stage.clean .hatch{opacity:0}
+  @media (hover:hover){ .card:not(.full) .zol-stage:hover .hatch{opacity:0} .card:not(.full) .zol-stage:hover .longline{stroke:#d1007f} }
+  .zol-stage .longline{transition:stroke .4s}
+  .zol-stage.clean .longline{stroke:#d1007f}
+
+  /* ---------- Thatcher ---------- */
+  .th-stage{background:radial-gradient(circle at 50% 40%,#2a2f44,#0b0d14)}
+  .face-wrap{width:200px;height:260px;transform:rotate(180deg);transition:transform 1.4s cubic-bezier(.6,0,.2,1)}
+  .face-wrap.upright{transform:rotate(0deg)}
+  .face-wrap svg{width:100%;height:100%;overflow:visible}
+  .feat{transform-box:fill-box;transform-origin:center;transition:transform .8s ease}
+  .thatcher .feat{transform:rotate(180deg)}
+
+  /* ---------- Crystal ball ---------- */
+  .cb-wrap{display:flex;gap:18px;width:100%;padding:12px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .cb-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;flex:1;min-width:280px;max-width:560px}
+  .cb-grid div{display:flex;flex-direction:column;align-items:center;color:#aab0cc;padding:2px 0;border-radius:6px;background:#0d0f18;font-family:monospace;font-size:11px;line-height:1.2}
+  .cb-grid div span:last-child{font-size:19px;line-height:1.15}
+  .cb-grid.reveal div.nine{background:#ff3fd855;box-shadow:0 0 0 1px var(--pink)}
+  .ball{width:120px;height:120px;border-radius:50%;flex-shrink:0;position:relative;
+    background:radial-gradient(circle at 35% 30%,#ffffffcc 0 6%,#b9a6ff55 18%,#4b2aa0 55%,#120a2a 100%);
+    box-shadow:0 0 30px #7b4bff66,inset 0 -10px 30px #000a;display:flex;align-items:center;justify-content:center}
+  .ball::after{content:"";position:absolute;bottom:-14px;left:20%;width:60%;height:16px;border-radius:0 0 40% 40%;background:linear-gradient(#5a3b1c,#2c1a0a)}
+  .ball .sym{font-size:56px;color:#fff;opacity:0;transform:scale(.3);transition:all .9s cubic-bezier(.2,1.4,.4,1);filter:drop-shadow(0 0 12px #fff)}
+  .ball.on{animation:pulse 1.4s ease-in-out}
+  .ball.done .sym{opacity:1;transform:scale(1)}
+  @keyframes pulse{0%,100%{box-shadow:0 0 30px #7b4bff66,inset 0 -10px 30px #000a}50%{box-shadow:0 0 70px #ff3fd8cc,inset 0 -10px 30px #000a;filter:brightness(1.5)}}
+
+  /* ---------- Peter ---------- */
+  .peter{width:100%;padding:16px;display:flex;flex-direction:column;gap:10px}
+  .peter label{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+  .peter input{width:100%;background:#0d0f18;border:1px solid #2b3047;border-radius:8px;padding:10px;color:var(--text);font-size:16px;font-family:inherit;outline:none}
+  .peter input:focus{border-color:var(--pink);box-shadow:0 0 10px #ff3fd833}
+  .peter .answer{min-height:48px;border-radius:8px;padding:10px;font-size:15px;color:var(--lime);font-family:monospace;
+    background:#0a0c12;border:1px dashed #2b3047;text-shadow:0 0 8px #b6ff3b66}
+
+  /* ---------- Cards ---------- */
+  .cards-stage{background:radial-gradient(circle at 50% 50%,#0f3b26,#062014)}
+  .table{display:grid;grid-template-columns:repeat(3,64px);gap:12px;padding:16px;perspective:800px}
+  .pcard{width:64px;height:92px;position:relative;transform-style:preserve-3d;transition:transform .7s, opacity .5s, translate .5s}
+  .pcard.back{transform:rotateY(180deg)}
+  .pcard.gone{opacity:0;transform:rotateY(180deg) scale(.4)}
+  .pcard .f,.pcard .b{position:absolute;inset:0;border-radius:7px;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  .pcard .f{background:#fafafa;border:1px solid #ccc;display:flex;flex-direction:column;justify-content:space-between;padding:4px 6px;font-weight:700;box-shadow:0 3px 8px #0007}
+  .pcard .f .c{font-size:15px;line-height:1}
+  .pcard .f .m{font-size:30px;text-align:center;line-height:1}
+  .pcard .f .c2{transform:rotate(180deg)}
+  .pcard .f.red{color:#d0112b}.pcard .f.blk{color:#111}
+  .pcard .b{transform:rotateY(180deg);border:3px solid #fff;
+    background:repeating-linear-gradient(45deg,#7a1030 0 5px,#a01642 5px 10px);box-shadow:0 3px 8px #0007}
+  .cards-msg{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:13px;color:#e8ffe8}
+
+  /* ---------- Shepard ---------- */
+  .sh-stage canvas{width:100%;height:260px;display:block}
+  .sh-arrow{position:absolute;font-size:44px;color:var(--amber);text-shadow:0 0 18px var(--amber);opacity:.85;pointer-events:none}
+
+  /* ---------- Peter mask ---------- */
+  .pet-wrap{position:relative}
+  .pet-wrap input{color:transparent !important;caret-color:transparent}
+  .pet-wrap input::selection{background:transparent;color:transparent}
+  .pet-wrap input::placeholder{color:#5c6280}
+  .pet-mask{position:absolute;left:11px;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:16px;color:var(--text);white-space:nowrap;overflow:hidden}
+  .pet-mask.focus::after{content:"";display:inline-block;width:1.5px;height:16px;background:var(--pink);vertical-align:middle;margin-left:1px;animation:caret 1s steps(1) infinite}
+  @keyframes caret{50%{opacity:0}}
+
+  /* ---------- Fullscreen ---------- */
+  .head-right{display:flex;gap:6px;align-items:center}
+  .full-btn{background:none;border:1px solid #3a4060;color:var(--muted);border-radius:8px;min-width:30px;height:24px;cursor:pointer;font-size:14px;line-height:1}
+  .full-btn:hover{color:var(--cyan);border-color:var(--cyan)}
+  .card.full{position:fixed;inset:10px;z-index:100;box-shadow:0 0 0 100vmax #000e}
+  .card.full .stage{flex:1}
+  .card.full .wf{height:auto;align-self:stretch}
+  .card.full .zol-stage svg,.card.full .scint-stage svg{height:100%;align-self:stretch}
+  .scint-stage svg{width:100%;height:260px;display:block}
+  body.has-full{overflow:hidden}
+  .zoomable{transition:transform .35s;flex-shrink:0}
+  @media(min-width:760px){.wide{grid-column:span 2}}
+
+  /* ---------- New illusions ---------- */
+  .stage canvas.zoomable{display:block;max-width:100%;height:auto}
+  .af-box{width:100%;max-width:360px}
+  .af-box canvas{width:100%;height:auto;display:block}
+  .card.full .stage canvas.zoomable,.card.full .af-box{max-width:none}
+  .af-box{position:relative}
+  .af-box .fix{position:absolute}
+  .readout{position:absolute;bottom:4px;left:8px;right:8px;text-align:center;font-family:monospace;font-size:12px;color:#fff;text-shadow:0 0 4px #000;pointer-events:none}
+  .swatch{display:inline-block;width:14px;height:14px;border:1px solid #fff;vertical-align:middle;margin-left:6px}
+
+  .t21{display:flex;gap:16px;padding:38px 10px 10px}
+  .col21{position:relative;width:52px;height:226px;border-radius:8px;cursor:pointer;transition:box-shadow .2s, transform .2s}
+  .col21:hover{box-shadow:0 0 0 2px var(--lime),0 0 18px #b6ff3b66}
+  .col21.off{pointer-events:none}
+  .mini{position:absolute;left:0;width:52px;height:70px;background:#fafafa;border:1px solid #bbb;border-radius:6px;padding:4px 5px;font-weight:700;font-size:15px;line-height:1.1;white-space:nowrap;
+    box-shadow:0 2px 5px #0007;transition:top .45s, opacity .35s, transform .45s}
+  .mini.red{color:#d0112b}.mini.blk{color:#111}
+  .t21.collect .mini{top:0 !important;opacity:.5}
+  .big-reveal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#062014e6;opacity:0;pointer-events:none;transition:opacity .5s}
+  .big-reveal.on{opacity:1;pointer-events:auto}
+  .big-card{width:110px;height:155px;background:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800;
+    box-shadow:0 0 40px #b6ff3b88;transform:rotateY(90deg);transition:transform .8s .2s}
+  .big-reveal.on .big-card{transform:rotateY(0)}
+
+  .bin{width:100%;padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .bin-title{font-size:14px;color:var(--text);text-align:center;min-height:20px}
+  .bin-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;width:100%;max-width:380px;transition:opacity .3s}
+  .bin-grid div{text-align:center;font-family:monospace;font-size:15px;padding:5px 0;border-radius:6px;border:1px solid currentColor;background:#0c0e16}
+  .bin .ball .sym{font-size:44px;color:#fff;font-weight:700;font-family:monospace}
+  .hidden{display:none !important}
+
+  .topnav{position:sticky;top:6px;z-index:50;max-width:1400px;margin:0 auto 4px;display:flex;gap:6px;align-items:center;overflow-x:auto;white-space:nowrap;
+    padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:#0b0d16f2;backdrop-filter:blur(8px);scrollbar-width:none}
+  .topnav::-webkit-scrollbar{display:none}
+  .topnav a{cursor:pointer;font-size:13px;color:var(--text);padding:5px 10px;border-radius:8px;border:1px solid transparent;user-select:none}
+  .topnav a:hover{border-color:var(--cyan);color:var(--cyan)}
+  .topnav a.hot{color:var(--amber)}
+  .topnav a.hot:hover{border-color:var(--amber)}
+  .nav-sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex-shrink:0}
+  .nav-label{font-size:12px;color:var(--muted)}
+  .card.flash{animation:flash 1.4s ease}
+  @keyframes flash{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 2px var(--amber),0 0 40px #ffc23b66}}
+  .section-title{scroll-margin-top:70px}
+  .card{scroll-margin-top:70px}
+  .voice-btn{color:var(--violet) !important;font-weight:600}
+  body.voice-on .voice-btn{color:#fff !important;background:linear-gradient(90deg,#7b4bff66,#ff3fd855);border-color:#b48cff !important;box-shadow:0 0 14px #9b6bff66}
+  .say-btn{display:none;background:none;border:1px solid #3a4060;color:var(--muted);border-radius:8px;min-width:30px;height:24px;cursor:pointer;font-size:13px;line-height:1}
+  .say-btn:hover{border-color:var(--violet)}
+  body.voice-on .say-btn{display:inline-block}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,40px);opacity:0;background:#1b1430;border:1px solid var(--violet);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:300;transition:all .35s;max-width:90vw;text-align:center;pointer-events:none}
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+  .stars{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden}
+  .stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;opacity:.5;animation:twinkle 4s ease-in-out infinite}
+  @keyframes twinkle{0%,100%{opacity:.08}50%{opacity:.7}}
+  header h1{background-size:200% 100%;animation:shimmer 6s ease-in-out infinite}
+  @keyframes shimmer{0%,100%{background-position:0% 0}50%{background-position:100% 0}}
+  @media (prefers-reduced-motion: reduce){ .stars i, header h1{animation:none} }
+  .trox{position:relative;width:300px;height:250px;background:#9a9a9a;border-radius:10px;overflow:hidden}
+  .trox-blobs{position:absolute;inset:-30px;filter:blur(26px);background:
+    radial-gradient(circle at 22% 28%,#ff7ab8 0 13%,transparent 14%),
+    radial-gradient(circle at 76% 24%,#7ad1ff 0 12%,transparent 13%),
+    radial-gradient(circle at 80% 74%,#b8ff7a 0 13%,transparent 14%),
+    radial-gradient(circle at 26% 78%,#ffd27a 0 12%,transparent 13%),
+    radial-gradient(circle at 52% 52%,#c49aff 0 7%,transparent 8%)}
+  .trox-cross{position:absolute;left:50%;top:50%;width:14px;height:14px;transform:translate(-50%,-50%)}
+  .trox-cross::before,.trox-cross::after{content:"";position:absolute;background:#000}
+  .trox-cross::before{left:6px;top:0;width:2px;height:14px}.trox-cross::after{top:6px;left:0;height:2px;width:14px}
+  footer{max-width:1400px;margin:30px auto 0;color:var(--muted);font-size:12px;text-align:center}
+
+  /* ---------- Projector mode ---------- */
+  :root{--muted:#a0a6c4}
+  .hint{color:#ccd0e8}
+  .topnav a.pres-btn{color:#fff;font-weight:600;background:linear-gradient(90deg,#2ff3ff30,#ff3fd830);border-color:#2ff3ff88}
+  .topnav a.pres-btn:hover{color:#fff;box-shadow:0 0 14px #2ff3ff55}
+  #presBg{position:fixed;inset:0;background:#000;z-index:90;display:none}
+  #presBar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:400;display:none;align-items:center;gap:8px;padding:8px 10px;
+    background:#0b0d16f7;border:1px solid #3a4060;border-radius:16px;box-shadow:0 10px 40px #000c;transition:opacity .5s;max-width:calc(100vw - 16px)}
+  #presBar button{background:transparent;color:var(--cyan);border:2px solid #2ff3ff99;border-radius:12px;min-width:50px;height:46px;padding:0 12px;
+    font-size:20px;font-family:inherit;cursor:pointer;white-space:nowrap;transition:all .2s}
+  #presBar button:hover:not(:disabled){background:#2ff3ff1c;box-shadow:0 0 14px #2ff3ff55}
+  #presBar button:disabled{opacity:.3;cursor:default}
+  #presBar button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  #presBar .pb-secret{color:var(--amber);border-color:#ffc23b99}
+  #presBar .pb-voice{color:var(--violet);border-color:#9b6bff99}
+  body.voice-on #presBar .pb-voice{color:#fff;background:linear-gradient(90deg,#7b4bff66,#ff3fd855)}
+  #presBar .pb-exit{color:var(--pink);border-color:#ff3fd899}
+  #presBar .pb-title{border-color:#3a4060;color:var(--text);display:flex;align-items:center;gap:10px;min-width:0;max-width:44vw}
+  #presBar .pb-num{font-family:monospace;font-size:17px;color:var(--muted);flex-shrink:0}
+  #presBar .pb-name{font-size:18px;overflow:hidden;text-overflow:ellipsis}
+  body.present #presBg{display:block}
+  body.present #presBar{display:flex}
+  body.present.idle #presBar{opacity:0;pointer-events:none}
+  body.present.idle{cursor:none}
+  body.present{overflow:hidden}
+  body.present .stars{display:none}
+  body.present .card .full-btn{display:none}
+  body.present .card.pres{border:2px solid #2c3150;background:#06070c;box-shadow:none}
+  body.present .card.pres h2{font-size:clamp(22px,2.6vw,40px)}
+  body.present .card.pres .sub{font-size:clamp(13px,1.3vw,20px)}
+  body.present .card.pres .tag{font-size:clamp(11px,1vw,15px);padding:4px 10px;border-width:2px}
+  body.present .card.pres .say-btn{min-width:44px;height:34px;font-size:18px}
+  /* illusion cards: full screen, big text */
+  body.present .card.full{inset:12px 12px 80px;padding:20px 26px;gap:14px}
+  body.present .card.full .hint{font-size:clamp(15px,1.55vw,24px);color:#fff;line-height:1.4}
+  body.present .card.full .btn{font-size:clamp(14px,1.35vw,22px);padding:.5em 1.1em;border-width:2px}
+  body.present .card.full .secret-panel{padding:clamp(20px,4vw,60px)}
+  body.present .card.full .secret-panel h3{font-size:clamp(20px,2.4vw,36px)}
+  body.present .card.full .secret-panel p{font-size:clamp(15px,1.7vw,26px);color:#fff}
+  /* game / trick cards: the whole card is scaled up to fill the screen */
+  body.present .card.pres.scaled{position:fixed;left:50%;top:calc(50% - 34px);width:600px;z-index:100;margin:0;
+    transform:translate(-50%,-50%) scale(var(--z,1));transform-origin:center center}
+  body.present .card.pres.scaled.wide{width:860px}
+  body.present .card.pres.scaled .hint{color:#fff}
+  #presBlack{position:fixed;inset:0;background:#000;z-index:500;display:none;cursor:none}
+  #presBlack.on{display:block}
+  /* table of contents */
+  #toc{position:fixed;inset:0;z-index:450;background:#05060bf2;backdrop-filter:blur(8px);display:none;overflow:auto;padding:24px}
+  #toc.on{display:block}
+  .toc-in{max-width:1500px;margin:0 auto}
+  .toc-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .toc-head h2{font-size:clamp(22px,2.4vw,34px);flex:1;background:linear-gradient(90deg,var(--cyan),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .toc-head .btn{font-size:clamp(14px,1.3vw,19px);padding:10px 18px;border-width:2px}
+  .toc-sec{font-size:clamp(12px,1.1vw,16px);letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin:18px 0 10px}
+  .toc-sec b{color:var(--cyan)}
+  .toc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .toc-tile{display:flex;align-items:center;gap:12px;text-align:left;background:linear-gradient(180deg,var(--panel2),var(--panel));border:2px solid var(--line);border-radius:14px;
+    padding:12px 14px;color:var(--text);font-family:inherit;font-size:clamp(14px,1.2vw,18px);cursor:pointer;transition:all .2s}
+  .toc-tile:hover,.toc-tile:focus-visible{border-color:var(--c,var(--cyan));box-shadow:0 0 16px color-mix(in srgb,var(--c,var(--cyan)) 40%,transparent);outline:none}
+  .toc-tile.cur{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+  .toc-tile i{font-style:normal;font-family:monospace;font-size:.85em;color:var(--c,var(--cyan));min-width:2ch}
+  .toc-tip{color:var(--muted);font-size:clamp(12px,1vw,15px);margin:22px 0 6px;line-height:1.6}
+  .toc-tip kbd{font-family:monospace;border:1px solid #3a4060;border-radius:5px;padding:1px 6px;color:var(--text)}
+  @media(max-width:640px){ #presBar{gap:5px;padding:6px} #presBar button{min-width:40px;height:40px;font-size:17px;padding:0 8px}
+    #presBar .pb-name,#presBar .pb-label{display:none} body.present .card.full{inset:6px 6px 66px;padding:12px}
+    body.present .card.pres.scaled,body.present .card.pres.scaled.wide{width:calc(100vw - 12px)} }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<header>
+  <div>
+    <h1>Пульт иллюзий</h1>
+    <p>29 волшебных экспериментов, которые обманывают глаза, уши и логику. Каждый можно потрогать. Ответ - под кнопкой "Секрет". Включите 🔮 волшебный голос - и пульт заговорит. Для большого экрана - кнопка 📽 Проектор.</p>
+  </div>
+  <div class="leds"><span class="led"></span><span class="led"></span><span class="led"></span>&nbsp;СИСТЕМА ВОСПРИЯТИЯ: ВЗЛОМАНА</div>
+</header>
+
+<nav class="topnav" id="topnav">
+  <a id="presStart" class="pres-btn" title="Показ на проекторе: по одному аттракциону на весь экран">📽 Проектор</a>
+  <a id="tocOpen" title="Все аттракционы списком">☰ Все 29</a>
+  <span class="nav-sep"></span>
+  <a data-go="optics">01 Глаза</a>
+  <a data-go="mind">02 Мысли</a>
+  <a data-go="sound">03 Звук</a>
+  <a data-go="wow">04 Бомба</a>
+  <a data-go="more">05 Ещё</a>
+  <span class="nav-sep"></span>
+  <a id="voiceBtn" class="voice-btn">🔮 Волшебный голос: выкл</a>
+  <span class="nav-sep"></span>
+  <span class="nav-label">Показать гостям:</span>
+  <a class="hot" data-go="c-pen">Треугольник</a>
+  <a class="hot" data-go="c-af">Цветная ч/б</a>
+  <a class="hot" data-go="c-peter">Питер</a>
+  <a class="hot" data-go="c-tri">Семейный спор</a>
+  <a class="hot" data-go="c-3d">Муха в наушниках</a>
+</nav>
+
+<!-- ================= SECTION 1 ================= -->
+<div class="section-title" id="optics"><b>01</b> Оптические иллюзии - движение и цвет</div>
+<div class="grid">
+
+  <!-- Lilac -->
+  <div class="card fs" id="c-lilac">
+    <div class="card-head"><div><h2>Сиреневая погоня</h2><div class="sub">Lilac Chaser</div></div><span class="tag t-opt">ЦВЕТ</span></div>
+    <div class="stage lilac-stage">
+      <div class="lilac zoomable" id="lilac"><div class="cross"></div></div>
+      <div class="timer" id="lilacTimer">0 с</div>
+    </div>
+    <div class="hint">Смотрите <b>только на чёрный крестик</b> 20-30 секунд и не отводите взгляд. Что станет с кругами?</div>
+    <div class="controls">
+      <button class="btn" id="lilacDir">Сменить направление</button>
+      <button class="btn pink" id="lilacSharp">Убрать размытие</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Сначала вы видите бегущий <b>зелёный</b> круг - хотя на экране нет ни одного зелёного пикселя. Потом сиреневые круги вообще исчезают.</p>
+      <p>Клетки сетчатки, долго получающие сиреневый цвет, "устают" (адаптируются). Когда круг пропадает, на его месте остаётся противоположный цвет - зелёный остаточный образ. А раз вы смотрите в одну точку, мозг стирает неподвижные размытые пятна по краям поля зрения (эффект Трокслера).</p>
+      <p>Нажмите "Убрать размытие" - с чёткими кругами иллюзия слабеет: мозгу проще за них зацепиться.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Waterfall -->
+  <div class="card fs" id="c-wf">
+    <div class="card-head"><div><h2>Эффект водопада</h2><div class="sub">Motion aftereffect</div></div><span class="tag t-opt">ДВИЖЕНИЕ</span></div>
+    <div class="stage">
+      <div class="wf"><div class="stones"></div><div class="flow" id="flow"></div><div class="stones"></div></div>
+      <div class="fix"></div>
+      <div class="wf-msg" id="wfMsg">Нажмите "Старт" и смотрите на красную точку</div>
+    </div>
+    <div class="hint">Поток бежит вверх 20 секунд. Когда он <b>остановится</b>, продолжайте смотреть на точку - и следите за камнями и полосами.</div>
+    <div class="controls">
+      <button class="btn lime" id="wfStart">Старт</button>
+      <button class="btn" id="wfStop">Стоп</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>После остановки неподвижная картинка "ползёт" вниз - хотя на экране ничего не двигается.</p>
+      <p>В мозге есть нейроны, настроенные на движение в определённую сторону. Пока поток бежит вверх, нейроны "вверх" работают на пределе и устают. Когда движение пропадает, нейроны "вниз" временно побеждают в споре - и мозг сообщает о движении вниз.</p>
+      <p>Эффект описали в 1834 году, глядя на водопад Фойерс в Шотландии.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Zollner -->
+  <div class="card fs" id="c-zol">
+    <div class="card-head"><div><h2>Иллюзия Цёльнера</h2><div class="sub">Zöllner illusion</div></div><span class="tag t-opt">ГЕОМЕТРИЯ</span></div>
+    <div class="stage zol-stage" id="zolStage"><svg id="zolSvg" viewBox="0 0 300 260" preserveAspectRatio="xMidYMid slice"></svg></div>
+    <div class="hint">Длинные линии кажутся сходящимися и расходящимися. <b>Наведите курсор</b> на картинку (или нажмите кнопку) - что с ними на самом деле?</div>
+    <div class="controls">
+      <button class="btn" id="zolToggle">Убрать штрихи</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Все длинные линии <b>строго параллельны</b>. Их "наклоняют" короткие штрихи.</p>
+      <p>Мозг плохо оценивает острые углы и систематически их преувеличивает. Каждый штрих чуть-чуть "отталкивает" линию в свою сторону, а соседние линии получают штрихи с противоположным наклоном - поэтому они кажутся то сходящимися, то расходящимися.</p>
+      <p>Иллюзию нашёл астроном Иоганн Цёльнер в 1860 году на рисунке ткани.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Thatcher -->
+  <div class="card fs" id="c-th">
+    <div class="card-head"><div><h2>Эффект Тэтчер</h2><div class="sub">Thatcher effect</div></div><span class="tag t-opt">ЛИЦА</span></div>
+    <div class="stage th-stage">
+      <div class="zoomable"><div class="face-wrap" id="faceWrap">
+        <svg viewBox="0 0 200 260" id="faceSvg" class="thatcher">
+          <defs>
+            <radialGradient id="skin" cx="45%" cy="40%" r="70%"><stop offset="0" stop-color="#f6cfae"/><stop offset=".7" stop-color="#e2a982"/><stop offset="1" stop-color="#b77a55"/></radialGradient>
+            <radialGradient id="iris" cx="40%" cy="40%" r="60%"><stop offset="0" stop-color="#8fc0e8"/><stop offset="1" stop-color="#2b5680"/></radialGradient>
+            <linearGradient id="lipU" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8484f"/><stop offset="1" stop-color="#8e2a33"/></linearGradient>
+            <linearGradient id="lipL" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c85a60"/><stop offset="1" stop-color="#d7787c"/></linearGradient>
+          </defs>
+          <!-- neck -->
+          <path d="M72 205 L72 260 L128 260 L128 205 Z" fill="#d49a74"/>
+          <!-- hair back -->
+          <ellipse cx="100" cy="112" rx="72" ry="84" fill="#3a2516"/>
+          <!-- ears -->
+          <ellipse cx="38" cy="132" rx="10" ry="18" fill="#dca07a"/>
+          <ellipse cx="162" cy="132" rx="10" ry="18" fill="#dca07a"/>
+          <!-- face -->
+          <ellipse cx="100" cy="135" rx="62" ry="80" fill="url(#skin)"/>
+          <!-- cheeks -->
+          <ellipse cx="66" cy="160" rx="13" ry="8" fill="#e88a7a" opacity=".35"/>
+          <ellipse cx="134" cy="160" rx="13" ry="8" fill="#e88a7a" opacity=".35"/>
+          <!-- hair top -->
+          <path d="M36 112 C36 52 90 34 120 44 C150 52 168 80 164 118 C150 88 128 74 100 76 C74 78 50 90 36 112 Z" fill="#4a3020"/>
+          <!-- brows (not flipped) -->
+          <path d="M60 104 Q74 95 90 101" stroke="#3a2516" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path d="M110 101 Q126 95 140 104" stroke="#3a2516" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <!-- left eye -->
+          <g class="feat">
+            <path d="M60 113 Q75 106 90 114" stroke="#a46d4c" stroke-width="1.4" fill="none"/>
+            <path d="M60 121 Q75 110 90 121 Q75 129 60 121 Z" fill="#fff"/>
+            <circle cx="75" cy="120" r="6.5" fill="url(#iris)"/>
+            <circle cx="75" cy="120" r="3" fill="#111"/>
+            <circle cx="73" cy="118" r="1.5" fill="#fff"/>
+            <path d="M58 121 Q75 107 92 120" stroke="#1a1008" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+            <path d="M62 123 Q75 129 88 123" stroke="#7a4a30" stroke-width="1" fill="none"/>
+          </g>
+          <!-- right eye -->
+          <g class="feat">
+            <path d="M110 114 Q125 106 140 113" stroke="#a46d4c" stroke-width="1.4" fill="none"/>
+            <path d="M110 121 Q125 110 140 121 Q125 129 110 121 Z" fill="#fff"/>
+            <circle cx="125" cy="120" r="6.5" fill="url(#iris)"/>
+            <circle cx="125" cy="120" r="3" fill="#111"/>
+            <circle cx="123" cy="118" r="1.5" fill="#fff"/>
+            <path d="M108 120 Q125 107 142 121" stroke="#1a1008" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+            <path d="M112 123 Q125 129 138 123" stroke="#7a4a30" stroke-width="1" fill="none"/>
+          </g>
+          <!-- nose -->
+          <path d="M100 124 Q96 145 90 156 Q95 162 100 160 Q105 162 110 156" stroke="#a8694a" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <ellipse cx="94" cy="157" rx="3" ry="2" fill="#8a4f35" opacity=".6"/>
+          <ellipse cx="106" cy="157" rx="3" ry="2" fill="#8a4f35" opacity=".6"/>
+          <!-- mouth -->
+          <g class="feat">
+            <path d="M78 178 Q88 172 95 175 Q100 172 105 175 Q112 172 122 178 Q100 181 78 178 Z" fill="url(#lipU)"/>
+            <path d="M78 178 Q100 181 122 178 Q112 192 100 193 Q88 192 78 178 Z" fill="url(#lipL)"/>
+            <path d="M76 176 Q100 183 124 176" stroke="#5a1a20" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+            <ellipse cx="96" cy="185" rx="6" ry="2" fill="#fff" opacity=".25"/>
+          </g>
+        </svg>
+      </div></div>
+    </div>
+    <div class="hint">Перевёрнутое лицо выглядит вполне обычно, правда? А теперь <b>переверните</b> его.</div>
+    <div class="controls">
+      <button class="btn pink" id="thFlip">Перевернуть лицо</button>
+      <button class="btn" id="thFix">Исправить глаза и рот</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Глаза и рот на этом лице перевёрнуты отдельно от всего лица. Вверх ногами этого почти не видно, а в нормальном положении лицо становится жутким.</p>
+      <p>Нормальное лицо мозг читает целиком - как единую конфигурацию, через особую "систему распознавания лиц". Перевёрнутое лицо она обрабатывает плохо, и мозг переключается на проверку отдельных деталей: глаз - на месте, рот - на месте. Что они перевёрнуты, он не замечает.</p>
+      <p>Эффект открыл Питер Томпсон в 1980 году на фотографии Маргарет Тэтчер.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+  <!-- Afterimage -->
+  <div class="card fs" id="c-af">
+    <div class="card-head"><div><h2>Цветная ч/б картинка</h2><div class="sub">Negative afterimage</div></div><span class="tag t-opt">ЦВЕТ</span></div>
+    <div class="stage">
+      <div class="af-box zoomable"><canvas id="afCanvas" width="360" height="240"></canvas><div class="fix"></div></div>
+      <div class="wf-msg" id="afMsg">Нажмите "Старт" и смотрите на красную точку</div>
+    </div>
+    <div class="hint">Смотрите на красную точку <b>20 секунд, не моргая</b>. Потом картинка станет чёрно-белой - не отводите взгляд и посмотрите, какого она цвета.</div>
+    <div class="controls">
+      <button class="btn lime" id="afStart">Старт</button>
+      <button class="btn" id="afOrig">Показать оригинал</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>После переключения вы несколько секунд видите <b>цветной пейзаж</b>, хотя на экране только оттенки серого.</p>
+      <p>Сначала показывается негатив: небо оранжевое, трава фиолетовая. Колбочки глаза, которые долго видят оранжевый, устают, и на месте оранжевого остаётся противоположный ему цвет - голубой. Чёрно-белая картинка даёт форму и яркость, а цвет дорисовывает уставшая сетчатка.</p>
+      <p>Моргнёте или отведёте взгляд - цвета пропадут.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Motion induced blindness -->
+  <div class="card fs" id="c-mib">
+    <div class="card-head"><div><h2>Исчезающие точки</h2><div class="sub">Motion-induced blindness</div></div><span class="tag t-opt">ВНИМАНИЕ</span></div>
+    <div class="stage"><canvas id="mibCanvas" class="zoomable" width="320" height="260"></canvas></div>
+    <div class="hint">На экране <b>три жёлтые точки</b>, и они никуда не двигаются. Смотрите на мигающую зелёную точку в центре 10-20 секунд. Сколько жёлтых осталось?</div>
+    <div class="controls">
+      <button class="btn" id="mibPause">Остановить синие кресты</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Жёлтые точки исчезают - по одной, по две, иногда все три сразу. А потом появляются снова.</p>
+      <p>Мозг всё время решает, что важно, а что можно не показывать. Когда вокруг много движения, неподвижные мелкие объекты на периферии он считает "шумом" и стирает из картинки, которую вы осознаёте. Глаз точки видит, а сознание - нет.</p>
+      <p>Остановите кресты - и точки перестанут пропадать.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Adelson -->
+  <div class="card fs" id="c-adel">
+    <div class="card-head"><div><h2>Шахматная тень</h2><div class="sub">Checker shadow illusion</div></div><span class="tag t-opt">ЯРКОСТЬ</span></div>
+    <div class="stage" style="background:#1b1d26">
+      <canvas id="adCanvas" class="zoomable" width="320" height="260" style="cursor:pointer"></canvas>
+      <div class="readout" id="adRead">Нажмите на любую клетку - покажу её точный цвет</div>
+    </div>
+    <div class="hint">Клетка <b>A</b> тёмная, клетка <b>B</b> светлая. Это же очевидно? Нажмите на обе и сравните цвета. Или соедините их полосой.</div>
+    <div class="controls">
+      <button class="btn pink" id="adBar">Соединить полосой</button>
+      <button class="btn" id="adMask">Закрыть остальное</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Клетки A и B <b>абсолютно одного цвета</b> - rgb(120, 120, 120). Это можно проверить нажатием.</p>
+      <p>Мозг не измеряет цвет, как фотоаппарат, - он пытается понять, какой цвет у предмета "на самом деле". Клетка B лежит в тени и окружена тёмными клетками, поэтому мозг делает вывод: "в тени она выглядит серой, значит, на самом деле она светлая". И честно показывает вам её светлой.</p>
+      <p>Иллюзию придумал Эдвард Адельсон в 1995 году. Здесь она нарисована заново кодом.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Drift -->
+  <div class="card fs" id="c-drift">
+    <div class="card-head"><div><h2>Вращающиеся кольца</h2><div class="sub">Peripheral drift</div></div><span class="tag t-opt">ДВИЖЕНИЕ</span></div>
+    <div class="stage" style="background:#5d6b3d"><canvas id="drCanvas" class="zoomable" width="340" height="240"></canvas></div>
+    <div class="hint">Просто скользите взглядом по картинке. Кольца крутятся? А теперь <b>посмотрите в одну точку</b> на одном кольце. Лучше всего на весь экран (кнопка ⛶).</div>
+    <div class="controls">
+      <button class="btn" id="drColor">Сделать серым</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Это <b>неподвижная картинка</b>. В коде нет ни одной анимации.</p>
+      <p>Каждый сегмент окрашен в порядке: чёрный - синий - белый - жёлтый. Мозг обрабатывает контрастные (чёрный, белый) и бледные участки с разной скоростью. Когда глаз чуть сдвигается или моргает, эта разница превращается в сигнал "движение от чёрного к синему". Если смотреть в одну точку, кольцо под взглядом останавливается, а боковые продолжают крутиться.</p>
+      <p>Идея принадлежит японскому психологу Акиёси Китаоке.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ================= SECTION 2 ================= -->
+<div class="section-title" id="mind"><b>02</b> Чтение мыслей - математика и психология</div>
+<div class="grid">
+
+  <!-- Crystal ball -->
+  <div class="card wide" id="c-cb">
+    <div class="card-head"><div><h2>Хрустальный шар</h2><div class="sub">Magic Gopher</div></div><span class="tag t-mind">МАТЕМАТИКА</span></div>
+    <div class="stage">
+      <div class="cb-wrap">
+        <div class="cb-grid" id="cbGrid"></div>
+        <div class="ball" id="ball"><span class="sym" id="ballSym"></span></div>
+      </div>
+    </div>
+    <div class="hint">1. Загадайте любое двузначное число, например <b>52</b>.<br>2. Сложите его цифры: 5+2=7.<br>3. Вычтите эту сумму из числа: 52-7=<b>45</b>.<br>4. Найдите в таблице <b>результат (45, а не 52!)</b> и запомните картинку рядом с ним. Затем загляните в шар.</div>
+    <div class="controls">
+      <button class="btn pink" id="cbRead">Читать мысли</button>
+      <button class="btn" id="cbAgain">Ещё раз</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Число "ab" - это 10a+b. Вычитаем a+b и получаем 9a. Например, 52-7=45, а это 9 умножить на 5. Значит, результат <b>всегда делится на 9</b>: 9, 18, 27, 36, 45, 54, 63, 72 или 81.</p>
+      <p>У всех чисел, кратных 9, в таблице стоит один и тот же символ. Остальные символы - просто для отвода глаз. Каждый раунд таблица перемешивается, чтобы зритель не заметил закономерность.</p>
+      <p>Нажмите "Подсветить", чтобы увидеть эти клетки.</p>
+      <button class="btn lime" id="cbShow">Подсветить</button>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Peter -->
+  <div class="card" id="c-peter">
+    <div class="card-head"><div><h2>Питер отвечает</h2><div class="sub">Peter Answers</div></div><span class="tag t-mind">ПСИХОЛОГИЯ</span></div>
+    <div class="stage">
+      <div class="peter">
+        <label>Прошение</label>
+        <div class="pet-wrap"><input id="petition" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Начните печатать прошение..."><div class="pet-mask" id="petMask"></div></div>
+        <label>Вопрос</label>
+        <input id="question" autocomplete="off" placeholder="Например: как зовут мою кошку?">
+        <div class="answer" id="answer">Питер ждёт вежливого прошения...</div>
+      </div>
+    </div>
+    <div class="hint">Попросите друга задать Питеру вопрос, на который знает ответ только он. Перед вопросом нужно вежливо напечатать прошение: <b>"Питер, пожалуйста, ответь на вопрос:"</b>.</div>
+    <div class="controls">
+      <button class="btn pink" id="askPeter">Спросить Питера</button>
+      <button class="btn" id="peterReset">Сброс</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Прошение печатаете <b>вы</b>, а не друг. Поле прошения - обманка: какие бы клавиши вы ни нажимали, в нём появляется фраза "Питер, пожалуйста, ответь на следующий вопрос:".</p>
+      <p>Секрет: нажмите <b>точку</b>, затем напечатайте ответ (например, Мурка), снова нажмите <b>точку</b> и допечатайте прошение до конца. Всё это время на экране будет только вежливая фраза. Ответ вы заранее узнаёте у друга "между делом". Можно и вставить ответ из буфера обмена - между двумя точками.</p>
+      <p>На телефоне клавиатура может подсказывать слова в строке над буквами - держите экран так, чтобы друг видел только поле.</p>
+      <p>Если ответ не спрятан, Питер вежливо отказывается отвечать - это тоже часть шоу.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Cards -->
+  <div class="card" id="c-cards">
+    <div class="card-head"><div><h2>Я знаю твою карту</h2><div class="sub">Card Prediction</div></div><span class="tag t-mind">ВНИМАНИЕ</span></div>
+    <div class="stage cards-stage">
+      <div class="cards-msg" id="cardsMsg">Мысленно выберите одну карту. Не говорите!</div>
+      <div class="table" id="table"></div>
+    </div>
+    <div class="hint">Запомните одну карту из шести - только запомните, никуда не нажимайте. Сосредоточьтесь на ней и нажмите кнопку.</div>
+    <div class="controls">
+      <button class="btn pink" id="cardsGo">Я знаю твою карту</button>
+      <button class="btn" id="cardsAgain">Ещё раз</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Ваша карта исчезла... но присмотритесь к остальным пяти. <b>Ни одной из исходных шести карт</b> среди них нет - заменены все.</p>
+      <p>Вы запоминали только свою карту, а остальные пять видели "краем глаза": "какие-то короли и дамы". Мозг не хранит детали того, на что не было направлено внимание (слепота к изменениям), поэтому подмена всех карт незаметна - замечается только пропажа "своей".</p>
+      <p>Поэтому используются только похожие карты - короли, дамы и валеты.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+  <!-- 21 cards -->
+  <div class="card" id="c-21">
+    <div class="card-head"><div><h2>Фокус 21 карты</h2><div class="sub">Классика фокусников</div></div><span class="tag t-mind">МАТЕМАТИКА</span></div>
+    <div class="stage cards-stage" style="min-height:290px">
+      <div class="cards-msg" id="msg21">Запомните одну карту и нажмите на её столбец</div>
+      <div class="t21" id="t21"></div>
+      <div class="big-reveal" id="rev21"><div style="color:#e8ffe8;font-size:14px">Ваша карта:</div><div class="big-card" id="big21"></div></div>
+    </div>
+    <div class="hint">Запомните любую карту. Три раза покажите, <b>в каком столбце</b> она лежит, - и я её назову.</div>
+    <div class="controls">
+      <button class="btn" id="again21">Заново</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Никакого чтения мыслей - только раскладка. После каждого выбора столбец с вашей картой кладётся <b>в середину</b> колоды, и карты раскладываются заново по строкам.</p>
+      <p>После первого раза карта оказывается среди 8-14-й, после второго - среди 10-12-й, после третьего - всегда на <b>11-м месте</b> из 21. Остаётся показать 11-ю карту.</p>
+      <p>Этот фокус можно показать и с настоящей колодой - теперь вы знаете как.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Binary -->
+  <div class="card" id="c-bin">
+    <div class="card-head"><div><h2>Угадаю число</h2><div class="sub">Карты-угадайки, 1-63</div></div><span class="tag t-mind">МАТЕМАТИКА</span></div>
+    <div class="stage">
+      <div class="bin">
+        <div class="bin-title" id="binTitle">Загадайте любое число от 1 до 63</div>
+        <div class="bin-grid hidden" id="binGrid"></div>
+        <div class="ball done" id="binBall"><span class="sym" id="binSym">?</span></div>
+      </div>
+    </div>
+    <div class="hint">Я покажу 6 карточек с числами. Просто отвечайте, <b>есть ли на карточке ваше число</b>. Больше ничего не нужно.</div>
+    <div class="controls">
+      <button class="btn lime" id="binStart">Загадал</button>
+      <button class="btn lime hidden" id="binYes">Есть</button>
+      <button class="btn pink hidden" id="binNo">Нет</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Это двоичная система счисления. Любое число от 1 до 63 складывается из 1, 2, 4, 8, 16 и 32 - каждое не больше одного раза. Например, 45 = 32 + 8 + 4 + 1.</p>
+      <p>На каждой карточке собраны числа, в которых есть "своё" слагаемое. Самое маленькое число на карточке и есть это слагаемое. Я просто складываю первые числа тех карточек, где вы ответили "Есть". Числа перемешаны, чтобы это было не так заметно.</p>
+      <p>Так компьютеры хранят все числа - нулями и единицами.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ================= SECTION 3 ================= -->
+<div class="section-title" id="sound"><b>03</b> Аудио-иллюзии - бонус</div>
+<div class="grid">
+  <div class="card" id="c-sh">
+    <div class="card-head"><div><h2>Тон Шепарда</h2><div class="sub">Shepard tone - бесконечная лестница звука</div></div><span class="tag t-aud">ЗВУК</span></div>
+    <div class="stage sh-stage">
+      <canvas id="shCanvas" width="700" height="260"></canvas>
+      <div class="sh-arrow" id="shArrow">▲</div>
+    </div>
+    <div class="hint">Наденьте наушники или включите звук (лучше негромко). Звук будет <b>бесконечно подниматься</b>... но никогда не станет писком.</div>
+    <div class="controls">
+      <button class="btn lime" id="shPlay">▶ Play</button>
+      <button class="btn" id="shDir">Направление: вверх</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Звучат одновременно 9 тонов, разделённых октавами. Все они медленно поднимаются. Самые громкие - в середине диапазона, а крайние почти беззвучны (это видно на графике: высота столбика = громкость).</p>
+      <p>Когда верхний тон уходит слишком высоко, он уже затих - и незаметно "перепрыгивает" вниз, где снова начинает тихо подниматься. Ухо всё время слышит подъём, а общая высота звука остаётся на месте. Звуковой аналог бесконечной лестницы Пенроуза.</p>
+      <p>Приём используют в кино, чтобы создать ощущение нарастающего напряжения.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SECTION 4 ================= -->
+<div class="section-title" id="wow"><b>04</b> Самое бомбическое</div>
+<div class="grid">
+
+  <!-- Penrose -->
+  <div class="card fs wide" id="c-pen">
+    <div class="card-head"><div><h2>Невозможный треугольник</h2><div class="sub">Penrose triangle - объёмная модель</div></div><span class="tag t-opt">3D</span></div>
+    <div class="stage" style="background:radial-gradient(circle at 50% 40%,#1c2238,#07080d)">
+      <canvas id="penCanvas" class="zoomable" width="420" height="300"></canvas>
+      <div class="wf-msg" id="penMsg">Такую фигуру невозможно построить. Или возможно?</div>
+    </div>
+    <div class="hint">Перед вами треугольник, у которого каждый угол прямой. Так не бывает... Нажмите <b>"Повернуть"</b> или двигайте ползунок.</div>
+    <div class="controls">
+      <button class="btn pink" id="penSpin">Повернуть</button>
+      <input type="range" id="penRange" min="-45" max="45" value="0" style="flex:1;min-width:120px;accent-color:#ff3fd8">
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Это <b>настоящая объёмная фигура</b> из трёх брусков, но не треугольник, а "лесенка": брусок вправо, брусок вглубь, брусок вверх. Концы у неё не соединены.</p>
+      <p>Если смотреть с одной-единственной точки, верхний конец ровно закрывает нижний, и мозг "склеивает" их. Мозг всегда выбирает самое простое объяснение: раз концы касаются на картинке, значит, касаются и в жизни. Стоит повернуть фигуру - обман раскрывается.</p>
+      <p>По этому принципу в Перте (Австралия) построена настоящая скульптура невозможного треугольника.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Spiral -->
+  <div class="card fs" id="c-sp">
+    <div class="card-head"><div><h2>Гипноспираль</h2><div class="sub">Spiral aftereffect</div></div><span class="tag t-opt">ДВИЖЕНИЕ</span></div>
+    <div class="stage" style="background:#000">
+      <canvas id="spCanvas" class="zoomable" width="260" height="260"></canvas>
+      <div class="wf-msg" id="spMsg">Нажмите "Старт"</div>
+    </div>
+    <div class="hint">Смотрите в центр спирали 30 секунд. Когда она остановится, сразу посмотрите <b>на свою ладонь или на лицо человека рядом</b>.</div>
+    <div class="controls">
+      <button class="btn lime" id="spStart">Старт</button>
+      <button class="btn" id="spDir">Сменить направление</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Ладонь (или лицо) несколько секунд <b>раздувается или сжимается</b>, хотя ничего не происходит.</p>
+      <p>Это тот же эффект, что и у водопада, только для движения "к себе - от себя". Нейроны, которые следили за "затягиванием" спирали, устали, и мозг показывает обратное движение на всём, куда вы посмотрите. Смените направление - эффект станет противоположным.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Stepping feet -->
+  <div class="card fs" id="c-feet">
+    <div class="card-head"><div><h2>Шагающие бруски</h2><div class="sub">Stepping feet</div></div><span class="tag t-opt">ДВИЖЕНИЕ</span></div>
+    <div class="stage"><canvas id="feetCanvas" class="zoomable" width="340" height="220"></canvas></div>
+    <div class="hint">Два бруска "шагают" по очереди, как ножки: то один рывком, то другой. Правда? Теперь <b>уберите полоски</b>.</div>
+    <div class="controls">
+      <button class="btn pink" id="feetToggle">Убрать полоски</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Бруски едут <b>с одинаковой постоянной скоростью</b>, без всяких рывков.</p>
+      <p>Скорость мозг оценивает по контрасту. Жёлтый брусок хорошо виден на чёрных полосках и плохо - на белых, а синий наоборот. Где контраст сильный, движение кажется быстрее, где слабый - медленнее. Поэтому бруски "шагают" по очереди.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Pinna -->
+  <div class="card fs" id="c-pinna">
+    <div class="card-head"><div><h2>Кольца, которые крутятся от взгляда</h2><div class="sub">Pinna-Brelstaff illusion</div></div><span class="tag t-opt">ДВИЖЕНИЕ</span></div>
+    <div class="stage" style="background:#8f8f8f"><canvas id="pinCanvas" class="zoomable" width="280" height="280"></canvas></div>
+    <div class="hint">Смотрите на точку в центре и <b>медленно приближайте лицо к экрану и отдаляйте</b>. Или нажмите "Приближать" и просто смотрите на точку.</div>
+    <div class="controls">
+      <button class="btn pink" id="pinZoom">Приближать</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Кольца крутятся в разные стороны, хотя квадратики только становятся больше или меньше.</p>
+      <p>Каждый квадратик наклонён и имеет светлые и тёмные края. Нейроны, которые замечают движение, видят только маленький кусочек картинки и не могут понять, куда на самом деле движется наклонная граница. Мозг ошибается в направлении на десятки градусов - и "расширение" превращается во вращение.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Tritone -->
+  <div class="card" id="c-tri">
+    <div class="card-head"><div><h2>Семейный спор</h2><div class="sub">Тритоновый парадокс</div></div><span class="tag t-aud">ЗВУК</span></div>
+    <div class="stage">
+      <div class="peter" style="align-items:center;text-align:center">
+        <div style="font-size:15px">Сейчас прозвучат <b>две ноты</b>.<br>Вторая выше первой или ниже?</div>
+        <div style="display:flex;gap:10px;margin-top:6px">
+          <button class="btn lime" id="triPlay">▶ Сыграть пару</button>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="btn" id="triUp">▲ Выше</button>
+          <button class="btn pink" id="triDown">▼ Ниже</button>
+        </div>
+        <div class="answer" id="triOut" style="width:100%">Пусть каждый член семьи ответит сам, не подсказывая другим.</div>
+      </div>
+    </div>
+    <div class="hint">Включите звук. Ответьте по очереди всей семьёй, <b>не подсказывая</b>, а потом сравните.</div>
+    <div class="controls">
+      <button class="btn" id="triNew">Новая пара</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Правильного ответа <b>нет</b>. Это особые "шепардовские" ноты: в каждой звучат все октавы сразу, а вторая нота отстоит от первой ровно на пол-октавы. Поэтому подъём и спуск одинаково честные.</p>
+      <p>Мозг всё равно выбирает, и разные люди слышат по-разному. Учёные (Диана Дойч, 1986) заметили, что ответ связан с тем, к какой высоте голоса человек привык с детства - то есть с языком и говором.</p>
+      <p>Кнопка "Новая пара" меняет ноты, и кто-то может "передумать".</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Stroop -->
+  <div class="card wide" id="c-stroop">
+    <div class="card-head"><div><h2>Мозг против глаз</h2><div class="sub">Тест Струпа - игра на скорость</div></div><span class="tag t-mind">ИГРА</span></div>
+    <div class="stage">
+      <div class="peter" style="align-items:center;text-align:center">
+        <div id="stInfo" style="font-size:14px;color:var(--muted)">Нажимайте кнопку <b style="color:#fff">цвета букв</b>, а не того, что написано. 10 слов на скорость.</div>
+        <div id="stWord" style="font-size:clamp(30px,9vw,52px);font-weight:800;letter-spacing:2px;min-height:70px">ГОТОВЫ?</div>
+        <div id="stBtns" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div>
+        <div class="answer" id="stOut" style="width:100%;max-width:520px">Сначала разминка (цветные квадраты), потом ловушка (слова).</div>
+      </div>
+    </div>
+    <div class="hint">Сначала пройдите <b>разминку</b>, потом <b>ловушку</b> - и сравните время. Устройте соревнование: кто в семье быстрее?</div>
+    <div class="controls">
+      <button class="btn lime" id="stWarm">Разминка</button>
+      <button class="btn pink" id="stTrap">Ловушка</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>В ловушке почти все отвечают <b>заметно медленнее</b> и чаще ошибаются, хотя задача та же - назвать цвет.</p>
+      <p>Взрослый человек читает автоматически: слово "прочитывается" само, раньше, чем вы успеваете решить. Мозгу приходится тормозить прочитанное слово и выбирать цвет - на этот "спор" уходит время. Интересно, что маленьким детям, которые ещё плохо читают, ловушка даётся легче.</p>
+      <p>Эффект описал Джон Струп в 1935 году.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SECTION 5 ================= -->
+<div class="section-title" id="more"><b>05</b> Ещё сильнее</div>
+<div class="grid">
+
+  <!-- 3D sound -->
+  <div class="card wide" id="c-3d">
+    <div class="card-head"><div><h2>Муха вокруг головы</h2><div class="sub">Объёмный 3D-звук - только в наушниках!</div></div><span class="tag t-aud">ЗВУК</span></div>
+    <div class="stage">
+      <canvas id="d3Canvas" class="zoomable" width="420" height="260"></canvas>
+      <div class="wf-msg" id="d3Msg" style="top:auto;bottom:10px">Наденьте наушники и закройте глаза</div>
+    </div>
+    <div class="hint"><b>Обязательно в наушниках</b> (из колонок эффекта не будет). Включите, закройте глаза и попробуйте показать пальцем, где звук.</div>
+    <div class="controls">
+      <button class="btn lime" id="d3Play">▶ Включить</button>
+      <button class="btn" data-mode="circle">Вокруг головы</button>
+      <button class="btn" data-mode="vertical">Через макушку</button>
+      <button class="btn" data-mode="ear">К самому уху</button>
+      <button class="btn" data-mode="fly">Живая муха</button>
+      <button class="btn pink" id="d3Src">Звук: муха</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>В наушниках всего два динамика - левый и правый. Но звук кажется спереди, сзади и даже над головой.</p>
+      <p>Мозг определяет, откуда звук, по крошечным подсказкам: в какое ухо он пришёл раньше (разница - доли миллисекунды), где громче, и как его "окрасили" форма головы и ушной раковины. Сзади звук звучит чуть глуше, чем спереди. Браузер умеет подделывать все эти подсказки (технология HRTF), и мозг верит.</p>
+      <p>Так же сделан объёмный звук в играх и кино.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Scintillating grid -->
+  <div class="card fs" id="c-scint">
+    <div class="card-head"><div><h2>Мерцающая решётка</h2><div class="sub">Scintillating grid</div></div><span class="tag t-opt">ЯРКОСТЬ</span></div>
+    <div class="stage scint-stage" style="background:#000"><svg id="scSvg" viewBox="0 0 300 260" preserveAspectRatio="xMidYMid slice"></svg></div>
+    <div class="hint">Видите, как в белых кружках вспыхивают <b>чёрные точки</b>? Попробуйте поймать взглядом хотя бы одну.</div>
+    <div class="controls">
+      <button class="btn" id="scDots">Убрать белые кружки</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Чёрных точек <b>нет совсем</b> - все кружки белые. Но поймать "чёрную" не получится: она есть везде, кроме того места, куда вы смотрите.</p>
+      <p>Клетки сетчатки усиливают контраст с соседями: светлое рядом с тёмным кажется светлее, и наоборот. На перекрёстках вокруг много серого и мало чёрного, и сбоку от точки взгляда, где клетки "крупнее", белый кружок затемняется. В центре взгляда клетки мелкие, и обмана нет.</p>
+      <p>Уберите кружки - останется решётка Германа с серыми пятнами на перекрёстках.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Cafe wall -->
+  <div class="card fs" id="c-cafe">
+    <div class="card-head"><div><h2>Стена кафе</h2><div class="sub">Café wall illusion</div></div><span class="tag t-opt">ГЕОМЕТРИЯ</span></div>
+    <div class="stage" style="background:#555"><canvas id="cafeCanvas" class="zoomable" width="340" height="240"></canvas></div>
+    <div class="hint">Ряды кирпичей явно кривые - то сходятся, то расходятся клином. Или нет? <b>Приложите линейку.</b></div>
+    <div class="controls">
+      <button class="btn pink" id="cafeRuler">Показать линейку</button>
+      <button class="btn" id="cafeAlign">Выровнять кирпичи</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Все горизонтальные линии <b>идеально ровные и параллельные</b>.</p>
+      <p>Тонкий серый шов между рядами по-разному смешивается с чёрными и белыми кирпичами рядом. Глаз видит не ровный шов, а множество крошечных наклонных "клинышков", и мозг складывает их в наклон всей линии. Если кирпичи стоят ровной шахматкой, клинышки гасят друг друга - и иллюзия пропадает.</p>
+      <p>Её нашли в 1973 году на стене настоящего кафе в английском Бристоле.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Dot sphere -->
+  <div class="card fs" id="c-sph">
+    <div class="card-head"><div><h2>В какую сторону крутится?</h2><div class="sub">Двусмысленное вращение</div></div><span class="tag t-opt">ДВИЖЕНИЕ</span></div>
+    <div class="stage" style="background:#05060a"><canvas id="sphCanvas" class="zoomable" width="260" height="260"></canvas></div>
+    <div class="hint">Шар из точек вращается. Влево или вправо? Посмотрите подольше - <b>направление само поменяется</b>. А можно поменять его усилием воли?</div>
+    <div class="controls">
+      <button class="btn pink" id="sphHint">Подсказать направление</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>На экране плоское облако точек, которые просто ездят влево и вправо. Ни одна точка не сообщает, ближе она или дальше. Поэтому оба варианта вращения <b>одинаково правильные</b>.</p>
+      <p>Мозг не любит неопределённость: он выбирает одну версию, а через какое-то время "устаёт" от неё и переключается на другую. С тренировкой можно научиться переключать направление по желанию.</p>
+      <p>Кнопка "Подсказать направление" делает ближние точки крупнее - и шар сразу крутится только в одну сторону.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Elephant from Denmark -->
+  <div class="card" id="c-den">
+    <div class="card-head"><div><h2>Енот из Дании</h2><div class="sub">Фокус-расчёт в уме</div></div><span class="tag t-mind">ПСИХОЛОГИЯ</span></div>
+    <div class="stage">
+      <div class="peter" style="align-items:center;text-align:center;justify-content:center;min-height:250px">
+        <div id="denStep" style="font-size:12px;color:var(--muted);letter-spacing:2px">ШАГ 0 ИЗ 8</div>
+        <div id="denText" style="font-size:19px;line-height:1.4;max-width:340px">Я угадаю, о чём вы подумаете. Считайте <b>в уме</b> и ничего не говорите вслух.</div>
+      </div>
+    </div>
+    <div class="hint">Пройдите по шагам, считая в уме. На последнем шаге я назову страну, животное и фрукт, о которых вы думаете.</div>
+    <div class="controls">
+      <button class="btn lime" id="denNext">Начать</button>
+      <button class="btn" id="denReset">Сначала</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p><b>Математика.</b> Любое число от 1 до 10, умноженное на 9, даёт число с суммой цифр 9 (18: 1+8, 27: 2+7...). Минус 4 - всегда 5, а пятая буква - <b>Д</b>.</p>
+      <p><b>Психология.</b> Страну на Д почти все называют одну - Данию. Следующая буква Е - и большинство вспоминает енота. Последняя буква "Дании" - Я, а фрукт на Я у всех один - яблоко.</p>
+      <p>Если кто-то назвал Доминикану или ежа - фокус не сработал, и это тоже интересно: значит, человек думает нестандартно.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Measure game -->
+  <div class="card wide" id="c-game">
+    <div class="card-head"><div><h2>Насколько тебя обманули глаза?</h2><div class="sub">Игра-измеритель, 3 раунда</div></div><span class="tag t-mind">ИГРА</span></div>
+    <div class="stage">
+      <div style="width:100%;padding:10px 14px;display:flex;flex-direction:column;gap:8px">
+        <div id="gmTitle" style="text-align:center;font-size:14px">Раунд 1 из 3</div>
+        <svg id="gmSvg" viewBox="0 0 520 220" style="width:100%;height:auto;max-height:240px"></svg>
+        <input type="range" id="gmRange" min="60" max="140" value="100" style="width:100%;accent-color:#2ff3ff">
+        <div class="answer" id="gmOut" style="text-align:center">Двигайте ползунок, пока нижняя фигура не станет <b>точно такой же</b>, как верхняя.</div>
+      </div>
+    </div>
+    <div class="hint">Подгоните размер "на глаз", нажмите "Проверить" - и узнайте, на сколько процентов вас обманула иллюзия. Устройте семейное соревнование!</div>
+    <div class="controls">
+      <button class="btn lime" id="gmCheck">Проверить</button>
+      <button class="btn" id="gmNext">Дальше</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p><b>Мюллер-Лайер:</b> "хвосты" на концах линии делают её длиннее на вид, а "стрелки" - короче. Мозг принимает их за углы стен - ближний и дальний.</p>
+      <p><b>Эббингауз:</b> круг среди больших кругов кажется маленьким, а среди маленьких - большим. Размер мозг всегда оценивает в сравнении с соседями.</p>
+      <p><b>Понцо:</b> сходящиеся линии выглядят как уходящие вдаль рельсы, поэтому верхняя полоска "дальше" - и значит, по мнению мозга, на самом деле больше.</p>
+      <p>Почти никто не попадает точнее, чем на 5%. Ошибка в 10-20% - нормально: так работает зрение у всех.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+  <!-- Confetti -->
+  <div class="card fs wide" id="c-conf">
+    <div class="card-head"><div><h2>Шарики-хамелеоны</h2><div class="sub">Confetti illusion</div></div><span class="tag t-opt">ЦВЕТ</span></div>
+    <div class="stage" style="background:#111"><div class="zoomable" data-maxscale="1" style="width:100%;max-width:620px;padding-bottom:22px"><svg id="confSvg" viewBox="0 0 520 240" style="width:100%;height:auto;display:block;cursor:pointer"></svg></div>
+      <div class="readout" id="confRead">Шарики оранжевые и зелёные? Нажмите на шарик</div></div>
+    <div class="hint">Одни шарики оранжевые, другие зелёные. Нажмите на любой шарик - покажу его настоящий цвет. Или <b>уберите полоски</b>.</div>
+    <div class="controls">
+      <button class="btn pink" id="confToggle">Убрать полоски</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Все шарики <b>одного и того же жёлтого цвета</b>. Различаются только полоски, которые проходят поверх них: у одних красные, у других синие.</p>
+      <p>Мозг смешивает цвет предмета с цветом тонкого узора, который его пересекает (это называется цветовой ассимиляцией). Жёлтый с красными полосками превращается в "оранжевый", с синими - в "зелёный".</p>
+      <p>Похожую иллюзию придумал Дэвид Новик, и в 2017 году она обошла весь интернет.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Troxler -->
+  <div class="card fs" id="c-trox">
+    <div class="card-head"><div><h2>Исчезающий туман</h2><div class="sub">Troxler fading</div></div><span class="tag t-opt">ЦВЕТ</span></div>
+    <div class="stage"><div class="trox zoomable"><div class="trox-blobs"></div><div class="trox-cross"></div></div>
+      <div class="wf-msg" id="troxMsg">Смотрите на крестик и не двигайте глазами</div></div>
+    <div class="hint">Смотрите <b>только на крестик</b> и старайтесь не двигать глазами 15-20 секунд. Что станет с цветными пятнами?</div>
+    <div class="controls">
+      <button class="btn lime" id="troxStart">Засечь 20 секунд</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Цветные пятна <b>растворяются</b>, и остаётся ровный серый экран. Моргнёте - и они вернутся.</p>
+      <p>Нервные клетки глаза реагируют на <b>изменения</b>. Если картинка размытая и совсем неподвижная, сигнал от неё "затухает", и мозг заполняет это место окружающим серым фоном. Обычно этого не происходит, потому что глаза постоянно и незаметно подрагивают.</p>
+      <p>Эффект описал швейцарский врач Игнац Трокслер в 1804 году.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+  <!-- Tusi -->
+  <div class="card fs" id="c-tusi">
+    <div class="card-head"><div><h2>Катящийся круг</h2><div class="sub">Пара Туси</div></div><span class="tag t-opt">ДВИЖЕНИЕ</span></div>
+    <div class="stage" style="background:#05060a"><canvas id="tusiCanvas" class="zoomable" width="260" height="260"></canvas></div>
+    <div class="hint">Белые точки образуют круг, который катится внутри красного кольца. Точно? Включите <b>дорожки</b> и посмотрите, как движется каждая точка.</div>
+    <div class="controls">
+      <button class="btn pink" id="tusiLines">Показать дорожки</button>
+      <button class="btn" id="tusiOne">Выделить одну точку</button>
+      <button class="btn secret">Секрет</button>
+    </div>
+    <div class="secret-panel">
+      <h3>Как это работает</h3>
+      <p>Ни одна точка не движется по кругу! Каждая просто ездит <b>туда-обратно по прямой</b>, как маятник. Точки чуть-чуть запаздывают одна за другой, и мозг соединяет их в катящийся круг.</p>
+      <p>Это математический факт, открытый персидским астрономом Насир ад-Дином Туси в XIII веке: если маленький круг катится внутри большого (вдвое большего), любая точка маленького круга движется по прямой.</p>
+      <p>Прославил эту иллюзию американский видеоблогер Brusspup.</p>
+      <button class="btn">Понятно</button>
+    </div>
+  </div>
+
+</div>
+
+<div id="presBg"></div>
+<div id="presBlack" title="Нажмите, чтобы вернуть картинку"></div>
+<div id="presBar">
+  <button id="pbPrev" title="Назад (стрелка влево, PageUp)">◀</button>
+  <button id="pbTitle" class="pb-title" title="Все аттракционы (M)"><span class="pb-num" id="pbNum">1 / 29</span><span class="pb-name" id="pbName"></span></button>
+  <button id="pbNext" title="Дальше (стрелка вправо, PageDown)">▶</button>
+  <button id="pbSecret" class="pb-secret" title="Секрет (S)">🤫<span class="pb-label"> Секрет</span></button>
+  <button id="pbVoice" class="pb-voice" title="Волшебный голос">🔮</button>
+  <button id="pbFull" title="Во весь экран (F)">⛶</button>
+  <button id="pbExit" class="pb-exit" title="Выйти (Esc)">✕</button>
+</div>
+<div id="toc"><div class="toc-in">
+  <div class="toc-head"><h2>Все аттракционы</h2>
+    <button class="btn lime" id="tocShow">📽 Показ с начала</button>
+    <button class="btn pink" id="tocClose">✕ Закрыть</button></div>
+  <div id="tocBody"></div>
+  <p class="toc-tip">Управление в режиме "Проектор": <kbd>→</kbd> или <kbd>PageDown</kbd> - дальше, <kbd>←</kbd> или <kbd>PageUp</kbd> - назад (пульт-кликер тоже работает),
+    <kbd>S</kbd> - секрет, <kbd>M</kbd> - этот список, <kbd>B</kbd> - чёрный экран, <kbd>F</kbd> - во весь экран, <kbd>Esc</kbd> - выход.</p>
+</div></div>
+
+<footer>Совет: для показа на проекторе или большом телевизоре нажмите "📽 Проектор" - аттракционы пойдут по одному на весь экран. Оптические иллюзии сильнее всего работают при приглушённом свете. Фокусы с картами и числами лучше показывать другому человеку - и только потом открывать "Секрет".</footer>
+
+<script>
+/* ===== Visibility: pause drawing of animations that are off screen ===== */
+const VIS = new WeakMap();
+const visIO = ('IntersectionObserver' in window) ? new IntersectionObserver(es=>es.forEach(e=>VIS.set(e.target,e.isIntersecting)),{rootMargin:'150px'}) : null;
+function hiDPI(cv){
+  const d=Math.min(window.devicePixelRatio||1,3); if(d<=1) return;
+  const w=cv.width, h=cv.height; cv.style.width=w+'px'; cv.width=Math.round(w*d); cv.height=Math.round(h*d);
+  cv.getContext('2d').setTransform(d,0,0,d,0,0);
+}
+function watchVisible(el){ VIS.set(el,true); if(visIO) visIO.observe(el); return ()=>VIS.get(el)!==false; }
+
+/* ===== Starfield ===== */
+(function(){ const box=document.getElementById('stars'); let h='';
+  for(let i=0;i<70;i++){ const sz=Math.random()<.15?3:2; h+=`<i style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${sz}px;height:${sz}px;animation-delay:${(Math.random()*4).toFixed(2)}s;animation-duration:${(3+Math.random()*4).toFixed(2)}s"></i>`; }
+  box.innerHTML=h; })();
+
+/* ===== Magic voice narrator (Web Speech API) ===== */
+const Voice = (function(){
+  const synth = window.speechSynthesis || null;
+  let on=false, voice=null;
+  function pick(){
+    if(!synth) return null;
+    const vs = synth.getVoices().filter(v=>/^ru/i.test(v.lang));
+    if(!vs.length) return null;
+    const score = v=>{ const n=v.name; let s=0;
+      if(/natural|neural|online/i.test(n)) s+=6;
+      if(/google/i.test(n)) s+=4;
+      if(/svetlana|dariya|milena|irina|alena|ekaterina|anna|katya|female|жен/i.test(n)) s+=2;
+      if(/pavel|dmitry|yuri|male|муж/i.test(n)) s-=1;
+      if(v.localService===false) s+=1;
+      return s; };
+    return vs.sort((a,b)=>score(b)-score(a))[0];
+  }
+  if(synth){ voice=pick(); synth.onvoiceschanged=()=>{ voice=pick(); }; }
+  function clean(t){ return String(t).replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,'').replace(/\s+([.,!?:;])/g,'$1').replace(/[▶■▲▼⛶✕"]/g,'').replace(/\s+/g,' ').trim(); }
+  function speak(t, force){
+    if(!synth || !(on||force)) return;
+    try{
+      synth.cancel();
+      const parts = clean(t).match(/[^.!?]+[.!?]*/g) || [];
+      parts.map(p=>p.trim()).filter(Boolean).forEach(p=>{
+        const u = new SpeechSynthesisUtterance(p);
+        u.lang='ru-RU'; if(voice) u.voice=voice; u.rate=0.95; u.pitch=1.05; u.volume=1;
+        synth.speak(u);
+      });
+    }catch(e){}
+  }
+  function stop(){ if(synth) try{ synth.cancel(); }catch(e){} }
+  return { get on(){return on;}, set(v){ on=v; if(!v) stop(); }, speak, stop, available:()=>!!synth, hasRu:()=>!!(voice||pick()) };
+})();
+function say(t){ Voice.speak(t); }
+const RANK_RU={A:'туз','2':'двойка','3':'тройка','4':'четвёрка','5':'пятёрка','6':'шестёрка','7':'семёрка','8':'восьмёрка','9':'девятка','10':'десятка',J:'валет',Q:'дама',K:'король'};
+const SUIT_RU={'♠':'пик','♣':'треф','♥':'червей','♦':'бубен'};
+
+/* ===== Navigation ===== */
+document.querySelectorAll('#topnav a').forEach(a=>a.addEventListener('click',()=>{
+  const el=document.getElementById(a.dataset.go); if(!el) return;
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  if(el.classList.contains('card')){ el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+}));
+
+/* ===== Voice toggle + per-card read buttons ===== */
+(function(){
+  const btn=document.getElementById('voiceBtn');
+  function toast(t){ let el=document.getElementById('toast'); if(!el){ el=document.createElement('div'); el.id='toast'; document.body.appendChild(el); }
+    el.textContent=t; el.classList.add('on'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('on'),4000); }
+  btn.addEventListener('click',()=>{
+    if(!Voice.available()){ toast('Этот браузер не умеет говорить. Попробуйте Chrome.'); return; }
+    const v=!Voice.on; Voice.set(v);
+    document.body.classList.toggle('voice-on',v);
+    btn.textContent = v ? '🔮 Волшебный голос: вкл' : '🔮 Волшебный голос: выкл';
+    if(v){
+      if(!Voice.hasRu()) toast('На этом устройстве не найден русский голос - речь может звучать с акцентом.');
+      say('Добро пожаловать в Пульт иллюзий! Я ваш волшебный помощник. Нажмите на динамик у любого аттракциона, и я расскажу, что делать. А когда фокус сработает, я объявлю результат.');
+    }
+  });
+  document.querySelectorAll('.card').forEach(card=>{
+    const head=card.querySelector('.card-head'); let wrap=head.querySelector('.head-right');
+    if(!wrap){ const tag=head.querySelector('.tag'); wrap=document.createElement('div'); wrap.className='head-right'; tag.replaceWith(wrap); wrap.appendChild(tag); }
+    const b=document.createElement('button'); b.className='say-btn'; b.title='Прочитать вслух'; b.textContent='🔈';
+    wrap.insertBefore(b, wrap.firstChild);
+    b.addEventListener('click',()=>{
+      const title=card.querySelector('h2').textContent, hint=card.querySelector('.hint').innerHTML;
+      Voice.speak(title+'. '+hint, true);
+    });
+  });
+})();
+
+/* ===== Secret panels ===== */
+document.querySelectorAll('.card').forEach(card=>{
+  const sb = card.querySelector('.btn.secret');
+  const panel = card.querySelector('.secret-panel');
+  if(sb) sb.addEventListener('click',()=>{ card.classList.add('show-secret');
+    if(Voice.on){ const ps=[...panel.querySelectorAll('p')].map(p=>p.innerHTML).join(' '); say('Секрет. '+ps); } });
+  panel.querySelectorAll('.btn').forEach(b=>{
+    if(b.textContent.trim()==='Понятно') b.addEventListener('click',()=>{ card.classList.remove('show-secret'); Voice.stop(); });
+  });
+});
+
+/* ===== 1. Lilac chaser ===== */
+(function(){
+  const box = document.getElementById('lilac');
+  const N = 12, R = 95, dots = [];
+  let clockwise = true;
+  for(let i=0;i<N;i++){
+    const d = document.createElement('div'); d.className='dot';
+    const a = (i/N)*Math.PI*2 - Math.PI/2;
+    d.style.transform = `translate(${Math.cos(a)*R}px, ${Math.sin(a)*R}px)`;
+    box.appendChild(d); dots.push(d);
+  }
+  function setDelays(){
+    dots.forEach((d,i)=>{
+      const k = clockwise ? i : (N - i) % N;
+      d.style.animation = 'none'; void d.offsetWidth;
+      d.style.animation = '';
+      d.style.animationDelay = (k*0.1 - 1.2) + 's';
+    });
+  }
+  setDelays();
+  if(visIO){ new IntersectionObserver(es=>es.forEach(e=>box.classList.toggle('paused',!e.isIntersecting))).observe(box); }
+  document.getElementById('lilacDir').onclick = ()=>{ clockwise=!clockwise; setDelays(); };
+  const sharpBtn = document.getElementById('lilacSharp');
+  sharpBtn.onclick = ()=>{
+    box.classList.toggle('sharp');
+    sharpBtn.textContent = box.classList.contains('sharp') ? 'Вернуть размытие' : 'Убрать размытие';
+  };
+  let t0 = Date.now(); const tEl = document.getElementById('lilacTimer');
+  setInterval(()=>{ tEl.textContent = Math.floor((Date.now()-t0)/1000) + ' с'; },1000);
+  // click on the stage restarts the timer
+  box.parentElement.addEventListener('click',()=>{ t0 = Date.now(); tEl.textContent='0 с'; });
+})();
+
+/* ===== 2. Waterfall ===== */
+(function(){
+  const flow = document.getElementById('flow'), msg = document.getElementById('wfMsg');
+  let timer = null, left = 0;
+  function stop(final){
+    clearInterval(timer); timer=null; flow.classList.remove('run');
+    msg.textContent = final ? 'СТОП! Смотрите на точку - всё поплыло вниз?' : 'Остановлено. Нажмите "Старт"';
+    msg.style.color = final ? '#b6ff3b' : '#fff';
+  }
+  document.getElementById('wfStart').onclick = ()=>{
+    if(timer) return;
+    left = 20; flow.classList.add('run'); msg.style.color='#fff';
+    msg.textContent = 'Смотрите на точку: ' + left + ' с';
+    timer = setInterval(()=>{
+      left--;
+      if(left<=0) stop(true); else msg.textContent = 'Смотрите на точку: ' + left + ' с';
+    },1000);
+  };
+  document.getElementById('wfStop').onclick = ()=>stop(false);
+})();
+
+/* ===== 3. Zollner ===== */
+(function(){
+  const svg = document.getElementById('zolSvg'), NS='http://www.w3.org/2000/svg';
+  const g = document.createElementNS(NS,'g');
+  g.setAttribute('transform','rotate(45 150 130)');
+  const lines = 9, gap = 34, y0 = 130 - (lines-1)*gap/2;
+  for(let i=0;i<lines;i++){
+    const y = y0 + i*gap;
+    const slope = i%2===0 ? 1 : -1;
+    for(let x=-120;x<=420;x+=13){
+      const h = document.createElementNS(NS,'line');
+      const dx = 9*slope, dy = 9;
+      h.setAttribute('x1',x-dx); h.setAttribute('y1',y-dy);
+      h.setAttribute('x2',x+dx); h.setAttribute('y2',y+dy);
+      h.setAttribute('stroke','#111'); h.setAttribute('stroke-width','2'); h.setAttribute('class','hatch');
+      g.appendChild(h);
+    }
+    const l = document.createElementNS(NS,'line');
+    l.setAttribute('x1',-120); l.setAttribute('y1',y); l.setAttribute('x2',420); l.setAttribute('y2',y);
+    l.setAttribute('stroke','#111'); l.setAttribute('stroke-width','3'); l.setAttribute('class','longline');
+    g.appendChild(l);
+  }
+  svg.appendChild(g);
+  const stage = document.getElementById('zolStage'), btn = document.getElementById('zolToggle');
+  btn.onclick = ()=>{
+    stage.classList.toggle('clean');
+    btn.textContent = stage.classList.contains('clean') ? 'Вернуть штрихи' : 'Убрать штрихи';
+  };
+})();
+
+/* ===== 4. Thatcher ===== */
+(function(){
+  const wrap = document.getElementById('faceWrap'), svg = document.getElementById('faceSvg');
+  const flip = document.getElementById('thFlip'), fix = document.getElementById('thFix');
+  flip.onclick = ()=>{
+    wrap.classList.toggle('upright');
+    flip.textContent = wrap.classList.contains('upright') ? 'Перевернуть обратно' : 'Перевернуть лицо';
+  };
+  fix.onclick = ()=>{
+    svg.classList.toggle('thatcher');
+    fix.textContent = svg.classList.contains('thatcher') ? 'Исправить глаза и рот' : 'Испортить глаза и рот';
+  };
+})();
+
+/* ===== 5. Crystal ball ===== */
+(function(){
+  const SYMBOLS = ['🐱','🐶','🦊','🐸','🐼','🐵','🦁','🐯','🐷','🐙','🦋','🐢','🐳','🦄','🍎','🍌','🍉','🍒','🍕','🍩','⚽','🚀','🎸','🎈','🌈','🌙','🔥','💎','🎁','🍀','🌵','🍄','🐞','🦀','🐝','🚲'];
+  const SYM_RU = ['котик','собачка','лисичка','лягушка','панда','обезьянка','лев','тигр','поросёнок','осьминог','бабочка','черепаха','кит','единорог','яблоко','банан','арбуз','вишенка','пицца','пончик','мяч','ракета','гитара','воздушный шарик','радуга','луна','огонь','бриллиант','подарок','клевер','кактус','грибок','божья коровка','краб','пчела','велосипед'];
+  const grid = document.getElementById('cbGrid'), ball = document.getElementById('ball'), sym = document.getElementById('ballSym');
+  let target = '', revealT = null, sayT = null;
+  function build(){
+    clearTimeout(revealT); clearTimeout(sayT); Voice.stop();
+    grid.innerHTML=''; grid.classList.remove('reveal');
+    target = SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
+    const others = SYMBOLS.filter(s=>s!==target);
+    for(let n=99;n>=0;n--){
+      const s = n%9===0 ? target : others[Math.floor(Math.random()*others.length)];
+      const d = document.createElement('div');
+      if(n%9===0) d.className='nine';
+      d.innerHTML = `<span>${n}</span><span>${s}</span>`;
+      grid.appendChild(d);
+    }
+    ball.classList.remove('on','done'); sym.textContent='';
+  }
+  build();
+  document.getElementById('cbRead').onclick = ()=>{
+    ball.classList.remove('done'); ball.classList.add('on');
+    sym.textContent = target;
+    const name=SYM_RU[SYMBOLS.indexOf(target)]; clearTimeout(sayT); sayT=setTimeout(()=>say('Я вижу... ваш символ - '+name+'!'),900);
+    clearTimeout(revealT); revealT = setTimeout(()=>{ ball.classList.remove('on'); ball.classList.add('done'); },1400);
+  };
+  document.getElementById('cbAgain').onclick = build;
+  document.getElementById('cbShow').onclick = ()=>{
+    grid.classList.add('reveal');
+    document.getElementById('c-cb').classList.remove('show-secret');
+  };
+})();
+
+/* ===== 6. Peter answers ===== */
+(function(){
+  const MASK = 'Питер, пожалуйста, ответь на следующий вопрос:';
+  const pet = document.getElementById('petition'), mask = document.getElementById('petMask');
+  const q = document.getElementById('question'), out = document.getElementById('answer');
+  // The real text lives in the input but is transparent; the overlay shows the polite phrase.
+  function update(){
+    mask.textContent = MASK.slice(0, pet.value.length);
+    mask.scrollLeft = mask.scrollWidth;
+  }
+  pet.addEventListener('input', update);
+  pet.addEventListener('focus', ()=>mask.classList.add('focus'));
+  pet.addEventListener('blur', ()=>mask.classList.remove('focus'));
+  function secret(){
+    const v = pet.value, a = v.indexOf('.');
+    if(a<0) return '';
+    const b = v.indexOf('.', a+1);
+    return (b<0 ? v.slice(a+1) : v.slice(a+1,b)).trim();
+  }
+  const EVASIVE = [
+    'Прошение составлено неверно. Питер не отвечает грубиянам.',
+    'Питер сейчас не в настроении. Попросите вежливее.',
+    'Питер не уверен, что вы достойны ответа.',
+    'Звёзды не сошлись. Повторите прошение.'
+  ];
+  let typing = null, pending = null;
+  function typeOut(text){
+    clearInterval(typing); out.textContent=''; let i=0;
+    typing = setInterval(()=>{ out.textContent += text[i++] || ''; if(i>=text.length) clearInterval(typing); },45);
+  }
+  document.getElementById('askPeter').onclick = ()=>{
+    if(pet.value.length < 5){ typeOut('Сначала напечатайте прошение.'); return; }
+    if(!q.value.trim()){ typeOut('А вопрос-то где?'); return; }
+    if(!q.value.trim().endsWith('?')){ typeOut('Вопрос должен заканчиваться знаком "?"'); return; }
+    clearInterval(typing); out.textContent='Питер думает...';
+    const s = secret();
+    clearTimeout(pending); pending = setTimeout(()=>{ const t = s ? 'Питер говорит: ' + s : EVASIVE[Math.floor(Math.random()*EVASIVE.length)]; typeOut(t); say(t); },1200);
+  };
+  document.getElementById('peterReset').onclick = ()=>{
+    pet.value=''; update(); q.value=''; clearInterval(typing); clearTimeout(pending); out.textContent='Питер ждёт вежливого прошения...';
+  };
+})();
+
+/* ===== 7. Cards ===== */
+(function(){
+  const table = document.getElementById('table'), msg = document.getElementById('cardsMsg');
+  const RANKS = ['K','Q','J'], SUITS = [['♠','blk'],['♣','blk'],['♥','red'],['♦','red']];
+  let all = [], busy = false;
+  RANKS.forEach(r=>SUITS.forEach(s=>all.push({r, s:s[0], c:s[1]})));
+  const shuffle = a=>{ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+  const face = c=>`<div class="f ${c.c}"><div class="c">${c.r}<br>${c.s}</div><div class="m">${c.s}</div><div class="c c2">${c.r}<br>${c.s}</div></div><div class="b"></div>`;
+  let first = [], second = [], gen = 0;
+  function deal(){
+    busy=false; gen++;
+    const s = shuffle(all); first = s.slice(0,6); second = s.slice(6,11);
+    table.innerHTML='';
+    first.forEach(c=>{ const d=document.createElement('div'); d.className='pcard'; d.innerHTML=face(c); table.appendChild(d); });
+    msg.textContent = 'Мысленно выберите одну карту. Не говорите!';
+  }
+  deal();
+  document.getElementById('cardsGo').onclick = ()=>{
+    if(busy) return; busy = true;
+    const my = gen, later = (f,ms)=>setTimeout(()=>{ if(my===gen) f(); }, ms);
+    const els = [...table.children];
+    msg.textContent = 'Сосредоточьтесь на своей карте...';
+    els.forEach(e=>e.classList.add('back'));
+    later(()=>{
+      msg.textContent = 'Читаю мысли...';
+      els.forEach((e,i)=>{ e.style.translate = `${(1-i%3)*76}px ${(i<3?1:-1)*52}px`; });
+    },800);
+    later(()=>{
+      els.forEach(e=>e.style.translate='0 0');
+      els[5].classList.add('gone');
+    },1700);
+    later(()=>{
+      els.forEach((e,i)=>{ if(i<5) e.innerHTML = face(second[i]); });
+      els.slice(0,5).forEach((e,i)=>later(()=>e.classList.remove('back'), i*120));
+      later(()=>{ els[5].remove(); msg.textContent='Я убрал вашу карту!'; say('Я убрал вашу карту!'); },900);
+    },2500);
+  };
+  document.getElementById('cardsAgain').onclick = deal;
+})();
+
+/* ===== 8. Shepard tone ===== */
+(function(){
+  const N = 9, BASE = 27.5, CENTER = Math.log2(440), SIGMA = 1.6, OCT_PER_SEC = 1/9;
+  let ctx=null, master=null, oscs=[], gains=[], playing=false, phase=0, dir=1, last=0, timer=null;
+  const canvas = document.getElementById('shCanvas'), g2 = canvas.getContext('2d'), arrow = document.getElementById('shArrow');
+  const playBtn = document.getElementById('shPlay'), dirBtn = document.getElementById('shDir');
+  const shVis = watchVisible(canvas);
+
+  const freqOf = i => BASE * Math.pow(2, ((i + phase) % N + N) % N);
+  const ampOf = f => Math.exp(-Math.pow(Math.log2(f)-CENTER,2)/(2*SIGMA*SIGMA));
+
+  function draw(){
+    if(canvas.clientWidth && canvas.width!==canvas.clientWidth){canvas.width=canvas.clientWidth;canvas.height=260;}
+    const W=canvas.width, H=canvas.height;
+    g2.clearRect(0,0,W,H);
+    // grid
+    g2.strokeStyle='#1d2133'; g2.lineWidth=1;
+    for(let k=0;k<=N;k++){ const x=30+k*(W-60)/N; g2.beginPath(); g2.moveTo(x,20); g2.lineTo(x,H-30); g2.stroke(); }
+    // envelope
+    g2.beginPath(); g2.strokeStyle='#ffc23b55'; g2.lineWidth=2;
+    for(let x=0;x<=W-60;x+=4){
+      const oct = x/(W-60)*N; const f = BASE*Math.pow(2,oct);
+      const y = H-30 - ampOf(f)*(H-60);
+      x===0 ? g2.moveTo(30+x,y) : g2.lineTo(30+x,y);
+    }
+    g2.stroke();
+    // bars
+    for(let i=0;i<N;i++){
+      const f=freqOf(i), oct=Math.log2(f/BASE), x=30+oct/N*(W-60), a=ampOf(f), h=a*(H-60);
+      const grd=g2.createLinearGradient(0,H-30-h,0,H-30); grd.addColorStop(0,'#ffc23b'); grd.addColorStop(1,'#ff3fd8');
+      g2.fillStyle=grd; g2.globalAlpha = playing ? 1 : .45;
+      g2.fillRect(x-5,H-30-h,10,h);
+      g2.globalAlpha=1;
+    }
+    g2.fillStyle='#8a90ad'; g2.font='12px monospace';
+    g2.fillText('низкие', 30, H-10); g2.fillText('высокие', W-90, H-10);
+    g2.fillText('громкость', 34, 16);
+  }
+
+  function tick(){
+    const now = performance.now(); const dt = (now-last)/1000; last = now;
+    phase += dir*OCT_PER_SEC*dt;
+    if(ctx){
+      const t = ctx.currentTime;
+      for(let i=0;i<N;i++){
+        const f=freqOf(i), prev=oscs[i].frequency.value;
+        if(Math.abs(Math.log2(f/prev))>1) oscs[i].frequency.setValueAtTime(f,t);
+        else oscs[i].frequency.linearRampToValueAtTime(f,t+0.05);
+        gains[i].gain.linearRampToValueAtTime(ampOf(f)*0.25,t+0.05);
+      }
+    }
+    if(shVis()){ arrow.style.transform = `translateY(${dir>0?-1:1}px) scale(${1+0.08*Math.sin(now/200)})`; draw(); }
+  }
+
+  function start(){
+    if(!ctx){
+      ctx = new (window.AudioContext||window.webkitAudioContext)();
+      master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
+      for(let i=0;i<N;i++){
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.type='sine'; o.frequency.value=freqOf(i); g.gain.value=0;
+        o.connect(g); g.connect(master); o.start();
+        oscs.push(o); gains.push(g);
+      }
+    }
+    ctx.resume();
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.linearRampToValueAtTime(0.35, ctx.currentTime+0.4);
+    playing = true; last = performance.now();
+    timer = setInterval(tick, 40);
+    playBtn.textContent='■ Stop';
+  }
+  function stop(){
+    if(ctx){ master.gain.cancelScheduledValues(ctx.currentTime); master.gain.linearRampToValueAtTime(0, ctx.currentTime+0.3); }
+    playing=false; clearInterval(timer); playBtn.textContent='▶ Play'; draw();
+    if(ctx) setTimeout(()=>{ if(!playing) ctx.suspend(); },400);
+  }
+  playBtn.onclick = ()=>{ try{ playing ? stop() : start(); }catch(e){ playBtn.textContent='Звук недоступен'; } };
+  dirBtn.onclick = ()=>{
+    dir = -dir;
+    dirBtn.textContent = 'Направление: ' + (dir>0 ? 'вверх' : 'вниз');
+    arrow.textContent = dir>0 ? '▲' : '▼';
+  };
+  draw(); window.addEventListener('resize',draw);
+})();
+/* ===== 9. Afterimage ===== */
+(function(){
+  const cv = document.getElementById('afCanvas'), ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  const off = document.createElement('canvas'); off.width=W; off.height=H; const c = off.getContext('2d');
+  // colourful scene
+  let g = c.createLinearGradient(0,0,0,H*0.6); g.addColorStop(0,'#0a5cff'); g.addColorStop(1,'#6ec8ff');
+  c.fillStyle=g; c.fillRect(0,0,W,H);
+  c.fillStyle='#ffd000'; c.beginPath(); c.arc(300,52,30,0,7); c.fill();
+  c.fillStyle='#0e8a2a'; c.beginPath(); c.moveTo(0,150); c.quadraticCurveTo(110,95,220,140); c.quadraticCurveTo(300,120,360,135); c.lineTo(360,240); c.lineTo(0,240); c.fill();
+  c.fillStyle='#24c43a'; c.beginPath(); c.moveTo(0,185); c.quadraticCurveTo(180,150,360,180); c.lineTo(360,240); c.lineTo(0,240); c.fill();
+  c.fillStyle='#1450e6'; c.beginPath(); c.ellipse(270,205,70,18,0,0,7); c.fill();
+  c.fillStyle='#e8141c'; c.fillRect(60,120,80,60);
+  c.fillStyle='#ff8a00'; c.beginPath(); c.moveTo(50,122); c.lineTo(100,82); c.lineTo(150,122); c.fill();
+  c.fillStyle='#ffe14a'; c.fillRect(72,135,18,16); c.fillRect(110,135,18,16);
+  c.fillStyle='#5a2a0c'; c.fillRect(91,152,16,28);
+  c.fillStyle='#7a4a1a'; c.fillRect(194,120,10,50);
+  c.fillStyle='#10b020'; c.beginPath(); c.arc(199,105,28,0,7); c.fill();
+  c.fillStyle='#ff2fd0'; [[30,205],[48,215],[160,210],[175,200],[330,170],[20,190]].forEach(p=>{c.beginPath();c.arc(p[0],p[1],5,0,7);c.fill();});
+  const orig = c.getImageData(0,0,W,H), neg = new ImageData(W,H), gray = new ImageData(W,H);
+  for(let i=0;i<orig.data.length;i+=4){
+    const r=orig.data[i], gg=orig.data[i+1], b=orig.data[i+2], L=0.299*r+0.587*gg+0.114*b;
+    neg.data[i]=255-r; neg.data[i+1]=255-gg; neg.data[i+2]=255-b; neg.data[i+3]=255;
+    gray.data[i]=gray.data[i+1]=gray.data[i+2]=L; gray.data[i+3]=255;
+  }
+  ctx.putImageData(neg,0,0);
+  const msg = document.getElementById('afMsg'); let t=null;
+  document.getElementById('afStart').onclick = ()=>{
+    clearInterval(t); ctx.putImageData(neg,0,0);
+    let left = 20; msg.style.color='#fff'; msg.textContent = 'Смотрите на точку, не моргая: ' + left;
+    t = setInterval(()=>{
+      left--;
+      if(left>0){ msg.textContent = 'Смотрите на точку, не моргая: ' + left; return; }
+      clearInterval(t); ctx.putImageData(gray,0,0);
+      msg.style.color='#b6ff3b'; msg.textContent = 'Не отводите взгляд! Какого цвета картинка?';
+    },1000);
+  };
+  document.getElementById('afOrig').onclick = ()=>{
+    clearInterval(t); ctx.putImageData(orig,0,0); msg.style.color='#fff'; msg.textContent='Оригинал. Похоже на то, что вы видели?';
+  };
+})();
+
+/* ===== 10. Motion-induced blindness ===== */
+(function(){
+  const cv = document.getElementById('mibCanvas'), ctx = cv.getContext('2d'), W=cv.width, H=cv.height; hiDPI(cv);
+  let ang = 0, last = performance.now(), running = true;
+  const dots = [[-75,-55],[80,-45],[5,85]];
+  const vis = watchVisible(cv);
+  function frame(now){
+    const dt = (now-last)/1000; last = now;
+    if(!vis()){ requestAnimationFrame(frame); return; }
+    if(running) ang += dt*1.6;
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+    ctx.save(); ctx.translate(W/2,H/2); ctx.rotate(ang);
+    ctx.strokeStyle='#2f5cff'; ctx.lineWidth=3;
+    for(let x=-210;x<=210;x+=30) for(let y=-210;y<=210;y+=30){
+      ctx.beginPath(); ctx.moveTo(x-6,y); ctx.lineTo(x+6,y); ctx.moveTo(x,y-6); ctx.lineTo(x,y+6); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle='#ffe100';
+    dots.forEach(d=>{ ctx.beginPath(); ctx.arc(W/2+d[0],H/2+d[1],6,0,7); ctx.fill(); });
+    if(Math.floor(now/400)%2===0){ ctx.fillStyle='#22ff55'; ctx.beginPath(); ctx.arc(W/2,H/2,5,0,7); ctx.fill(); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  const b = document.getElementById('mibPause');
+  b.onclick = ()=>{ running=!running; b.textContent = running ? 'Остановить синие кресты' : 'Запустить синие кресты'; };
+})();
+
+/* ===== 11. Checker shadow ===== */
+(function(){
+  const cv = document.getElementById('adCanvas'), ctx = cv.getContext('2d'), W=cv.width, H=cv.height;
+  const n=6, sq=34, ox=(W-n*sq)/2, oy=(H-n*sq)/2-14;
+  const A={r:1,c:2}, B={r:3,c:3}, SAME=120, LIGHT=212, DARK=SAME;
+  const bx = ox+(B.c+.5)*sq, by = oy+(B.r+.5)*sq;
+  const img = ctx.createImageData(W,H);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const i=(y*W+x)*4; let v=27, gch=29, bl=38;
+    const c=Math.floor((x-ox)/sq), r=Math.floor((y-oy)/sq);
+    if(c>=0&&c<n&&r>=0&&r<n){
+      const base = (r+c)%2===0 ? LIGHT : DARK;
+      const d = Math.hypot(x-bx,y-by)/sq;
+      const s = 1 - (1-SAME/LIGHT)*Math.exp(-(d/1.35)*(d/1.35));
+      v = gch = bl = base*s;
+      if((r===A.r&&c===A.c)||(r===B.r&&c===B.c)) v=gch=bl=SAME;
+    }
+    img.data[i]=v; img.data[i+1]=gch; img.data[i+2]=bl; img.data[i+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+  // green ball casting the shadow
+  const cx = bx+sq*1.05, cy = by-sq*1.15, R = sq*0.8;
+  const gr = ctx.createRadialGradient(cx-R*.35,cy-R*.4,R*.1,cx,cy,R);
+  gr.addColorStop(0,'#b8ff9a'); gr.addColorStop(.5,'#2fa83a'); gr.addColorStop(1,'#0b4a14');
+  ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
+  const base = ctx.getImageData(0,0,W,H);
+  const center = p=>[ox+(p.c+.5)*sq, oy+(p.r+.5)*sq];
+  let bar=false, masked=false;
+  function draw(){
+    ctx.putImageData(base,0,0);
+    if(masked){
+      ctx.fillStyle='#2a2a2a'; ctx.beginPath(); ctx.rect(0,0,W,H);
+      [A,B].forEach(p=>ctx.rect(ox+(p.c+1)*sq, oy+p.r*sq, -sq, sq));
+      ctx.fill('evenodd');
+    }
+    if(bar){
+      const [ax,ay]=center(A), [bx2,by2]=center(B);
+      ctx.strokeStyle=`rgb(${SAME},${SAME},${SAME})`; ctx.lineWidth=12; ctx.lineCap='butt';
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(ax,by2); ctx.lineTo(bx2,by2); ctx.stroke();
+    }
+    ctx.font='bold 15px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    [[A,'A'],[B,'B']].forEach(([p,l])=>{ const [x,y]=center(p); ctx.fillStyle='#fff'; ctx.fillText(l,x-10,y-10); });
+  }
+  draw();
+  const read = document.getElementById('adRead');
+  cv.addEventListener('click', e=>{
+    const rc = cv.getBoundingClientRect();
+    const x = Math.floor((e.clientX-rc.left)*W/rc.width), y = Math.floor((e.clientY-rc.top)*H/rc.height);
+    const i=(y*W+x)*4, d=base.data, col=`rgb(${d[i]}, ${d[i+1]}, ${d[i+2]})`;
+    const c=Math.floor((x-ox)/sq), r=Math.floor((y-oy)/sq);
+    let name = 'Этот пиксель';
+    if(r===A.r&&c===A.c) name='Клетка A'; else if(r===B.r&&c===B.c) name='Клетка B';
+    read.innerHTML = `${name}: ${col}<span class="swatch" style="background:${col}"></span>`;
+  });
+  const bb=document.getElementById('adBar'), mb=document.getElementById('adMask');
+  bb.onclick=()=>{ bar=!bar; bb.textContent = bar?'Убрать полосу':'Соединить полосой'; draw(); };
+  mb.onclick=()=>{ masked=!masked; mb.textContent = masked?'Вернуть доску':'Закрыть остальное'; draw(); };
+})();
+
+/* ===== 12. Peripheral drift ===== */
+(function(){
+  const cv = document.getElementById('drCanvas'), ctx = cv.getContext('2d'); const DW=cv.width, DH=cv.height; hiDPI(cv);
+  let colorful = true;
+  function draw(){
+    ctx.clearRect(0,0,DW,DH);
+    const COLS = colorful ? ['#000','#1d3fd0','#fff','#f2d400'] : ['#000','#555','#fff','#aaa'];
+    const SIZES = [.38,.12,.38,.12];
+    let k=0;
+    for(let j=0;j<2;j++) for(let i=0;i<3;i++){
+      const cx=58+i*112, cy=62+j*116, dirDisk = (i+j)%2 ? 1 : -1;
+      ctx.fillStyle = colorful ? '#8a9a52' : '#777';
+      ctx.beginPath(); ctx.arc(cx,cy,54,0,7); ctx.fill();
+      for(let ring=0, r=8; r<54; ring++, r+=9.2){
+        const segs = Math.max(6, Math.round(2*Math.PI*r/11));
+        const dir = dirDisk * (ring%2 ? 1 : -1);
+        const step = 2*Math.PI/segs, rot = ring*0.35+k;
+        for(let s=0;s<segs;s++){
+          let a = rot + s*step;
+          for(let q=0;q<4;q++){
+            const idx = dir>0 ? q : 3-q;
+            const a2 = a + SIZES[idx]*step;
+            ctx.fillStyle = COLS[idx];
+            ctx.beginPath(); ctx.arc(cx,cy,r+8,a,a2); ctx.arc(cx,cy,r,a2,a,true); ctx.fill();
+            a = a2;
+          }
+        }
+      }
+      k += 0.7;
+    }
+  }
+  draw();
+  const b=document.getElementById('drColor');
+  b.onclick=()=>{ colorful=!colorful; b.textContent = colorful?'Сделать серым':'Вернуть цвет'; draw(); };
+})();
+
+/* ===== 13. 21 cards ===== */
+(function(){
+  const box=document.getElementById('t21'), msg=document.getElementById('msg21'), rev=document.getElementById('rev21'), big=document.getElementById('big21');
+  const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'], SUITS=[['♠','blk'],['♣','blk'],['♥','red'],['♦','red']];
+  let deck=[], round=0, busy=false, gen=0;
+  const MSG=['Запомните одну карту и нажмите на её столбец','Я разложил заново. В каком столбце ваша карта?','Последний раз: в каком она столбце?'];
+  function newDeck(){
+    const all=[]; RANKS.forEach(r=>SUITS.forEach(s=>all.push({r,s:s[0],c:s[1]})));
+    for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
+    deck=all.slice(0,21); round=0; busy=false; gen++; rev.classList.remove('on'); render();
+  }
+  function render(){
+    box.innerHTML=''; box.classList.remove('collect');
+    for(let k=0;k<3;k++){
+      const col=document.createElement('div'); col.className='col21'; col.dataset.k=k;
+      for(let j=0;j<7;j++){
+        const c=deck[j*3+k], m=document.createElement('div');
+        m.className='mini '+c.c; m.style.top=(j*26)+'px'; m.innerHTML=`${c.r}${c.s}`;
+        col.appendChild(m);
+      }
+      col.onclick=()=>pick(k);
+      box.appendChild(col);
+    }
+    msg.textContent = MSG[round] || '';
+  }
+  function pick(k){
+    if(busy||round>=3) return; busy=true;
+    const cols=[0,1,2].map(i=>[0,1,2,3,4,5,6].map(j=>deck[j*3+i]));
+    const others=[0,1,2].filter(i=>i!==k);
+    deck=[...cols[others[0]],...cols[k],...cols[others[1]]];
+    round++;
+    box.classList.add('collect'); msg.textContent='Собираю...';
+    const my=gen;
+    setTimeout(()=>{ if(my!==gen) return;
+      if(round<3){ render(); busy=false; return; }
+      msg.textContent='Читаю мысли...';
+      setTimeout(()=>{ if(my!==gen) return;
+        const c=deck[10]; say('Ваша карта - '+RANK_RU[c.r]+' '+SUIT_RU[c.s]+'!');
+        big.innerHTML=`<span style="color:${c.c==='red'?'#d0112b':'#111'}">${c.r}${c.s}</span>`;
+        rev.classList.add('on'); msg.textContent='';
+      },700);
+    },550);
+  }
+  document.getElementById('again21').onclick=newDeck;
+  newDeck();
+})();
+
+/* ===== 14. Binary mind reader ===== */
+(function(){
+  const title=document.getElementById('binTitle'), grid=document.getElementById('binGrid'), ball=document.getElementById('binBall'), sym=document.getElementById('binSym');
+  const bStart=document.getElementById('binStart'), bYes=document.getElementById('binYes'), bNo=document.getElementById('binNo');
+  const COLORS=['#2ff3ff','#ff3fd8','#b6ff3b','#ffc23b','#9b6bff','#ff6b6b'];
+  let order=[], step=0, sum=0, busy=false, gen=0;
+  function show(){
+    const bit=order[step], nums=[];
+    for(let n=1;n<64;n++) if(n & (1<<bit)) nums.push(n);
+    nums.sort(()=>Math.random()-.5);
+    grid.style.color=COLORS[step];
+    grid.innerHTML=nums.map(n=>`<div>${n}</div>`).join('');
+    title.textContent=`Карточка ${step+1} из 6. Есть на ней ваше число?`;
+  }
+  function answer(yes){
+    if(busy || step>=6) return; busy=true;
+    if(yes) sum += 1<<order[step];
+    step++;
+    const my=gen;
+    if(step<6){ grid.style.opacity=0; setTimeout(()=>{ if(my!==gen) return; show(); grid.style.opacity=1; busy=false; },300); return; }
+    grid.classList.add('hidden'); bYes.classList.add('hidden'); bNo.classList.add('hidden'); bStart.classList.remove('hidden');
+    bStart.textContent='Ещё раз';
+    ball.classList.remove('hidden','done'); ball.classList.add('on');
+    sym.textContent = sum===0 ? '?' : sum;
+    title.textContent='Вглядываюсь в хрустальный шар...';
+    setTimeout(()=>{ if(my!==gen) return; ball.classList.remove('on'); ball.classList.add('done');
+      title.textContent = sum===0 ? 'Хм, вашего числа не было ни на одной карточке. Точно от 1 до 63?' : 'Вы загадали число...'; say(sum===0 ? 'Хм, вашего числа не было ни на одной карточке.' : 'Вы загадали число '+sum+'!'); },1400);
+  }
+  bStart.onclick=()=>{
+    gen++; busy=false;
+    order=[0,1,2,3,4,5].sort(()=>Math.random()-.5); step=0; sum=0;
+    ball.classList.add('hidden'); ball.classList.remove('done'); grid.classList.remove('hidden'); grid.style.opacity=1;
+    bStart.classList.add('hidden'); bYes.classList.remove('hidden'); bNo.classList.remove('hidden');
+    show();
+  };
+  bYes.onclick=()=>answer(true); bNo.onclick=()=>answer(false);
+})();
+
+
+/* ===== 15. Penrose triangle (real 3D) ===== */
+(function(){
+  const cv=document.getElementById('penCanvas'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height; hiDPI(cv);
+  const N=6, S=30, cubes=[];
+  for(let i=0;i<N;i++) cubes.push({p:[i,0,0],last:i<=1});
+  for(let j=1;j<N;j++) cubes.push({p:[N-1,j,0],first:false});
+  for(let k=1;k<N;k++) cubes.push({p:[N-1,N-1,k]});
+  const occ=new Set(cubes.map(c=>c.p.join(',')));
+  const E=Math.atan(1/Math.SQRT2);
+  const range=document.getElementById('penRange'), msg=document.getElementById('penMsg');
+  let off=0;
+  function draw(){
+    const a=Math.PI/4+off*Math.PI/180;
+    const d=[Math.cos(a)*Math.cos(E),Math.sin(a)*Math.cos(E),Math.sin(E)];
+    const r=[-Math.sin(a),Math.cos(a),0];
+    const u=[-Math.cos(a)*Math.sin(E),-Math.sin(a)*Math.sin(E),Math.cos(E)];
+    const c0=[0,1,2].map(k=>cubes.reduce((a,c)=>a+c.p[k],0)/cubes.length);
+    const proj=p=>{const q=[p[0]-c0[0],p[1]-c0[1],p[2]-c0[2]];
+      return [W/2+S*(q[0]*r[0]+q[1]*r[1]+q[2]*r[2]), H/2+16-S*(q[0]*u[0]+q[1]*u[1]+q[2]*u[2])];};
+    const dep=p=>p[0]*d[0]+p[1]*d[1]+p[2]*d[2];
+    const list=cubes.map(c=>({c,z:dep(c.p)+((c.last&&Math.abs(off)<2)?1e6:0)})).sort((x,y)=>x.z-y.z);
+    ctx.clearRect(0,0,W,H);
+    // faces: [axis, sign, colour]
+    const faces=[[2,1,'#ff5fe0'],[0,Math.sign(d[0])||1,'#2ff3ff'],[1,Math.sign(d[1])||1,'#7b4bff']];
+    list.forEach(({c})=>{
+      const [x,y,z]=c.p;
+      faces.forEach(([ax,sg,col])=>{
+        if(d[ax]*sg<=0) return;
+        const nb=c.p.slice(); nb[ax]+=sg; if(occ.has(nb.join(','))) return;
+        const o=[x-.5,y-.5,z-.5]; o[ax]+= sg>0?1:0;
+        const a1=(ax+1)%3, a2=(ax+2)%3, pts=[];
+        [[0,0],[1,0],[1,1],[0,1]].forEach(([s,t])=>{const p=o.slice(); p[a1]+=s; p[a2]+=t; pts.push(proj(p));});
+        ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.closePath();
+        const shade = ax===2 ? 1 : (ax===0 ? .55+.35*Math.abs(d[0]) : .35+.35*Math.abs(d[1]));
+        ctx.fillStyle=col; ctx.globalAlpha=1; ctx.fill();
+        ctx.fillStyle='#000'; ctx.globalAlpha=1-shade; ctx.fill(); ctx.globalAlpha=1;
+      });
+    });
+    msg.textContent = Math.abs(off)<2 ? 'Такую фигуру невозможно построить. Или возможно?' : 'Концы вовсе не соединены!';
+  }
+  draw();
+  let anim=null;
+  range.oninput=()=>{cancelAnimationFrame(anim); off=+range.value; draw();};
+  document.getElementById('penSpin').onclick=()=>{
+    cancelAnimationFrame(anim); const t0=performance.now();
+    const step=now=>{ const t=(now-t0)/4000; if(t>=1){off=0; range.value=0; draw(); return;}
+      off=Math.sin(t*Math.PI*2)*40*Math.sin(t*Math.PI); range.value=off; draw(); anim=requestAnimationFrame(step); };
+    anim=requestAnimationFrame(step);
+  };
+})();
+
+/* ===== 16. Hypno spiral ===== */
+(function(){
+  const cv=document.getElementById('spCanvas'), ctx=cv.getContext('2d'), W=cv.width;
+  const off=document.createElement('canvas'); off.width=off.height=W;
+  const oc=off.getContext('2d'), img=oc.createImageData(W,W);
+  for(let y=0;y<W;y++) for(let x=0;x<W;x++){
+    const dx=x-W/2, dy=y-W/2, r=Math.hypot(dx,dy), th=Math.atan2(dy,dx), i=(y*W+x)*4;
+    const v = r>W/2-2 ? 0 : (Math.sin(3*th + r*0.11) > 0 ? 255 : 0);
+    img.data[i]=img.data[i+1]=img.data[i+2]=v; img.data[i+3]=255;
+  }
+  oc.putImageData(img,0,0);
+  let ang=0, dir=1, running=false, last=0, timer=null;
+  const msg=document.getElementById('spMsg');
+  function draw(){ ctx.save(); ctx.translate(W/2,W/2); ctx.rotate(ang); ctx.drawImage(off,-W/2,-W/2); ctx.restore();
+    ctx.fillStyle='#ff3b3b'; ctx.beginPath(); ctx.arc(W/2,W/2,4,0,7); ctx.fill(); }
+  function loop(now){ if(!running) return; ang+=dir*(now-last)/1000*2.2; last=now; draw(); requestAnimationFrame(loop); }
+  draw();
+  document.getElementById('spStart').onclick=()=>{
+    clearInterval(timer); running=true; last=performance.now(); requestAnimationFrame(loop);
+    let left=30; msg.style.color='#fff'; msg.textContent='Смотрите в центр: '+left;
+    timer=setInterval(()=>{ left--; if(left>0){msg.textContent='Смотрите в центр: '+left; return;}
+      clearInterval(timer); running=false; msg.style.color='#b6ff3b'; msg.textContent='Быстро! Посмотрите на ладонь!'; },1000);
+  };
+  document.getElementById('spDir').onclick=()=>{dir=-dir;};
+})();
+
+/* ===== 17. Stepping feet ===== */
+(function(){
+  const cv=document.getElementById('feetCanvas'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height; hiDPI(cv);
+  let stripes=true, x=-60, last=performance.now();
+  const vis = watchVisible(cv);
+  function frame(now){
+    x+=(now-last)/1000*38; last=now; if(x>W+10) x=-70;
+    if(!vis()){ requestAnimationFrame(frame); return; }
+    if(stripes){ for(let i=0;i<W;i+=12){ ctx.fillStyle=(i/12)%2?'#fff':'#000'; ctx.fillRect(i,0,12,H);} }
+    else { ctx.fillStyle='#808080'; ctx.fillRect(0,0,W,H); }
+    ctx.fillStyle='#ffe600'; ctx.fillRect(x,70,60,20);
+    ctx.fillStyle='#142a7a'; ctx.fillRect(x,130,60,20);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  const b=document.getElementById('feetToggle');
+  b.onclick=()=>{stripes=!stripes; b.textContent=stripes?'Убрать полоски':'Вернуть полоски';};
+})();
+
+/* ===== 18. Pinna-Brelstaff ===== */
+(function(){
+  const cv=document.getElementById('pinCanvas'), ctx=cv.getContext('2d'), W=cv.width; hiDPI(cv);
+  let zoom=false, t0=0;
+  function ring(R,n,tilt,sc){
+    const s=12*sc;
+    for(let i=0;i<n;i++){
+      const th=i/n*Math.PI*2;
+      ctx.save(); ctx.translate(W/2+Math.cos(th)*R*sc, W/2+Math.sin(th)*R*sc); ctx.rotate(th+tilt);
+      ctx.lineWidth=2.2*sc;
+      ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(-s/2,s/2); ctx.lineTo(-s/2,-s/2); ctx.lineTo(s/2,-s/2); ctx.stroke();
+      ctx.strokeStyle='#000'; ctx.beginPath(); ctx.moveTo(s/2,-s/2); ctx.lineTo(s/2,s/2); ctx.lineTo(-s/2,s/2); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  function draw(sc){
+    ctx.fillStyle='#8f8f8f'; ctx.fillRect(0,0,W,W);
+    ring(104,30,Math.PI/4,sc); ring(70,20,-Math.PI/4,sc);
+    ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(W/2,W/2,3.5,0,7); ctx.fill();
+  }
+  function loop(now){ if(!zoom){draw(1);return;} const t=(now-t0)/1000; draw(1+0.16*Math.sin(t*2.4)); requestAnimationFrame(loop); }
+  draw(1);
+  const b=document.getElementById('pinZoom');
+  b.onclick=()=>{ zoom=!zoom; b.textContent=zoom?'Остановить':'Приближать'; if(zoom){t0=performance.now(); requestAnimationFrame(loop);} else draw(1); };
+})();
+
+/* ===== 19. Tritone paradox ===== */
+(function(){
+  let ctx=null, pc=Math.floor(Math.random()*12), up=0, down=0;
+  const out=document.getElementById('triOut');
+  function tone(pitchClass, start, dur){
+    const master=ctx.createGain(); master.connect(ctx.destination);
+    master.gain.setValueAtTime(0,start); master.gain.linearRampToValueAtTime(0.25,start+0.03);
+    master.gain.setValueAtTime(0.25,start+dur-0.06); master.gain.linearRampToValueAtTime(0,start+dur);
+    for(let o=0;o<9;o++){
+      const f=27.5*Math.pow(2,o+pitchClass/12);
+      const a=Math.exp(-Math.pow(Math.log2(f)-Math.log2(330),2)/(2*1.3*1.3));
+      const os=ctx.createOscillator(), g=ctx.createGain();
+      os.frequency.value=f; g.gain.value=a*0.3; os.connect(g); g.connect(master);
+      os.start(start); os.stop(start+dur+0.05);
+    }
+  }
+  document.getElementById('triPlay').onclick=()=>{
+    try{ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); ctx.resume(); }catch(e){ out.textContent='Звук не включился в этом браузере.'; return; }
+    const t=ctx.currentTime+0.05; tone(pc,t,0.6); tone((pc+6)%12,t+0.75,0.6);
+  };
+  const show=()=>{ out.textContent=`Ответы: выше - ${up}, ниже - ${down}. `+(up&&down?'Вот и спор! Правы все.':'Спросите следующего!'); };
+  document.getElementById('triUp').onclick=()=>{up++; show();};
+  document.getElementById('triDown').onclick=()=>{down++; show();};
+  document.getElementById('triNew').onclick=()=>{ pc=Math.floor(Math.random()*12); up=down=0; out.textContent='Новая пара нот готова. Отвечайте заново!'; };
+})();
+
+/* ===== 20. Stroop ===== */
+(function(){
+  const C=[['КРАСНЫЙ','#ff3b3b'],['СИНИЙ','#3b7bff'],['ЗЕЛЁНЫЙ','#2fd34a'],['ЖЁЛТЫЙ','#ffd21f'],['ФИОЛЕТОВЫЙ','#b05bff']];
+  const word=document.getElementById('stWord'), btns=document.getElementById('stBtns'), out=document.getElementById('stOut');
+  let mode='', n=0, errors=0, t0=0, ink=0, results={};
+  C.forEach((c,i)=>{ const b=document.createElement('button'); b.className='btn'; b.style.cssText=`background:${c[1]};border-color:${c[1]};width:52px;height:42px;box-shadow:0 0 12px ${c[1]}88`;
+    b.onclick=()=>answer(i); btns.appendChild(b); });
+  function next(){
+    ink=Math.floor(Math.random()*C.length);
+    if(mode==='warm'){ word.textContent='■■■■'; }
+    else { let w; do{ w=Math.floor(Math.random()*C.length);}while(w===ink); word.textContent=C[w][0]; }
+    word.style.color=C[ink][1];
+  }
+  function start(m){ if(m==='warm') delete results.trap; mode=m; n=0; errors=0; t0=performance.now(); out.textContent=(m==='warm'?'Разминка':'Ловушка')+': жмите цвет букв!'; next(); }
+  function answer(i){
+    if(!mode) return;
+    if(i!==ink){ errors++; word.animate([{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'none'}],{duration:200}); return; }
+    n++;
+    if(n<10){ next(); return; }
+    const t=((performance.now()-t0)/1000).toFixed(1); results[mode]=t;
+    word.textContent='ГОТОВО'; word.style.color='#fff';
+    let s=(mode==='warm'?'Разминка':'Ловушка')+`: ${t} с, ошибок: ${errors}.`;
+    if(results.warm&&results.trap){ const d=results.trap-results.warm;
+      s+= d>0.05 ? ` Ловушка медленнее разминки на ${d.toFixed(1)} с!` : ' Ого, ловушка вас не замедлила - редкий талант!'; }
+    else if(mode==='warm') s+=' Теперь попробуйте ловушку.';
+    out.textContent=s; mode='';
+  }
+  document.getElementById('stWarm').onclick=()=>start('warm');
+  document.getElementById('stTrap').onclick=()=>start('trap');
+})();
+
+
+/* ===== 21. 3D sound ===== */
+(function(){
+  const cv=document.getElementById('d3Canvas'), g=cv.getContext('2d'), W=cv.width, H=cv.height; hiDPI(cv);
+  const msg=document.getElementById('d3Msg'), playBtn=document.getElementById('d3Play'), srcBtn=document.getElementById('d3Src');
+  const modeBtns=[...document.querySelectorAll('#c-3d [data-mode]')];
+  let ctx=null, panner=null, flyGain=null, clickGain=null, master=null, playing=false, mode='circle', src='fly', t0=0, raf=0;
+  const pos={x:0,y:0,z:-1.6}, trail=[];
+  const NAMES={circle:'Вокруг головы',vertical:'Через макушку: спереди - сверху - сзади',ear:'Подлетает к правому уху',fly:'Живая муха'};
+  function build(){
+    ctx=new (window.AudioContext||window.webkitAudioContext)();
+    master=ctx.createGain(); master.gain.value=0; master.connect(ctx.destination);
+    try{ panner=new PannerNode(ctx,{panningModel:'HRTF',distanceModel:'inverse',refDistance:0.6,rolloffFactor:1}); }
+    catch(e){ panner=ctx.createPanner(); panner.panningModel='HRTF'; panner.distanceModel='inverse'; panner.refDistance=0.6; }
+    panner.connect(master);
+    // fly: buzzing saw with wing-beat wobble
+    const osc=ctx.createOscillator(); osc.type='sawtooth'; osc.frequency.value=185;
+    const lfo=ctx.createOscillator(); lfo.frequency.value=23; const lfoG=ctx.createGain(); lfoG.gain.value=18; lfo.connect(lfoG); lfoG.connect(osc.frequency);
+    const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1100; bp.Q.value=0.7;
+    flyGain=ctx.createGain(); flyGain.gain.value = src==='fly' ? 0.5 : 0;
+    osc.connect(bp); bp.connect(flyGain); flyGain.connect(panner); osc.start(); lfo.start();
+    // clicks: short noise bursts, very easy to localise
+    const len=Math.floor(ctx.sampleRate*0.22), buf=ctx.createBuffer(1,len,ctx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++){ const k=i/ctx.sampleRate; d[i]= k<0.012 ? (Math.random()*2-1)*Math.exp(-k*300) : 0; }
+    const bs=ctx.createBufferSource(); bs.buffer=buf; bs.loop=true;
+    clickGain=ctx.createGain(); clickGain.gain.value = src==='click' ? 0.9 : 0; bs.connect(clickGain); clickGain.connect(panner); bs.start();
+  }
+  function setPos(x,y,z){
+    pos.x=x; pos.y=y; pos.z=z;
+    if(!panner) return;
+    if(panner.positionX){ const t=ctx.currentTime; panner.positionX.setTargetAtTime(x,t,0.02); panner.positionY.setTargetAtTime(y,t,0.02); panner.positionZ.setTargetAtTime(z,t,0.02); }
+    else panner.setPosition(x,y,z);
+  }
+  function path(t){
+    if(mode==='circle'){ const a=t*1.1; return [1.6*Math.sin(a),0,-1.6*Math.cos(a)]; }
+    if(mode==='vertical'){ const a=t*0.9; return [0,1.6*Math.sin(a),-1.6*Math.cos(a)]; }
+    if(mode==='ear'){ const r=0.22+2.6*(0.5+0.5*Math.cos(t*0.8)); return [r,0,0]; }
+    return [1.4*Math.sin(t*0.9)+0.6*Math.sin(t*2.3), 0.7*Math.sin(t*1.3), 1.3*Math.cos(t*0.7)+0.5*Math.sin(t*1.9)];
+  }
+  function draw(){
+    g.clearRect(0,0,W,H);
+    const cx=W/2, cy=H/2+8, S=52;
+    g.strokeStyle='#1f2436'; g.lineWidth=1;
+    [1,2].forEach(k=>{ g.beginPath(); g.arc(cx,cy,S*0.8*k,0,7); g.stroke(); });
+    g.fillStyle='#8a90ad'; g.font='12px monospace'; g.textAlign='left';
+    g.fillText('вид сверху', 10, 18); g.fillText('впереди', cx-26, 22); g.fillText('сзади', cx-20, H-6);
+    // head
+    g.fillStyle='#2a3150'; g.beginPath(); g.arc(cx,cy,22,0,7); g.fill();
+    g.beginPath(); g.moveTo(cx-6,cy-20); g.lineTo(cx,cy-30); g.lineTo(cx+6,cy-20); g.fill();
+    g.fillStyle='#3a4370'; g.beginPath(); g.ellipse(cx-23,cy,4,8,0,0,7); g.ellipse(cx+23,cy,4,8,0,0,7); g.fill();
+    // trail and source
+    trail.forEach((p,i)=>{ g.fillStyle=`rgba(255,194,59,${i/trail.length*0.5})`; g.beginPath(); g.arc(cx+p[0]*S,cy+p[2]*S,3,0,7); g.fill(); });
+    const r=7+pos.y*3;
+    g.fillStyle='#ffc23b'; g.shadowColor='#ffc23b'; g.shadowBlur=16;
+    g.beginPath(); g.arc(cx+pos.x*S,cy+pos.z*S,Math.max(3,r),0,7); g.fill(); g.shadowBlur=0;
+  }
+  function loop(now){
+    if(!playing) return;
+    const t=(now-t0)/1000, p=path(t); setPos(p[0],p[1],p[2]);
+    trail.push(p); if(trail.length>40) trail.shift();
+    draw(); raf=requestAnimationFrame(loop);
+  }
+  function setMode(m){
+    mode=m; t0=performance.now(); trail.length=0;
+    modeBtns.forEach(b=>b.classList.toggle('lime',b.dataset.mode===m));
+    if(playing) msg.textContent=NAMES[m];
+  }
+  modeBtns.forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+  setMode('circle'); draw();
+  playBtn.onclick=()=>{
+    try{
+      if(!ctx) build();
+      if(!playing){
+        ctx.resume(); master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setTargetAtTime(0.6,ctx.currentTime,0.1);
+        playing=true; t0=performance.now(); playBtn.textContent='■ Выключить'; msg.textContent=NAMES[mode]; raf=requestAnimationFrame(loop);
+      } else {
+        master.gain.setTargetAtTime(0,ctx.currentTime,0.05); playing=false; cancelAnimationFrame(raf);
+        playBtn.textContent='▶ Включить'; msg.textContent='Наденьте наушники и закройте глаза';
+        setTimeout(()=>{ if(!playing) ctx.suspend(); },300);
+      }
+    }catch(e){ msg.textContent='Объёмный звук не поддерживается этим браузером'; }
+  };
+  srcBtn.onclick=()=>{
+    src = src==='fly' ? 'click' : 'fly';
+    srcBtn.textContent = src==='fly' ? 'Звук: муха' : 'Звук: щелчки';
+    if(ctx){ flyGain.gain.setTargetAtTime(src==='fly'?0.5:0,ctx.currentTime,0.05); clickGain.gain.setTargetAtTime(src==='click'?0.9:0,ctx.currentTime,0.05); }
+  };
+})();
+
+/* ===== 22. Scintillating grid ===== */
+(function(){
+  const svg=document.getElementById('scSvg'), NS='http://www.w3.org/2000/svg';
+  const step=36, lw=6;
+  let on=true, dots=[], lastKey='';
+  const add=(tag,attrs)=>{ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); svg.appendChild(e); return e; };
+  function build(){
+    const W=Math.max(200,Math.round(svg.clientWidth||300)), H=Math.max(200,Math.round(svg.clientHeight||260));
+    const key=W+'x'+H; if(key===lastKey) return; lastKey=key;
+    svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+    svg.innerHTML=''; dots=[];
+    const nx=Math.floor((W-30)/step), ny=Math.floor((H-30)/step);
+    const x0=(W-nx*step)/2, y0=(H-ny*step)/2;
+    add('rect',{x:0,y:0,width:W,height:H,fill:'#000'});
+    for(let i=0;i<=nx;i++) add('rect',{x:x0+i*step-lw/2,y:0,width:lw,height:H,fill:'#7c7c7c'});
+    for(let j=0;j<=ny;j++) add('rect',{x:0,y:y0+j*step-lw/2,width:W,height:lw,fill:'#7c7c7c'});
+    for(let i=0;i<=nx;i++) for(let j=0;j<=ny;j++){ const d=add('circle',{cx:x0+i*step,cy:y0+j*step,r:5.2,fill:'#fff'}); d.style.display=on?'':'none'; dots.push(d); }
+  }
+  build();
+  if('ResizeObserver' in window) new ResizeObserver(()=>build()).observe(svg); else window.addEventListener('resize',build);
+  const b=document.getElementById('scDots');
+  b.onclick=()=>{ on=!on; dots.forEach(d=>d.style.display=on?'':'none'); b.textContent=on?'Убрать белые кружки':'Вернуть белые кружки'; };
+})();
+
+/* ===== 23. Cafe wall ===== */
+(function(){
+  const cv=document.getElementById('cafeCanvas'), g=cv.getContext('2d'), W=cv.width, H=cv.height; hiDPI(cv);
+  const bw=34, bh=22, m=2.5, rows=Math.ceil(H/(bh+m));
+  let ruler=false, aligned=false;
+  const OFF=[0,bw/3,2*bw/3,bw/3];
+  function draw(){
+    g.fillStyle='#8c8c8c'; g.fillRect(0,0,W,H);
+    for(let r=0;r<rows;r++){
+      const y=r*(bh+m)+m, off = aligned ? (r%2)*bw : OFF[r%4];
+      for(let k=-2;k*bw<W+bw;k++){
+        g.fillStyle = (k%2===0) ? '#000' : '#fff';
+        g.fillRect(k*bw+off - bw, y, bw, bh);
+      }
+    }
+    if(ruler){
+      g.strokeStyle='#ff2b6a'; g.lineWidth=1.5;
+      for(let r=0;r<=rows;r++){ const y=r*(bh+m)+m/2; g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
+    }
+  }
+  draw();
+  const rb=document.getElementById('cafeRuler'), ab=document.getElementById('cafeAlign');
+  rb.onclick=()=>{ ruler=!ruler; rb.textContent=ruler?'Убрать линейку':'Показать линейку'; draw(); };
+  ab.onclick=()=>{ aligned=!aligned; ab.textContent=aligned?'Вернуть сдвиг':'Выровнять кирпичи'; draw(); };
+})();
+
+/* ===== 24. Dot sphere ===== */
+(function(){
+  const cv=document.getElementById('sphCanvas'), g=cv.getContext('2d'), W=cv.width; hiDPI(cv);
+  const vis=watchVisible(cv), P=[];
+  for(let i=0;i<420;i++){ const y=Math.random()*2-1, ph=Math.random()*Math.PI*2, r=Math.sqrt(1-y*y); P.push([r*Math.cos(ph),y,r*Math.sin(ph)]); }
+  let ang=0, last=performance.now(), depth=false;
+  function frame(now){
+    ang+=(now-last)/1000*0.9; last=now;
+    if(vis()){
+      g.fillStyle='#05060a'; g.fillRect(0,0,W,W);
+      const c=Math.cos(ang), s=Math.sin(ang), R=W*0.4;
+      for(const p of P){
+        const x=p[0]*c+p[2]*s, z=-p[0]*s+p[2]*c;
+        let rad=1.8, a=1;
+        if(depth){ rad=0.8+2.2*(z+1)/2; a=0.25+0.75*(z+1)/2; }
+        g.fillStyle=`rgba(230,240,255,${a})`;
+        g.beginPath(); g.arc(W/2+x*R, W/2-p[1]*R, rad, 0, 7); g.fill();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  const b=document.getElementById('sphHint');
+  b.onclick=()=>{ depth=!depth; b.textContent=depth?'Убрать подсказку':'Подсказать направление'; };
+})();
+
+/* ===== 25. Raccoon from Denmark ===== */
+(function(){
+  const STEPS=[
+    'Загадайте любое число <b>от 1 до 10</b>.',
+    'Умножьте его <b>на 9</b>.',
+    'Если получилось двузначное число - <b>сложите его цифры</b>. Если однозначное - оставьте как есть.',
+    'Вычтите из результата <b>4</b>.',
+    'Найдите букву алфавита с этим номером:<br><span style="font-family:monospace;color:var(--cyan)">А=1 Б=2 В=3 Г=4 Д=5 Е=6 Ё=7 Ж=8 З=9</span>',
+    'Придумайте <b>страну</b>, которая начинается на эту букву.',
+    'Возьмите <b>следующую букву алфавита</b> после первой буквы страны. Придумайте <b>животное</b> на эту букву.',
+    'Возьмите <b>последнюю букву</b> названия страны. Придумайте <b>фрукт</b> на эту букву.'
+  ];
+  const stepEl=document.getElementById('denStep'), text=document.getElementById('denText'), next=document.getElementById('denNext');
+  let i=-1, timer=null, done=false;
+  function reset(){
+    clearTimeout(timer); i=-1; done=false; next.disabled=false; next.textContent='Начать';
+    stepEl.textContent='ШАГ 0 ИЗ 8';
+    text.innerHTML='Я угадаю, о чём вы подумаете. Считайте <b>в уме</b> и ничего не говорите вслух.';
+  }
+  next.onclick=()=>{
+    if(done){ reset(); return; }
+    if(next.disabled) return;
+    i++;
+    if(i<STEPS.length){
+      stepEl.textContent=`ШАГ ${i+1} ИЗ 8`; text.innerHTML=STEPS[i];
+      next.textContent = i===STEPS.length-1 ? 'Читать мысли' : 'Дальше'; return;
+    }
+    next.disabled=true; stepEl.textContent='ЧТЕНИЕ МЫСЛЕЙ';
+    text.innerHTML='Сосредоточьтесь на стране, животном и фрукте...';
+    timer=setTimeout(()=>{
+      text.innerHTML='<div style="font-size:15px;color:var(--muted)">Вы думаете о...</div><div style="font-size:26px;margin-top:6px"><b style="color:var(--pink)">Дании</b>, <b style="color:var(--amber)">еноте</b> 🦝<br>и <b style="color:var(--lime)">яблоке</b> 🍎</div>';
+      next.textContent='Ещё раз'; next.disabled=false; done=true;
+      say('Вы думаете о Дании... о еноте... и о яблоке!');
+    },1800);
+  };
+  document.getElementById('denReset').onclick=reset;
+})();
+
+/* ===== 26. Measure game ===== */
+(function(){
+  const svg=document.getElementById('gmSvg'), range=document.getElementById('gmRange'), out=document.getElementById('gmOut'), title=document.getElementById('gmTitle');
+  const NS='http://www.w3.org/2000/svg';
+  const ROUNDS=['muller','ebb','ponzo'];
+  const NAMES={muller:'Линии Мюллер-Лайера: сделайте нижнюю линию такой же длины, как верхняя',ebb:'Круги Эббингауза: сделайте правый центральный круг таким же, как левый',ponzo:'Рельсы Понцо: сделайте нижнюю полоску такой же длины, как верхняя'};
+  let round=0, checked=false, errors=[];
+  const el=(tag,a)=>{ const e=document.createElementNS(NS,tag); for(const k in a) e.setAttribute(k,a[k]); svg.appendChild(e); return e; };
+  function line(x1,y1,x2,y2,col,w,dash){ return el('line',{x1,y1,x2,y2,stroke:col,'stroke-width':w||4,'stroke-linecap':'round','stroke-dasharray':dash||''}); }
+  function fins(x,y,dir,len){ // dir: +1 tips point away from line (tails), -1 arrowheads
+    const f=22; line(x,y,x+dir*f*len,y-f,'#2ff3ff',4); line(x,y,x+dir*f*len,y+f,'#2ff3ff',4);
+  }
+  function draw(){
+    svg.innerHTML=''; const s=range.value/100, type=ROUNDS[round];
+    if(type==='muller'){
+      const L=170, cx=260;
+      line(cx-L/2,65,cx+L/2,65,'#2ff3ff'); fins(cx-L/2,65,1,1); fins(cx+L/2,65,-1,1);
+      const U=L*s; line(cx-U/2,160,cx+U/2,160,'#ff3fd8'); 
+      [[cx-U/2,-1],[cx+U/2,1]].forEach(([x,d])=>{ line(x,160,x+d*22,138,'#ff3fd8',4); line(x,160,x+d*22,182,'#ff3fd8',4); });
+      if(checked) line(cx-L/2,196,cx+L/2,196,'#b6ff3b',3,'6 5');
+    }
+    if(type==='ebb'){
+      const r=20;
+      el('circle',{cx:140,cy:110,r,fill:'#ffc23b'});
+      for(let k=0;k<6;k++){ const a=k/6*Math.PI*2; el('circle',{cx:140+Math.cos(a)*68,cy:110+Math.sin(a)*68,r:33,fill:'#7b4bff'}); }
+      const ru=r*s; el('circle',{cx:390,cy:110,r:ru,fill:'#ffc23b'});
+      for(let k=0;k<8;k++){ const a=k/8*Math.PI*2; el('circle',{cx:390+Math.cos(a)*(ru+16),cy:110+Math.sin(a)*(ru+16),r:7,fill:'#7b4bff'}); }
+      if(checked) el('circle',{cx:390,cy:110,r,fill:'none',stroke:'#b6ff3b','stroke-width':2.5,'stroke-dasharray':'5 4'});
+    }
+    if(type==='ponzo'){
+      line(170,215,248,8,'#8a90ad',3); line(350,215,272,8,'#8a90ad',3);
+      for(let y=30;y<215;y+=22){ const t=(y-8)/207, half=12+78*t; line(260-half,y,260+half,y,'#2a3047',3); }
+      const L=60; line(260-L/2,60,260+L/2,60,'#ffc23b',8);
+      const U=L*s; line(260-U/2,180,260+U/2,180,'#ff3fd8',8);
+      if(checked) line(260-L/2,196,260+L/2,196,'#b6ff3b',3,'6 5');
+    }
+  }
+  function start(r){
+    round=r; checked=false;
+    let v; do{ v=70+Math.floor(Math.random()*61); }while(Math.abs(v-100)<12);
+    range.value=v; range.disabled=false;
+    title.textContent=`Раунд ${round+1} из 3`;
+    out.innerHTML=NAMES[ROUNDS[round]];
+    draw();
+  }
+  range.oninput=()=>{ if(!checked) draw(); };
+  document.getElementById('gmCheck').onclick=()=>{
+    if(checked) return;
+    checked=true; range.disabled=true; draw();
+    const e=range.value-100; errors[round]=Math.abs(e);
+    const how = e===0 ? 'Идеально точно! Глаз-алмаз.' : `Вы ошиблись на <b>${Math.abs(e)}%</b> - сделали фигуру ${e>0?'больше':'меньше'}, чем нужно. Зелёный пунктир - правильный размер.`;
+    out.innerHTML = how + (round<2 ? ' Нажмите "Дальше".' : '');
+    if(round===2){
+      const avg=Math.round(errors.reduce((a,b)=>a+b,0)/3);
+      const verdict = avg<=4 ? 'Глаз-алмаз! Вас почти не обмануть.' : avg<=10 ? 'Хороший глазомер, но мозг всё же попался.' : 'Мозг попался по полной - как и у большинства людей!';
+      out.innerHTML += `<br><b style="color:var(--amber)">Итог: в среднем глаза обманулись на ${avg}%. ${verdict}</b><br>Нажмите "Дальше", чтобы сыграть ещё раз.`;
+      say(`В среднем ваши глаза обманулись на ${avg} процентов. ${verdict}`);
+    }
+  };
+  document.getElementById('gmNext').onclick=()=>{
+    if(!checked){ out.innerHTML='Сначала подгоните размер и нажмите <b>"Проверить"</b>.'; return; }
+    if(round===2){ errors=[]; start(0); return; }
+    start(round+1);
+  };
+  start(0);
+})();
+
+
+/* ===== 27. Confetti ===== */
+(function(){
+  const svg=document.getElementById('confSvg'), NS='http://www.w3.org/2000/svg', read=document.getElementById('confRead');
+  const BALL='#f3c623';
+  svg.innerHTML=`<defs>
+    <pattern id="pR" width="8" height="5" patternUnits="userSpaceOnUse"><rect width="8" height="2.5" fill="#ff1f3d"/></pattern>
+    <pattern id="pB" width="8" height="5" patternUnits="userSpaceOnUse"><rect y="2.5" width="8" height="2.5" fill="#1f6bff"/></pattern></defs>
+    <g id="confBg"><rect width="520" height="240" fill="url(#pR)"/><rect width="520" height="240" fill="url(#pB)"/></g>`;
+  let seed=7; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
+  const balls=[], over=[];
+  const cols=8, rows=3;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const x=40+c*63+(rnd()-.5)*16, y=45+r*75+(rnd()-.5)*14, R=20+rnd()*6, red=(r+c)%2===0;
+    const b=document.createElementNS(NS,'circle'); b.setAttribute('cx',x); b.setAttribute('cy',y); b.setAttribute('r',R-0.6); b.setAttribute('fill',BALL); svg.appendChild(b); balls.push(b);
+    const o=document.createElementNS(NS,'circle'); o.setAttribute('cx',x); o.setAttribute('cy',y); o.setAttribute('r',R); o.setAttribute('fill',red?'url(#pR)':'url(#pB)'); o.style.pointerEvents='none'; svg.appendChild(o); over.push(o);
+  }
+  balls.forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); read.innerHTML=`Настоящий цвет шарика - жёлтый<span class="swatch" style="background:${BALL}"></span> У всех шариков он одинаковый!`; say('Настоящий цвет этого шарика - жёлтый. И у всех остальных тоже!'); }));
+  const bg=svg.querySelector('#confBg'), t=document.getElementById('confToggle'); let on=true;
+  t.onclick=()=>{
+    on=!on; const d=on?'':'none';
+    bg.style.display=d; over.forEach(o=>o.style.display=d);
+    t.textContent=on?'Убрать полоски':'Вернуть полоски';
+    read.textContent = on ? 'Шарики оранжевые и зелёные? Нажмите на шарик' : 'Без полосок видно: все шарики одного цвета!';
+  };
+})();
+
+/* ===== 28. Troxler ===== */
+(function(){
+  const msg=document.getElementById('troxMsg'); let timer=null;
+  document.getElementById('troxStart').onclick=()=>{
+    clearInterval(timer); let left=20; msg.textContent='Смотрите на крестик: '+left;
+    timer=setInterval(()=>{ left--; if(left>0){ msg.textContent='Смотрите на крестик: '+left; return; }
+      clearInterval(timer); msg.textContent='Пятна пропали? Моргните - и они вернутся!'; say('Пятна пропали? Моргните - и они вернутся!'); },1000);
+  };
+})();
+
+/* ===== 29. Tusi couple ===== */
+(function(){
+  const cv=document.getElementById('tusiCanvas'), g=cv.getContext('2d'), W=cv.width; hiDPI(cv);
+  const vis=watchVisible(cv), N=8, R=110;
+  let lines=false, one=false, t0=performance.now();
+  function frame(now){
+    if(vis()){
+      const t=(now-t0)/1000*1.3, c=W/2;
+      g.clearRect(0,0,W,W);
+      g.fillStyle='#d4143c'; g.beginPath(); g.arc(c,c,R+12,0,7); g.fill();
+      g.fillStyle='#2a0610'; g.beginPath(); g.arc(c,c,R+2,0,7); g.fill();
+      for(let k=0;k<N;k++){
+        const th=k*Math.PI/N, dx=Math.cos(th), dy=Math.sin(th), p=(R-10)*Math.cos(t-th);
+        if(lines){ g.strokeStyle='rgba(255,255,255,.28)'; g.lineWidth=1.5; g.beginPath(); g.moveTo(c-dx*(R-10),c-dy*(R-10)); g.lineTo(c+dx*(R-10),c+dy*(R-10)); g.stroke(); }
+        const hl = one && k===0;
+        g.fillStyle = hl ? '#2ff3ff' : '#fff';
+        if(hl){ g.shadowColor='#2ff3ff'; g.shadowBlur=14; }
+        g.beginPath(); g.arc(c+dx*p,c+dy*p,hl?10:9,0,7); g.fill(); g.shadowBlur=0;
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  const lb=document.getElementById('tusiLines'), ob=document.getElementById('tusiOne');
+  lb.onclick=()=>{ lines=!lines; lb.textContent=lines?'Скрыть дорожки':'Показать дорожки'; };
+  ob.onclick=()=>{ one=!one; ob.textContent=one?'Все точки одинаковые':'Выделить одну точку'; };
+})();
+
+/* ===== Fullscreen for illusion cards ===== */
+(function(){
+  function fit(card){
+    const z=card.querySelector('.zoomable'), st=card.querySelector('.stage');
+    if(!z) return;
+    z.style.transform='';
+    if(!card.classList.contains('full')) return;
+    let s=Math.min((st.clientWidth-20)/z.offsetWidth,(st.clientHeight-20)/z.offsetHeight);
+    if(z.dataset.maxscale) s=Math.min(s,+z.dataset.maxscale);
+    z.style.transform=`scale(${s})`;
+  }
+  function close(card){
+    card.classList.remove('full','show-secret'); card.querySelector('.full-btn').textContent='⛶';
+    document.body.classList.remove('has-full'); fit(card);
+  }
+  document.querySelectorAll('.card.fs').forEach(card=>{
+    let wrap=card.querySelector('.head-right');
+    if(!wrap){ const tag=card.querySelector('.card-head .tag'); wrap=document.createElement('div'); wrap.className='head-right'; tag.replaceWith(wrap); wrap.appendChild(tag); }
+    const b=document.createElement('button'); b.className='full-btn'; b.title='На весь экран'; b.textContent='⛶';
+    wrap.appendChild(b);
+    b.onclick=()=>{
+      if(card.classList.contains('full')){ close(card); return; }
+      document.querySelectorAll('.card.full').forEach(close);
+      card.classList.add('full'); document.body.classList.add('has-full'); b.textContent='✕';
+      requestAnimationFrame(()=>fit(card));
+    };
+  });
+  window.addEventListener('resize',()=>document.querySelectorAll('.card.full').forEach(fit));
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !document.body.classList.contains('present')) document.querySelectorAll('.card.full').forEach(close); });
+  window.fitFull=fit; window.closeFull=close;
+})();
+
+/* ===== Projector mode + table of contents ===== */
+(function(){
+  const body=document.body, cards=[...document.querySelectorAll('.card')], N=cards.length;
+  const $=id=>document.getElementById(id);
+  const bar=$('presBar'), num=$('pbNum'), name=$('pbName'), prevB=$('pbPrev'), nextB=$('pbNext');
+  const toc=$('toc'), black=$('presBlack');
+  let idx=-1, present=false, ownFs=false, idleT=null;
+  const titleOf=c=>c.querySelector('h2').textContent;
+  const isPresent=()=>present;
+
+  /* --- table of contents --- */
+  const tiles=[];
+  (function build(){
+    let h='';
+    document.querySelectorAll('.section-title').forEach(sec=>{
+      const grid=sec.nextElementSibling; if(!grid||!grid.classList.contains('grid')) return;
+      h+=`<div class="toc-sec">${sec.innerHTML}</div><div class="toc-grid">`;
+      grid.querySelectorAll('.card').forEach(c=>{
+        const i=cards.indexOf(c), tag=c.querySelector('.tag');
+        const col=tag.classList.contains('t-mind')?'var(--pink)':tag.classList.contains('t-aud')?'var(--amber)':'var(--cyan)';
+        h+=`<button class="toc-tile" data-i="${i}" style="--c:${col}"><i>${String(i+1).padStart(2,'0')}</i><span>${titleOf(c)}</span></button>`;
+      });
+      h+='</div>';
+    });
+    $('tocBody').innerHTML=h;
+    $('tocBody').querySelectorAll('.toc-tile').forEach(t=>{ tiles[+t.dataset.i]=t; t.onclick=()=>pick(+t.dataset.i); });
+  })();
+  function openToc(){ tiles.forEach((t,i)=>t.classList.toggle('cur',present&&i===idx)); toc.classList.add('on'); toc.scrollTop=0;
+    const f=(present&&tiles[idx])||tiles[0]; if(f){ f.focus({preventScroll:true}); f.scrollIntoView({block:'nearest'}); } }
+  function closeToc(){ toc.classList.remove('on'); }
+  function pick(i){
+    closeToc();
+    if(present){ show(i); return; }
+    const c=cards[i]; c.scrollIntoView({behavior:'smooth',block:'start'}); c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash');
+  }
+  $('tocOpen').onclick=openToc; $('tocClose').onclick=closeToc;
+  $('tocShow').onclick=()=>{ closeToc(); if(present) show(0); else start(0); };
+  toc.addEventListener('click',e=>{ if(e.target===toc) closeToc(); });
+
+  /* --- scaling of game cards --- */
+  function scale(c){
+    if(!c||!c.classList.contains('scaled')) return;
+    const narrow=innerWidth<=640, W=innerWidth-(narrow?12:40), H=innerHeight-(narrow?78:104);
+    const z=Math.min(W/c.offsetWidth, H/c.offsetHeight, 2.6);
+    c.style.setProperty('--z',z.toFixed(3));
+  }
+  const ro=('ResizeObserver' in window)?new ResizeObserver(()=>scale(cards[idx])):null;
+
+  /* --- slides --- */
+  function leave(c){
+    if(!c) return;
+    c.querySelectorAll('.btn').forEach(b=>{ if(/^■/.test(b.textContent.trim())) b.click(); }); // stop running sound
+    c.classList.remove('pres','scaled','show-secret');
+    if(c.classList.contains('full')){ c.classList.remove('full'); const fb=c.querySelector('.full-btn'); if(fb) fb.textContent='⛶'; window.fitFull(c); }
+    c.style.removeProperty('--z');
+    if(ro) ro.unobserve(c);
+  }
+  function show(i){
+    i=Math.max(0,Math.min(N-1,i));
+    if(i===idx && present) return;
+    leave(cards[idx]); idx=i; Voice.stop();
+    const c=cards[idx];
+    c.classList.add('pres');
+    if(c.classList.contains('fs')){ c.classList.add('full'); requestAnimationFrame(()=>window.fitFull(c)); }
+    else { c.classList.add('scaled'); scale(c); if(ro) ro.observe(c); }
+    num.textContent=`${idx+1} / ${N}`; name.textContent=titleOf(c);
+    prevB.disabled=idx===0; nextB.disabled=idx===N-1;
+    if(Voice.on) say(titleOf(c)+'.');
+    wake();
+  }
+  function start(i){
+    if(present) return;
+    document.querySelectorAll('.card.full').forEach(c=>window.closeFull(c));
+    present=true; body.classList.add('present','has-full');
+    const el=document.documentElement;
+    if(el.requestFullscreen && !document.fullscreenElement){
+      try{ el.requestFullscreen().then(()=>{ ownFs=true; },()=>{}); }catch(e){}
+    }
+    idx=-1;
+    if(i==null){ i=cards.findIndex(c=>c.getBoundingClientRect().bottom>90); if(i<0) i=0; }
+    show(i);
+  }
+  function stop(){
+    if(!present) return;
+    leave(cards[idx]); present=false; Voice.stop();
+    body.classList.remove('present','has-full','idle'); black.classList.remove('on'); closeToc();
+    const c=cards[idx];
+    if(ownFs && document.fullscreenElement){ ownFs=false; try{ document.exitFullscreen(); }catch(e){} }
+    ownFs=false;
+    if(c) c.scrollIntoView({block:'center'});
+  }
+  function toggleSecret(){
+    const c=cards[idx]; if(!c) return;
+    if(c.classList.contains('show-secret')){ c.classList.remove('show-secret'); Voice.stop(); }
+    else { const sb=c.querySelector('.btn.secret'); if(sb) sb.click(); }
+  }
+  function toggleFs(){
+    if(document.fullscreenElement){ ownFs=false; try{ document.exitFullscreen(); }catch(e){} }
+    else if(document.documentElement.requestFullscreen){ try{ document.documentElement.requestFullscreen().then(()=>{ ownFs=true; },()=>{}); }catch(e){} }
+  }
+  document.addEventListener('fullscreenchange',()=>{
+    // Esc in browser full screen is swallowed by the browser - treat leaving full screen as "exit show"
+    if(!document.fullscreenElement && ownFs && present){ ownFs=false; stop(); }
+  });
+
+  $('presStart').onclick=()=>start();
+  prevB.onclick=()=>show(idx-1); nextB.onclick=()=>show(idx+1);
+  $('pbTitle').onclick=openToc; $('pbSecret').onclick=toggleSecret;
+  $('pbVoice').onclick=()=>$('voiceBtn').click();
+  $('pbFull').onclick=toggleFs; $('pbExit').onclick=stop;
+  black.onclick=()=>black.classList.remove('on');
+  window.addEventListener('resize',()=>{ if(present) scale(cards[idx]); });
+
+  /* --- hide the control bar and cursor when the mouse rests --- */
+  function wake(){
+    body.classList.remove('idle'); clearTimeout(idleT);
+    if(present) idleT=setTimeout(()=>{ if(!bar.matches(':hover') && !toc.classList.contains('on')) body.classList.add('idle'); },3000);
+  }
+  ['mousemove','mousedown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{ if(present) wake(); },{passive:true}));
+
+  /* --- keyboard and presentation clickers --- */
+  document.addEventListener('keydown',e=>{
+    if(e.ctrlKey||e.altKey||e.metaKey) return;
+    const k=e.key, t=e.target, typing=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);
+    if(toc.classList.contains('on')){
+      if(k==='Escape'||(!typing&&/^[mMьЬ]$/.test(k))){ e.preventDefault(); closeToc(); }
+      return;
+    }
+    if(!present) return;
+    if(black.classList.contains('on')){ e.preventDefault(); black.classList.remove('on'); return; }
+    if(typing && !['PageDown','PageUp','Escape'].includes(k)) return;
+    let done=true;
+    if(k==='ArrowRight'||k==='PageDown') show(idx+1);
+    else if(k==='ArrowLeft'||k==='PageUp') show(idx-1);
+    else if(k==='Home') show(0);
+    else if(k==='End') show(N-1);
+    else if(k==='Escape') stop();
+    else if(/^[bBиИ.]$/.test(k)) black.classList.add('on');
+    else if(/^[sSыЫ]$/.test(k)) toggleSecret();
+    else if(/^[mMьЬ]$/.test(k)) openToc();
+    else if(/^[fFаА]$/.test(k)) toggleFs();
+    else done=false;
+    if(done){ e.preventDefault(); if(document.activeElement&&document.activeElement.blur&&!typing) document.activeElement.blur(); wake(); }
+  });
+  window.Projector={start,stop,show,isPresent,get idx(){return idx;}};
+})();
+
+</script>
+</body>
+</html>
