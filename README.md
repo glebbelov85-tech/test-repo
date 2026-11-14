@@ -10,6 +10,7 @@
 | Операторы дронов | `https://glebbelov85.gitverse.site/sreda-razrabotki/fpv/` |
 | Лес | `https://glebbelov85.gitverse.site/sreda-razrabotki/les/` |
 | Муха | `https://glebbelov85.gitverse.site/sreda-razrabotki/muha/` |
+| AR-охота на монстров | `https://glebbelov85.gitverse.site/sreda-razrabotki/ar/` |
 | Пульт иллюзий | `https://glebbelov85.gitverse.site/sreda-razrabotki/pult/` |
 
 Старые адреса `glebbelov85-tech.github.io/test-repo/...` перенаправляют на GitVerse
