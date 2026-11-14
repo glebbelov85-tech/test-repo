@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Охота за цветом</title>
+<link rel="stylesheet" href="core.css">
+<style>#banner { top: 10%; }</style>
+</head>
+<body>
+<script src="core.js"></script>
+<script>
+"use strict";
+// ===== Охота за цветом =====
+// Игра просит найти в комнате предмет нужного цвета. Наводишь кружок на настоящий
+// предмет - телефон проверяет цвет пикселей. Нашёл - кусочек предмета "оживает":
+// у него появляются глаза, рот и ножки, он прыгает и говорит, как его зовут.
+const COLORS = [
+  { id: 'red',    name: 'красное',     css: '#ff2a2a', who: 'Красныш',     test: (h, s, v) => (h < 14 || h > 342) && s > 0.45 && v > 0.28 },
+  { id: 'orange', name: 'оранжевое',   css: '#ff8a1a', who: 'Апельсинчик', test: (h, s, v) => h >= 14 && h < 40 && s > 0.5 && v > 0.35 },
+  { id: 'yellow', name: 'жёлтое',      css: '#ffe01a', who: 'Лимоша',      test: (h, s, v) => h >= 40 && h < 68 && s > 0.4 && v > 0.45 },
+  { id: 'green',  name: 'зелёное',     css: '#2ad44a', who: 'Зеленушка',   test: (h, s, v) => h >= 68 && h < 165 && s > 0.3 && v > 0.2 },
+  { id: 'blue',   name: 'синее или голубое', css: '#2a7aff', who: 'Синька', test: (h, s, v) => h >= 165 && h < 255 && s > 0.3 && v > 0.2 },
+  { id: 'violet', name: 'фиолетовое',  css: '#a24dff', who: 'Фиолетик',    test: (h, s, v) => h >= 255 && h < 295 && s > 0.25 && v > 0.18 },
+  { id: 'pink',   name: 'розовое',     css: '#ff6ad5', who: 'Розочка',     test: (h, s, v) => h >= 295 && h <= 342 && s > 0.25 && v > 0.4 },
+  { id: 'white',  name: 'белое',       css: '#ffffff', who: 'Снежок',      test: (h, s, v) => s < 0.16 && v > 0.78 },
+  { id: 'black',  name: 'чёрное',      css: '#222222', who: 'Уголёк',      test: (h, s, v) => v < 0.18 }
+];
+const TIME_PER = 40;
+let queue = [], cur = null, found = 0, score = 0, prog = 0, match = 0, timeLeft = 0, zoo = [], alive = null, mode = 'search';
+const SAMPLE = 40;
+const sc = document.createElement('canvas'); sc.width = sc.height = SAMPLE;
+const sctx = sc.getContext('2d', { willReadFrequently: true });
+
+const ringR = () => Math.min(W, H) * 0.19;
+function rgb2hsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+  return [h, mx ? d / mx : 0, mx];
+}
+// какая доля пикселей в кружке нужного цвета
+function measure() {
+  if (!camOn || !cam.videoWidth) return 0;
+  const fit = videoFit(), R = ringR() / fit.s, c = screenToVideo(W / 2, H / 2, fit);
+  sctx.drawImage(cam, c.x - R, c.y - R, R * 2, R * 2, 0, 0, SAMPLE, SAMPLE);
+  const d = sctx.getImageData(0, 0, SAMPLE, SAMPLE).data;
+  let tot = 0, hit = 0;
+  for (let y = 0; y < SAMPLE; y++) for (let x = 0; x < SAMPLE; x++) {
+    if ((x - SAMPLE / 2 + 0.5) ** 2 + (y - SAMPLE / 2 + 0.5) ** 2 > (SAMPLE / 2) ** 2) continue;
+    const i = (y * SAMPLE + x) * 4, hsv = rgb2hsv(d[i], d[i + 1], d[i + 2]);
+    tot++; if (cur.test(hsv[0], hsv[1], hsv[2])) hit++;
+  }
+  return tot ? hit / tot : 0;
+}
+// вырезаем кусочек картинки - из него сделаем существо
+function snapshot() {
+  const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const c = cv.getContext('2d');
+  if (camOn && cam.videoWidth) {
+    const fit = videoFit(), R = ringR() / fit.s, p = screenToVideo(W / 2, H / 2, fit);
+    if (fit.mirror) { c.translate(S, 0); c.scale(-1, 1); }
+    c.drawImage(cam, p.x - R, p.y - R, R * 2, R * 2, 0, 0, S, S);
+  } else { c.fillStyle = cur.css; c.fillRect(0, 0, S, S); }
+  return cv;
+}
+
+const sfx = {
+  tick() { tone(1200, 0.03, 'square', 0.03); },
+  found() { [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, 1, i * 0.07)); noise(0.5, 0.1, 6000, 0, 'highpass'); },
+  boing() { tone(220, 0.25, 'sine', 0.15, 2.5); },
+  chirp() { tone(rnd(600, 1000), 0.08, 'square', 0.05, 1.6); tone(rnd(800, 1200), 0.08, 'square', 0.05, 0.7, 0.09); },
+  timeout() { tone(300, 0.3, 'sawtooth', 0.08, 0.5); }
+};
+
+function nextColor() {
+  if (!queue.length) { finish(); return; }
+  cur = queue.shift(); prog = 0; timeLeft = TIME_PER; mode = 'search';
+  showBanner('Найди что-то<br><span style="color:' + cur.css + ';-webkit-text-stroke:1px #0008">' + cur.name.toUpperCase() + '</span>', '', 2600);
+  say('Найди что-то ' + cur.name + '!');
+  updateHud();
+}
+function updateHud() { hud(score + '<br><small>найдено: ' + found + ' из ' + COLORS.length + '</small>'); }
+function finish() {
+  mode = 'end';
+  say(found ? 'Ура! Ты оживил ' + found + ' ' + (found === 1 ? 'друга' : found < 5 ? 'друзей' : 'друзей') + '!' : 'Попробуем ещё раз?');
+  const b = best.get('cvet'); let line = 'Рекорд: ' + b;
+  if (score > b) { best.set('cvet', score); line = 'Новый рекорд!'; }
+  const pics = zoo.map(z => '<img src="' + z.img.toDataURL('image/jpeg', 0.8) + '" style="width:64px;height:64px;border-radius:50%;margin:4px;border:3px solid ' + z.color.css + '" title="' + z.color.who + '">').join('');
+  ARGame.over('Твой зоопарк', `<p>${pics || 'Пока пусто'}</p><p>Очки: <b>${score}</b></p><p>${line}</p>`, 1500);
+}
+function skip() {
+  if (mode !== 'search') return;
+  sfx.timeout();
+  cur.skips = (cur.skips || 0) + 1;
+  if (cur.skips < 2) queue.push(cur); // вернётся в конце, но только один раз
+  showHint('Ладно, поищем другой цвет', 1500); nextColor();
+}
+
+ARGame.setup({
+  title: 'Охота за цветом',
+  colors: { bg1: '#3a2a08', glow: '#ffcf3a', b1: '#ffb300', b2: '#e65100', b3: '#7a2a00' },
+  intro: ['Игра попросит найти в комнате что-то <b>красное</b>, <b>жёлтое</b>, <b>синее</b>...',
+    'Наведи кружок на настоящий предмет этого цвета и подержи. Найденная вещь <b>оживёт</b>: у неё вырастут глаза и ножки, и она скажет, как её зовут!',
+    '<span class="note">Нужна камера. Лучше играть при хорошем свете.</span>'],
+  startText: 'Искать цвета',
+  useGyro: false,
+  fakeWorld: false,
+  buttons: [{ text: 'Другой', onclick: () => skip() }],
+  drawIcon: (c, t) => drawCritter(c, null, '#ff2a2a', t, 46, 1),
+  onBegin() {
+    COLORS.forEach(c => c.skips = 0); queue = COLORS.slice().sort(() => Math.random() - 0.5); found = 0; score = 0; zoo = []; alive = null;
+    if (!camOn) showHint('Камера не включилась - без неё цвета не найти', 4000);
+    nextColor();
+  },
+  onTap(x, y) {
+    // тап по живому существу - оно подпрыгивает и пищит
+    if (alive && Math.hypot(x - W / 2, y - H * 0.45) < 120) { alive.jump = 0.4; sfx.chirp(); }
+    for (const z of zoo) if (Math.hypot(x - z.x, y - z.y) < 30) { z.jump = 0.4; sfx.chirp(); }
+  },
+  update(dt) {
+    for (const z of zoo) { z.t += dt; z.jump = Math.max(0, (z.jump || 0) - dt); }
+    if (ARGame.state !== 'play') return;
+    if (mode === 'search') {
+      timeLeft -= dt;
+      match += (measure() - match) * 0.4;
+      if (match > 0.42) { prog += dt / 1.1; if (Math.random() < dt * 8) sfx.tick(); }
+      else prog = Math.max(0, prog - dt * 0.8);
+      if (prog >= 1) {
+        // нашли! оживляем
+        mode = 'alive'; found++;
+        const pts = 100 + Math.round(Math.max(0, timeLeft)) * 5;
+        score += pts; updateHud();
+        alive = { img: snapshot(), color: cur, t: 0, jump: 0, pts };
+        sfx.found(); buzz([40, 40, 80]);
+        burst(W / 2, H / 2, cur.css, 50, 360);
+        floatText(W / 2, H / 2 - ringR() - 20, '+' + pts, cur.css === '#222222' ? '#fff' : cur.css);
+        setTimeout(() => { say('Привет! Я ' + cur.who + '!'); }, 1300);
+      } else if (timeLeft <= 0) skip();
+    } else if (mode === 'alive') {
+      alive.t += dt; alive.jump = Math.max(0, alive.jump - dt);
+      if (alive.t > 1.3 && alive.t < 3.2 && Math.random() < dt * 4) sfx.chirp();
+      if (alive.t > 4.2) {
+        // существо уходит на полочку внизу
+        zoo.push({ img: alive.img, color: alive.color, t: 0, x: 0, y: 0, jump: 0.4 });
+        alive = null; sfx.boing(); nextColor();
+      }
+    }
+  },
+  render() {
+    if (!camOn) { ctx.fillStyle = '#222'; ctx.fillRect(0, 0, W, H); }
+    const R = ringR();
+    if (mode === 'search' && cur) {
+      // затемняем всё, кроме кружка
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(W / 2, H / 2, R, 0, 7, true); ctx.fill('evenodd'); ctx.restore();
+      ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.arc(W / 2, H / 2, R + 4, 0, 7); ctx.stroke();
+      ctx.strokeStyle = cur.css; ctx.lineWidth = 5; ctx.setLineDash([12, 10]); ctx.lineDashOffset = -time * 30;
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      // прогресс
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.lineCap = 'round';
+      if (prog > 0) { ctx.beginPath(); ctx.arc(W / 2, H / 2, R + 14, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2); ctx.stroke(); }
+      // подсказка: насколько похоже
+      const t = match > 0.42 ? 'Есть! Держи...' : match > 0.15 ? 'Почти! Ближе к предмету' : 'Ищи ' + cur.name;
+      ctx.font = '700 18px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+      ctx.strokeText(t, W / 2, H / 2 + R + 46); ctx.fillText(t, W / 2, H / 2 + R + 46);
+      // таймер
+      ctx.fillStyle = timeLeft < 10 ? '#ff6b6b' : '#fff';
+      const tt = Math.max(0, Math.ceil(timeLeft)) + ' c';
+      ctx.strokeText(tt, W / 2, H / 2 - R - 26); ctx.fillText(tt, W / 2, H / 2 - R - 26);
+    }
+    if (alive) {
+      // оживление: картинка отрывается от фона, растёт, у неё появляются глаза и ножки
+      const k = Math.min(1, alive.t / 0.9);
+      const size = R * (1 + k * 0.25);
+      const y = H * 0.45 + (1 - k) * (H / 2 - H * 0.45);
+      const hop = alive.t > 1 ? Math.abs(Math.sin((alive.t - 1) * 5)) * 30 : 0;
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.translate(W / 2, y - hop - alive.jump * 100);
+      drawCritter(ctx, alive.img, alive.color.css, alive.t, size, clamp((alive.t - 0.6) / 0.6, 0, 1), hop);
+      ctx.restore();
+      if (alive.t > 1.2) {
+        ctx.font = '900 30px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 5;
+        const label = 'Я - ' + alive.color.who + '!';
+        ctx.strokeText(label, W / 2, H * 0.45 + size + 70); ctx.fillText(label, W / 2, H * 0.45 + size + 70);
+      }
+    }
+  },
+  renderTop() {
+    // полочка с ожившими друзьями
+    if (!zoo.length || ARGame.state === 'over') return;
+    const n = zoo.length, gap = Math.min(52, (W - 20) / n), x0 = W / 2 - (n - 1) * gap / 2, y = H - 50;
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, y - 34, W, 70);
+    zoo.forEach((z, i) => {
+      z.x = x0 + i * gap; z.y = y - Math.abs(Math.sin(z.t * 3 + i)) * 6 - z.jump * 40;
+      ctx.save(); ctx.translate(z.x, z.y); drawCritter(ctx, z.img, z.color.css, z.t + i, 20, 1, 0); ctx.restore();
+    });
+  }
+});
+
+// существо из картинки: круглое тело с текстурой предмета, глаза, рот, ножки
+function drawCritter(c, img, color, t, R, alive, hop) {
+  const squash = alive ? 1 + Math.sin(t * 10) * 0.05 * alive + (hop === 0 && t > 1 ? 0.08 : 0) : 1;
+  // ножки
+  if (alive > 0) {
+    c.strokeStyle = '#222'; c.lineWidth = Math.max(2, R * 0.09); c.lineCap = 'round';
+    const L = R * 0.45 * alive, sw = Math.sin(t * 12) * R * 0.12;
+    c.beginPath(); c.moveTo(-R * 0.35, R * 0.8); c.lineTo(-R * 0.4 + sw, R * 0.8 + L); c.lineTo(-R * 0.6 + sw, R * 0.8 + L);
+    c.moveTo(R * 0.35, R * 0.8); c.lineTo(R * 0.4 - sw, R * 0.8 + L); c.lineTo(R * 0.6 - sw, R * 0.8 + L); c.stroke();
+    // ручки машут
+    const wave = Math.sin(t * 8) * 0.6;
+    c.beginPath(); c.moveTo(-R * 0.9, 0); c.lineTo(-R * 1.3, -R * 0.3 + wave * R * 0.3); c.moveTo(R * 0.9, 0); c.lineTo(R * 1.3, -R * 0.3 - wave * R * 0.3); c.stroke();
+  }
+  c.save(); c.scale(1 / squash, squash);
+  c.beginPath(); c.arc(0, 0, R, 0, 7); c.save(); c.clip();
+  if (img) c.drawImage(img, -R, -R, R * 2, R * 2); else { c.fillStyle = color; c.fillRect(-R, -R, R * 2, R * 2); }
+  // объём: блик и тень
+  const g = c.createRadialGradient(-R * 0.4, -R * 0.4, R * 0.1, 0, 0, R);
+  g.addColorStop(0, 'rgba(255,255,255,.35)'); g.addColorStop(0.6, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,.35)');
+  c.fillStyle = g; c.fillRect(-R, -R, R * 2, R * 2);
+  c.restore();
+  c.lineWidth = Math.max(2, R * 0.06); c.strokeStyle = color; c.stroke();
+  if (alive > 0) {
+    // глаза (моргают)
+    const blink = Math.sin(t * 1.7) > 0.97 ? 0.15 : 1;
+    const er = R * 0.24 * alive, look = Math.sin(t * 1.3) * er * 0.35;
+    for (const s of [-1, 1]) {
+      c.fillStyle = '#fff'; c.beginPath(); c.ellipse(s * R * 0.32, -R * 0.15, er, er * 1.15 * blink, 0, 0, 7); c.fill();
+      c.lineWidth = Math.max(1, R * 0.03); c.strokeStyle = '#222'; c.stroke();
+      if (blink > 0.5) { c.fillStyle = '#111'; c.beginPath(); c.arc(s * R * 0.32 + look, -R * 0.1, er * 0.5, 0, 7); c.fill();
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(s * R * 0.32 + look + er * 0.2, -R * 0.18, er * 0.16, 0, 7); c.fill(); }
+    }
+    // рот: открывается, когда "говорит"
+    const talk = t > 1.3 && t < 3.2 ? Math.abs(Math.sin(t * 14)) : 0.15;
+    c.fillStyle = '#3a0010'; c.beginPath(); c.ellipse(0, R * 0.38, R * 0.22 * alive, R * (0.05 + talk * 0.14) * alive, 0, 0, 7); c.fill();
+    c.fillStyle = 'rgba(255,120,150,.45)'; c.beginPath(); c.arc(-R * 0.6, R * 0.2, R * 0.12, 0, 7); c.arc(R * 0.6, R * 0.2, R * 0.12, 0, 7); c.fill();
+  }
+  c.restore();
+}
+</script>
+</body>
+</html>

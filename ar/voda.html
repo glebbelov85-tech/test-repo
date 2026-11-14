@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Комната под водой</title>
+<link rel="stylesheet" href="core.css">
+<style>
+#ulov { position: fixed; inset: 0; z-index: 9; background: #021a2ccc; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+#ulov.show { display: flex; }
+#ulov h2 { margin: 0 0 6px; font: 900 28px system-ui; }
+#ulovGrid { display: grid; grid-template-columns: repeat(3, 100px); gap: 10px; }
+#ulovGrid div { background: #ffffff14; border-radius: 14px; padding: 6px; text-align: center; font: 600 13px system-ui; }
+#ulovGrid canvas { width: 88px; height: 66px; }
+#ulovGrid .no canvas { filter: brightness(0) opacity(.35); }
+</style>
+</head>
+<body>
+<div id="ulov"><h2>Мой улов</h2><div id="ulovGrid"></div><button class="big" id="btnUlovClose">Ловить дальше</button></div>
+<script src="core.js"></script>
+<script>
+"use strict";
+// ===== Комната под водой =====
+// Комната затапливается: вода поднимается снизу вверх, картинка камеры начинает
+// колыхаться, по стенам бегут блики, всплывают пузыри. Из мутной глубины
+// выплывают рыбы - сначала еле видные, потом ближе. Лови их сачком (тап).
+const KINDS = {
+  ryba:      { name: 'Рыбка',      pts: 10,  size: 0.22, speed: 1.0, weight: 30 },
+  polosatik: { name: 'Полосатик',  pts: 15,  size: 0.26, speed: 1.2, weight: 22 },
+  meduza:    { name: 'Медуза',     pts: 20,  size: 0.3,  speed: 0.45, weight: 16 },
+  osminog:   { name: 'Осьминог',   pts: 30,  size: 0.32, speed: 0.6, weight: 10 },
+  cherepaha: { name: 'Черепаха',   pts: 40,  size: 0.42, speed: 0.55, weight: 7 },
+  zolotaya:  { name: 'Золотая рыбка', pts: 100, size: 0.24, speed: 1.6, weight: 3 }
+};
+const KIND_LIST = Object.keys(KINDS);
+const FAR = 12, CATCH = 5.5;
+let fish = [], bubbles = [], nets = [], flooded = false, score = 0, catchCount = {}, spawnT = 0, allCaught = false;
+let floodT = 0;
+let ulov = {};
+try { ulov = JSON.parse(localStorage.getItem('ar_voda_ulov') || '{}'); } catch (e) {}
+
+const sfx = {
+  water() { noise(3.5, 0.25, 500); noise(2, 0.12, 2500, 1, 'bandpass'); tone(80, 3, 'sine', 0.08, 0.6); },
+  net() { noise(0.25, 0.2, 1500, 0, 'bandpass'); },
+  catch() { tone(520, 0.1, 'sine', 0.1, 1.6); tone(780, 0.14, 'sine', 0.09, 1.5, 0.08); bubble(); bubble(0.05); },
+  gold() { [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(f, 0.25, 'sine', 0.09, 1, i * 0.08)); },
+  far() { tone(300, 0.15, 'sine', 0.05, 0.7); },
+  newKind() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.2, 'triangle', 0.08, 1, i * 0.1)); }
+};
+function bubble(delay = 0) { tone(rnd(500, 900), 0.08, 'sine', 0.05, 2.2, delay); }
+
+function pickKind() {
+  let sum = 0; for (const k of KIND_LIST) sum += KINDS[k].weight;
+  let r = Math.random() * sum; for (const k of KIND_LIST) { r -= KINDS[k].weight; if (r <= 0) return k; } return 'ryba';
+}
+// рыба плывёт по трём точкам: из глубины -> мимо игрока -> обратно в глубину
+function spawnFish(kind) {
+  kind = kind || pickKind();
+  const a0 = camHeading() + rnd(-2.6, 2.6), d0 = rnd(FAR - 1, FAR + 1);
+  const side = Math.random() < 0.5 ? -1 : 1, a1 = a0 + side * rnd(0.3, 0.9), d1 = rnd(1.6, 3.2);
+  const a2 = a1 + side * rnd(0.6, 1.6);
+  const h = kind === 'cherepaha' ? rnd(0.3, 1.2) : kind === 'meduza' ? rnd(1.2, 2.4) : rnd(0.4, 2.2);
+  const P = (a, d, hh) => [Math.sin(a) * d, Math.cos(a) * d, hh];
+  fish.push({ kind, t: 0, pts: [P(a0, d0, h), P(a1, d1, h + rnd(-0.3, 0.3)), P(a2, FAR + 2, h + rnd(-0.5, 0.5))], seg: 0, k: 0,
+    pos: P(a0, d0, h), dir: [0, 1, 0], seed: Math.random() * 9, wiggle: 0 });
+}
+const vecFromEye = p => [p[0], p[1], p[2] - EYE];
+function fishProj(f) { return project3(vecFromEye(f.pos), KINDS[f.kind].size); }
+
+function tap(x, y) {
+  sfx.net(); nets.push({ x, y, t: 0 });
+  const list = fish.map(f => ({ f, p: fishProj(f) })).filter(o => o.p.vis).sort((a, b) => a.p.range - b.p.range);
+  for (const { f, p } of list) {
+    if (Math.hypot(x - p.sx, y - p.sy) < Math.max(p.r * 1.4, 28)) {
+      if (p.range > CATCH) { sfx.far(); showHint('Далеко! Подожди, пока подплывёт ближе', 1500); f.scared = 1; return; }
+      f.caught = true;
+      const K = KINDS[f.kind];
+      score += K.pts; catchCount[f.kind] = (catchCount[f.kind] || 0) + 1;
+      const isNew = !ulov[f.kind];
+      ulov[f.kind] = (ulov[f.kind] || 0) + 1; try { localStorage.setItem('ar_voda_ulov', JSON.stringify(ulov)); } catch (e) {}
+      floatText(p.sx, p.sy - p.r, K.name + ' +' + K.pts, f.kind === 'zolotaya' ? '#ffd700' : '#bff4ff');
+      for (let i = 0; i < 14; i++) bubbles.push({ x: p.sx + rnd(-p.r, p.r), y: p.sy + rnd(-p.r, p.r), r: rnd(2, 7), vy: rnd(-120, -60), wob: Math.random() * 6 });
+      if (f.kind === 'zolotaya') { sfx.gold(); burst(p.sx, p.sy, '#ffd700', 40); showBanner('Золотая рыбка!', 'Загадай желание'); } else sfx.catch();
+      if (isNew && f.kind !== 'zolotaya') { sfx.newKind(); showHint('Новый вид в улове: ' + K.name + '!', 2200); }
+      buzz(30); updateHud();
+      if (!allCaught && KIND_LIST.every(k => catchCount[k])) { allCaught = true; setTimeout(() => showBanner('Все виды пойманы!', 'Ты настоящий рыбак'), 1500); }
+      return;
+    }
+  }
+}
+function updateHud() {
+  const kinds = KIND_LIST.filter(k => catchCount[k]).length;
+  hud(score + '<br><small>видов: ' + kinds + ' из ' + KIND_LIST.length + '</small>');
+}
+
+ARGame.setup({
+  title: 'Комната под водой',
+  colors: { bg1: '#0a3a5a', glow: '#5fd8ff', b1: '#29b6f6', b2: '#0277bd', b3: '#01416b' },
+  intro: ['Сейчас твоя комната уйдёт под воду! Вода поднимется, стены заколышутся, а из глубины начнут выплывать рыбы.',
+    '<b>Крутись с телефоном</b> и лови рыб сачком - <b>тапни</b>, когда рыба подплывёт близко. Собери все 6 видов!'],
+  startText: 'Затопить комнату',
+  useGyro: true,
+  fakeWorld: false,
+  buttons: [{ text: '🐟', onclick: () => showUlov() }],
+  drawIcon: (c, t) => { c.scale(1.3, 1.3); drawFish(c, 'ryba', t, 1); },
+  onBegin() {
+    fish = []; nets = []; score = 0; catchCount = {}; allCaught = false; spawnT = 7; floodT = 0; flooded = false;
+    sfx.water(); updateHud();
+    showBanner('Вода прибывает!', '', 2500);
+    setTimeout(() => { spawnFish('ryba'); }, 6500);
+    setTimeout(() => showHint('Рыбы приплывают из глубины. Ищи их вокруг себя', 3500), 8000);
+  },
+  onTap: tap,
+  update(dt) {
+    floodT += dt; flooded = floodT > 6;
+    if (Math.random() < dt * 3) bubbles.push({ x: rnd(0, W), y: H + 10, r: rnd(2, 8), vy: rnd(-140, -50), wob: Math.random() * 6 });
+    for (const b of bubbles) { b.y += b.vy * dt; b.x += Math.sin(time * 3 + b.wob) * 20 * dt; }
+    bubbles = bubbles.filter(b => b.y > -20);
+    for (const n of nets) n.t += dt; nets = nets.filter(n => n.t < 0.5);
+    spawnT -= dt;
+    if (flooded && spawnT <= 0 && fish.length < 6) { spawnFish(); spawnT = rnd(2, 4.5); }
+    for (const f of fish) {
+      f.t += dt;
+      const K = KINDS[f.kind];
+      let sp = K.speed * (f.scared ? 2.5 : 1);
+      if (f.scared) f.scared = Math.max(0, f.scared - dt);
+      if (f.caught) { f.gone = true; continue; }
+      const a = f.pts[f.seg], b = f.pts[f.seg + 1];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+      f.k += sp * dt / len;
+      if (f.k >= 1) { f.k = 0; f.seg++; if (f.seg >= f.pts.length - 1) { f.gone = true; continue; } }
+      const A = f.pts[f.seg], B = f.pts[f.seg + 1];
+      // плавная кривая: рыбы виляют
+      const wig = Math.sin(f.t * 1.5 + f.seed) * 0.4;
+      const np = [A[0] + (B[0] - A[0]) * f.k + wig * 0.3, A[1] + (B[1] - A[1]) * f.k, A[2] + (B[2] - A[2]) * f.k + Math.sin(f.t * 0.9 + f.seed) * 0.15];
+      f.dir = [np[0] - f.pos[0], np[1] - f.pos[1], np[2] - f.pos[2]];
+      f.pos = np;
+    }
+    fish = fish.filter(f => !f.gone);
+  },
+  render(dt) {
+    const roll = screenRoll();
+    // ----- вода: колышущаяся картинка камеры под линией воды -----
+    const level = clamp(floodT / 6, 0, 1.15); // 0 - сухо, >1 - всё под водой
+    const surfY = H - level * H * 1.05;
+    ctx.save();
+    ctx.beginPath();
+    const tilt = Math.tan(-roll * (gyroOK ? 1 : 0));
+    ctx.moveTo(0, H);
+    for (let x = 0; x <= W; x += 10) ctx.lineTo(x, surfY + (x - W / 2) * tilt + Math.sin(x * 0.03 + time * 3) * 6 + Math.sin(x * 0.07 - time * 2) * 3);
+    ctx.lineTo(W, H); ctx.closePath(); ctx.clip();
+    if (camOn && cam.videoWidth) {
+      const fit = videoFit(), step = 6;
+      for (let y = 0; y < H; y += step) {
+        const off = Math.sin(y * 0.025 + time * 2.2) * 7 + Math.sin(y * 0.06 - time * 3.1) * 3;
+        const sy = (y - fit.oy) / fit.s, sh = step / fit.s;
+        if (fit.mirror) { ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(cam, 0, sy, fit.vw, sh, fit.ox + off, y, fit.vw * fit.s, step + 0.5);
+        if (fit.mirror) ctx.restore();
+      }
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2d6f8f'); g.addColorStop(1, '#0b2a3d');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    // окраска в морской цвет
+    ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = '#4fa8c8'; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(40,140,190,.25)'); g.addColorStop(1, 'rgba(0,30,60,.45)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // блики (каустика)
+    ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(160,240,255,.09)'; ctx.lineWidth = 3;
+    for (let i = 0; i < 9; i++) {
+      ctx.beginPath();
+      for (let x = -20; x <= W + 20; x += 16) { const y = (i / 9) * H + Math.sin(x * 0.02 + time * 1.3 + i * 2) * 26 + Math.sin(x * 0.045 - time * 0.9 + i) * 14; x < 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    for (let i = 0; i < 9; i++) {
+      ctx.beginPath();
+      for (let y = -20; y <= H + 20; y += 16) { const x = (i / 9) * W + Math.sin(y * 0.02 + time * 1.1 + i * 3) * 30; y < 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    // лучи света сверху
+    for (let i = 0; i < 4; i++) {
+      const x = W * (0.15 + i * 0.25) + Math.sin(time * 0.4 + i * 2) * 40;
+      const lg = ctx.createLinearGradient(0, 0, 0, H * 0.8); lg.addColorStop(0, 'rgba(200,250,255,.10)'); lg.addColorStop(1, 'rgba(200,250,255,0)');
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(x - 20, 0); ctx.lineTo(x + 20, 0); ctx.lineTo(x + 120, H * 0.8); ctx.lineTo(x - 40, H * 0.8); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    // ----- рыбы -----
+    const list = fish.map(f => ({ f, p: fishProj(f) }));
+    list.filter(o => o.p.vis).sort((a, b) => b.p.range - a.p.range).forEach(({ f, p }) => {
+      // в какую сторону экрана плывёт
+      const ahead = project3(vecFromEye([f.pos[0] + f.dir[0] * 20, f.pos[1] + f.dir[1] * 20, f.pos[2] + f.dir[2] * 20]), 0.1);
+      let face = 1, ang = 0;
+      if (ahead.c.z > 0.05) { const dx = ahead.sx - p.sx, dy = ahead.sy - p.sy; face = dx >= 0 ? 1 : -1; ang = clamp(Math.atan2(dy, Math.abs(dx)), -0.6, 0.6) * face; }
+      const vis = clamp((FAR - p.range) / 5, 0.08, 1);
+      ctx.save(); ctx.translate(p.sx, p.sy); ctx.rotate(roll + ang); ctx.globalAlpha = vis;
+      const s = p.r / 50; ctx.scale(s * face, s);
+      drawFish(ctx, f.kind, f.t + f.seed, 1);
+      ctx.restore();
+      // мутная вода: дальние рыбы - синеватые пятна
+      if (vis < 1) { ctx.globalAlpha = (1 - vis) * 0.6; ctx.fillStyle = '#1e5f7c'; ctx.beginPath(); ctx.arc(p.sx, p.sy, p.r * 1.1, 0, 7); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      // близкую рыбу можно ловить - лёгкое свечение
+      if (p.range < CATCH) { ctx.strokeStyle = `rgba(255,255,255,${0.2 + Math.sin(time * 6) * 0.1})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.sx, p.sy, p.r * 1.3, 0, 7); ctx.stroke(); }
+    });
+    list.filter(o => !o.p.vis && o.p.range < 7).forEach(o => drawPointer(o.p.c, o.f.kind === 'zolotaya' ? '#ffd700' : 'rgba(200,245,255,.85)', false));
+    // пузыри
+    for (const b of bubbles) {
+      ctx.strokeStyle = 'rgba(220,250,255,.6)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.25, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+    // линия воды
+    if (level < 1.1) {
+      ctx.strokeStyle = 'rgba(220,250,255,.8)'; ctx.lineWidth = 3; ctx.beginPath();
+      for (let x = 0; x <= W; x += 10) { const y = surfY + (x - W / 2) * tilt + Math.sin(x * 0.03 + time * 3) * 6 + Math.sin(x * 0.07 - time * 2) * 3; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+    }
+    // сачок
+    for (const n of nets) {
+      const k = n.t / 0.5;
+      ctx.strokeStyle = `rgba(255,255,255,${1 - k})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(n.x, n.y, 20 + k * 40, 0, 7); ctx.stroke();
+      ctx.lineWidth = 1;
+      for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(n.x + i * 12 * (1 + k), n.y - (20 + k * 40)); ctx.lineTo(n.x + i * 12 * (1 + k), n.y + (20 + k * 40)); ctx.stroke(); }
+    }
+  }
+});
+
+// ---------- Рисуем морских жителей (смотрят вправо) ----------
+function drawFish(c, kind, t, alpha) {
+  const tail = Math.sin(t * 8) * 0.35;
+  if (kind === 'ryba' || kind === 'zolotaya') {
+    const gold = kind === 'zolotaya';
+    if (gold) { c.shadowColor = '#ffd700'; c.shadowBlur = 25; }
+    c.fillStyle = gold ? '#ffcc33' : '#ff8a2a';
+    c.save(); c.translate(-30, 0); c.rotate(tail);
+    c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-25, -30, gold ? -45 : -28, -28); c.quadraticCurveTo(-18, 0, gold ? -45 : -28, 28); c.quadraticCurveTo(-25, 30, 0, 0); c.fill();
+    c.restore();
+    c.beginPath(); c.ellipse(0, 0, 38, 24, 0, 0, 7); c.fill(); c.shadowBlur = 0;
+    c.fillStyle = gold ? '#fff2a8' : '#ffd0a0'; c.beginPath(); c.ellipse(4, 8, 24, 10, 0, 0, 7); c.fill();
+    c.fillStyle = gold ? '#e6a800' : '#e05a10'; c.beginPath(); c.moveTo(-8, -20); c.quadraticCurveTo(4, -40, 16, -20); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(22, -5, 7, 0, 7); c.fill();
+    c.fillStyle = '#111'; c.beginPath(); c.arc(24, -5, 4, 0, 7); c.fill();
+    if (gold) { c.fillStyle = '#ffd700'; c.beginPath(); c.moveTo(-6, -24); c.lineTo(0, -38); c.lineTo(6, -28); c.lineTo(12, -40); c.lineTo(16, -24); c.fill(); }
+  } else if (kind === 'polosatik') {
+    c.fillStyle = '#ffd31a';
+    c.save(); c.translate(-28, 0); c.rotate(tail); c.beginPath(); c.moveTo(0, 0); c.lineTo(-24, -22); c.lineTo(-24, 22); c.fill(); c.restore();
+    c.beginPath(); c.ellipse(0, 0, 32, 34, 0, 0, 7); c.fill();
+    c.save(); c.beginPath(); c.ellipse(0, 0, 32, 34, 0, 0, 7); c.clip();
+    c.fillStyle = '#1a3fa8'; for (let i = -1; i <= 1; i++) c.fillRect(i * 18 - 5, -40, 9, 80);
+    c.restore();
+    c.fillStyle = '#ffd31a'; c.beginPath(); c.moveTo(-10, -30); c.lineTo(10, -52); c.lineTo(18, -28); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(18, -8, 7, 0, 7); c.fill(); c.fillStyle = '#111'; c.beginPath(); c.arc(20, -8, 4, 0, 7); c.fill();
+  } else if (kind === 'meduza') {
+    const pulse = 1 + Math.sin(t * 3) * 0.12;
+    c.save();
+    c.strokeStyle = 'rgba(255,160,230,.75)'; c.lineWidth = 3;
+    for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(i * 8, 0); for (let y = 0; y < 60; y += 6) c.lineTo(i * 8 + Math.sin(t * 3 + y * 0.12 + i) * 6, y); c.stroke(); }
+    c.shadowColor = '#ff8ae0'; c.shadowBlur = 20;
+    c.fillStyle = 'rgba(255,150,225,.7)'; c.beginPath(); c.ellipse(0, -6, 34 * pulse, 28 / pulse, 0, Math.PI, 0); c.quadraticCurveTo(0, 6, -34 * pulse, -6); c.fill();
+    c.shadowBlur = 0; c.fillStyle = 'rgba(255,255,255,.5)'; c.beginPath(); c.ellipse(-10, -20, 8, 5, -0.4, 0, 7); c.fill();
+    c.restore();
+  } else if (kind === 'osminog') {
+    c.strokeStyle = '#8e3fd0'; c.lineWidth = 7; c.lineCap = 'round';
+    for (let i = 0; i < 8; i++) { const x = -21 + i * 6; c.beginPath(); c.moveTo(x, 10); c.quadraticCurveTo(x + Math.sin(t * 4 + i) * 14, 34, x + Math.sin(t * 4 + i + 1) * 18, 50); c.stroke(); }
+    c.fillStyle = '#a24de0'; c.beginPath(); c.ellipse(0, -10, 28, 32, 0, 0, 7); c.fill();
+    c.fillStyle = '#c98af5'; for (const [x, y] of [[-12, -26], [10, -30], [-2, -14]]) { c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill(); }
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(-9, -2, 7, 0, 7); c.arc(11, -2, 7, 0, 7); c.fill();
+    c.fillStyle = '#111'; c.beginPath(); c.arc(-7, -1, 4, 0, 7); c.arc(13, -1, 4, 0, 7); c.fill();
+  } else if (kind === 'cherepaha') {
+    const fl = Math.sin(t * 3);
+    c.fillStyle = '#7cc46a';
+    c.save(); c.translate(18, -22); c.rotate(-0.6 + fl * 0.5); c.beginPath(); c.ellipse(0, -12, 9, 22, 0, 0, 7); c.fill(); c.restore();
+    c.save(); c.translate(18, 22); c.rotate(0.6 - fl * 0.5); c.beginPath(); c.ellipse(0, 12, 9, 22, 0, 0, 7); c.fill(); c.restore();
+    c.save(); c.translate(-26, 18); c.rotate(0.4 + fl * 0.3); c.beginPath(); c.ellipse(0, 8, 7, 14, 0, 0, 7); c.fill(); c.restore();
+    c.save(); c.translate(-26, -18); c.rotate(-0.4 - fl * 0.3); c.beginPath(); c.ellipse(0, -8, 7, 14, 0, 0, 7); c.fill(); c.restore();
+    c.beginPath(); c.ellipse(46, 0, 14, 11, 0, 0, 7); c.fill();
+    c.fillStyle = '#111'; c.beginPath(); c.arc(52, -4, 2.5, 0, 7); c.fill();
+    c.fillStyle = '#5a7d2e'; c.beginPath(); c.ellipse(0, 0, 38, 30, 0, 0, 7); c.fill();
+    c.strokeStyle = '#3d5a1c'; c.lineWidth = 2;
+    for (const [x, y] of [[0, 0], [-18, -12], [-18, 12], [16, -12], [16, 12]]) { c.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; i ? c.lineTo(x + Math.cos(a) * 9, y + Math.sin(a) * 9) : c.moveTo(x + Math.cos(a) * 9, y + Math.sin(a) * 9); } c.closePath(); c.stroke(); }
+  }
+}
+function showUlov() {
+  const grid = $('#ulovGrid'); grid.innerHTML = '';
+  for (const k of KIND_LIST) {
+    const d = document.createElement('div'); if (!ulov[k]) d.className = 'no';
+    const cv = document.createElement('canvas'); cv.width = 176; cv.height = 132;
+    const c = cv.getContext('2d'); c.setTransform(1.3, 0, 0, 1.3, 88, 66); drawFish(c, k, 1, 1);
+    d.appendChild(cv); d.insertAdjacentHTML('beforeend', '<br>' + (ulov[k] ? KINDS[k].name + ' × ' + ulov[k] : '???'));
+    grid.appendChild(d);
+  }
+  $('#ulov').classList.add('show');
+  if (ARGame.state === 'play') ARGame.state = 'pause';
+}
+$('#btnUlovClose').onclick = () => { $('#ulov').classList.remove('show'); if (ARGame.state === 'pause') ARGame.state = 'play'; };
+</script>
+</body>
+</html>

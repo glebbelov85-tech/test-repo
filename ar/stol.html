@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Городок на столе</title>
+<link rel="stylesheet" href="core.css">
+<style>
+canvas.three { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#overlay { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+#overlay .hbtn { pointer-events: auto; }
+#hud { display: none; }
+#scan { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 40px); text-align: center; font: 700 17px system-ui; text-shadow: 0 2px 6px #000; display: none; padding: 0 20px; }
+#placeBtn { display: none; }
+#supportMsg { color: #ffd34d; }
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="hud">
+    <button class="hbtn" id="btnExit">✕</button>
+    <span class="grow"></span><span id="hudInfo"></span><span class="grow"></span>
+    <button class="hbtn" id="btnSize">Размер</button>
+    <button class="hbtn" id="btnSound">🔊</button>
+  </div>
+  <div id="banner"></div><div id="hint"></div>
+  <div id="scan">Медленно води телефоном над столом,<br>пока не появится кольцо. Потом тапни.</div>
+</div>
+<div class="screen" id="startScr" style="--bg1:#1d3a12;--glow:#9cff6a;--b1:#7ccf3a;--b2:#3a8a1a;--b3:#1d4a0b">
+  <h1>Городок на столе</h1>
+  <p>Наведи телефон на настоящий стол (или пол) - и на нём появится крошечный городок с замком и жителями.</p>
+  <p>Из нор по краям вылезают жуки и ползут к замку. <b>Тапай по жукам</b>, защищай городок! Его можно обойти со всех сторон.</p>
+  <p class="note" id="supportMsg">Проверяю, умеет ли телефон AR...</p>
+  <button class="big" id="btnAR" style="display:none">Начать AR</button>
+  <button class="big" id="btnDemo" style="display:none">Демо без AR</button>
+  <a class="small" href="./">← Все режимы</a>
+</div>
+<div class="screen hide" id="overScr" style="--bg1:#3a1212">
+  <h1>Жуки захватили замок!</h1>
+  <div id="overBody"></div>
+  <button class="big" id="btnAgain">Ещё раз</button>
+  <a class="small" href="./">← Все режимы</a>
+</div>
+<script src="three.min.js"></script>
+<script src="core.js"></script>
+<script>
+"use strict";
+// ===== Городок на столе (WebXR, Chrome на Android с ARCore) =====
+// Телефон находит настоящую поверхность (hit-test), на неё ставится городок.
+// Жуки появляются из нор по краям и ползут к замку. Тап - выстрел лучом из телефона.
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.xr.enabled = true;
+renderer.domElement.className = 'three';
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 30);
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667744, 0.65));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+sun.position.set(0.4, 1.2, 0.3); sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -0.7, right: 0.7, top: 0.7, bottom: -0.7, near: 0.1, far: 3 });
+sun.shadow.bias = -0.001;
+scene.add(sun); scene.add(sun.target);
+
+// кольцо-прицел на найденной поверхности
+const reticle = new THREE.Mesh(new THREE.RingGeometry(0.06, 0.075, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9cff6a }));
+reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
+
+// ---------- Материалы и простые модели ----------
+const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 });
+const mat = {
+  grass: M(0x5fbf3a), path: M(0xd9c08a), stone: M(0xcfc8bd), roofR: M(0xd2402e), roofB: M(0x3a6fd2), wall: M(0xfff1d6),
+  wood: M(0x8a5a2b), leaf: M(0x2f9a3a), flag: M(0xffd23a), bug: M(0x5b2a86), bug2: M(0xb0141c), head: M(0x2a1440),
+  eye: new THREE.MeshBasicMaterial({ color: 0xffe14d }), dark: new THREE.MeshBasicMaterial({ color: 0x1a0d05 }),
+  dirt: M(0x6b4a2a), splat: new THREE.MeshBasicMaterial({ color: 0x9cff3a, transparent: true, opacity: 0.8 }),
+  person: [M(0xff6a6a), M(0x6ab0ff), M(0xffd36a), M(0xa66aff)], skin: M(0xffd2b0)
+};
+const shadowy = o => { o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
+function house(roof) {
+  const g = new THREE.Group();
+  const w = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.032, 0.035), mat.wall); w.position.y = 0.016; g.add(w);
+  const r = new THREE.Mesh(new THREE.ConeGeometry(0.034, 0.026, 4), roof); r.position.y = 0.045; r.rotation.y = Math.PI / 4; g.add(r);
+  const d = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.016, 0.002), mat.wood); d.position.set(0, 0.008, 0.0176); g.add(d);
+  return shadowy(g);
+}
+function tree() {
+  const g = new THREE.Group();
+  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.004, 0.02, 6), mat.wood); t.position.y = 0.01; g.add(t);
+  const l = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.04, 8), mat.leaf); l.position.y = 0.038; g.add(l);
+  return shadowy(g);
+}
+function castle() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.04, 12), mat.stone); base.position.y = 0.02; g.add(base);
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.025, 0.07, 12), mat.stone); tower.position.y = 0.075; g.add(tower);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.04, 12), mat.roofB); roof.position.y = 0.13; g.add(roof);
+  for (let i = 0; i < 8; i++) { const z = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.012, 0.012), mat.stone); const a = i / 8 * Math.PI * 2; z.position.set(Math.cos(a) * 0.044, 0.046, Math.sin(a) * 0.044); g.add(z); }
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.0012, 0.0012, 0.04), mat.wood); pole.position.y = 0.17; g.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.022, 0.014, 6, 1), new THREE.MeshStandardMaterial({ color: 0xffd23a, side: THREE.DoubleSide }));
+  flag.position.set(0.011, 0.182, 0); g.add(flag); g.userData.flag = flag;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.022, 0.003), mat.wood); door.position.set(0, 0.011, 0.049); g.add(door);
+  return shadowy(g);
+}
+function person(i) {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.005, 0.012, 8), mat.person[i % 4]); b.position.y = 0.006; g.add(b);
+  const h = new THREE.Mesh(new THREE.SphereGeometry(0.0035, 8, 6), mat.skin); h.position.y = 0.0155; g.add(h);
+  return shadowy(g);
+}
+function bugModel(big) {
+  const g = new THREE.Group(), s = big ? 2 : 1;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.011, 12, 8), big ? mat.bug2 : mat.bug); body.scale.set(1, 0.6, 1.35); body.position.y = 0.008; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.0065, 10, 8), mat.head); head.position.set(0, 0.008, 0.016); g.add(head);
+  for (const x of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.0022, 6, 4), mat.eye); e.position.set(x * 0.003, 0.011, 0.021); g.add(e); }
+  g.userData.legs = [];
+  const legGeo = new THREE.CylinderGeometry(0.0009, 0.0009, 0.016).rotateZ(Math.PI / 2).translate(0.008, 0, 0);
+  for (let i = -1; i <= 1; i++) for (const x of [-1, 1]) {
+    const leg = new THREE.Mesh(legGeo, mat.head); leg.position.set(x * 0.008, 0.006, i * 0.008); leg.rotation.y = x < 0 ? Math.PI : 0; leg.rotation.z = x * -0.4;
+    leg.userData.phase = i + (x > 0 ? 1.5 : 0); g.add(leg); g.userData.legs.push(leg);
+  }
+  g.scale.setScalar(s);
+  return shadowy(g);
+}
+
+// ---------- Городок ----------
+const town = new THREE.Group(); town.visible = false; scene.add(town);
+const TOWN_R = 0.16;
+{
+  const ground = new THREE.Mesh(new THREE.CylinderGeometry(TOWN_R, TOWN_R + 0.008, 0.008, 40), mat.grass); ground.position.y = 0.004; ground.receiveShadow = true; town.add(ground);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.07, 0.085, 40).rotateX(-Math.PI / 2), mat.path); ring.position.y = 0.0085; ring.receiveShadow = true; town.add(ring);
+  // тень от городка на настоящем столе
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ opacity: 0.35 })); sh.position.y = 0.0005; sh.receiveShadow = true; town.add(sh);
+}
+const castleObj = castle(); castleObj.position.y = 0.008; town.add(castleObj);
+for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2 + 0.3, h = house(i % 2 ? mat.roofR : mat.roofB); h.position.set(Math.cos(a) * 0.115, 0.008, Math.sin(a) * 0.115); h.rotation.y = -a + Math.PI / 2 + Math.PI; town.add(h); }
+for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2 + 0.75, t = tree(); t.position.set(Math.cos(a) * 0.14, 0.008, Math.sin(a) * 0.14); t.scale.setScalar(rnd(0.8, 1.3)); town.add(t); }
+const people = [];
+for (let i = 0; i < 6; i++) { const p = person(i); p.userData = { a: Math.random() * 7, sp: rnd(0.4, 0.8) * (Math.random() < 0.5 ? -1 : 1), r: 0.0775, hop: Math.random() * 6 }; town.add(p); people.push(p); }
+
+// ---------- Игра ----------
+let bugs = [], holes = [], splats = [], sparks = [];
+let castleHp = 10, score = 0, wave = 0, toSpawn = 0, spawnT = 0, waveT = 0, playing = false, placed = false, sizeK = 1, castleHitT = 0;
+const sfx = {
+  place() { [392, 523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.1, 1, i * 0.09)); },
+  dig() { noise(0.6, 0.15, 700); },
+  squash() { noise(0.15, 0.35, 1500); tone(180, 0.12, 'square', 0.08, 0.5); },
+  hit() { tone(400, 0.06, 'square', 0.06); },
+  miss() { tone(900, 0.05, 'square', 0.03, 0.6); },
+  castle() { tone(110, 0.4, 'sawtooth', 0.15, 0.5); noise(0.25, 0.3, 600); },
+  wave() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, 1, i * 0.1)); }
+};
+function updateHud() { hud('🏰 ' + '■'.repeat(Math.max(0, castleHp)) + '<br>' + score + ' <small>· волна ' + wave + '</small>'); }
+function startWave() {
+  wave++; toSpawn = 3 + wave * 2; spawnT = 1.5; waveT = 0;
+  showBanner('Волна ' + wave, wave === 1 ? 'Жуки лезут из нор!' : wave % 3 === 0 ? 'Идёт большой жук!' : '');
+  sfx.wave(); updateHud();
+}
+// направление "от игрока" в координатах городка - жуки идут с дальней стороны и с боков
+const viewerPos = new THREE.Vector3(0, 0.5, 0.6);
+function viewerAngle() {
+  const cp = (renderer.xr.isPresenting ? viewerPos : camera.position).clone();
+  town.worldToLocal(cp); return Math.atan2(cp.z, cp.x);
+}
+function openHole(big) {
+  const a = viewerAngle() + Math.PI + rnd(-1.9, 1.9), r = rnd(0.3, 0.38);
+  const h = new THREE.Group();
+  const pit = new THREE.Mesh(new THREE.CircleGeometry(0.018 * (big ? 1.6 : 1), 16).rotateX(-Math.PI / 2), mat.dark); pit.position.y = 0.001; h.add(pit);
+  for (let i = 0; i < 6; i++) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 4), mat.dirt); const b = i / 6 * 7; d.position.set(Math.cos(b) * 0.022, 0.001, Math.sin(b) * 0.022); d.scale.y = 0.5; h.add(d); }
+  h.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); h.scale.setScalar(0.01);
+  town.add(h); holes.push({ obj: h, t: 0, big, a, r });
+  sfx.dig();
+}
+function spawnBug(hole) {
+  const big = hole.big, obj = bugModel(big);
+  obj.position.copy(hole.obj.position); obj.position.y = -0.02;
+  town.add(obj);
+  bugs.push({ obj, t: 0, hp: big ? 3 : 1, big, speed: (big ? 0.018 : 0.03) * (1 + wave * 0.06), wob: Math.random() * 7, out: 0, dead: false, squash: 0 });
+}
+function killBug(b) {
+  b.dead = true; b.squash = 0.001;
+  const pts = b.big ? 50 : 10; score += pts * (b.obj.position.length() > 0.25 ? 2 : 1); updateHud();
+  const sp = new THREE.Mesh(new THREE.CircleGeometry(b.big ? 0.03 : 0.018, 12).rotateX(-Math.PI / 2), mat.splat.clone());
+  sp.position.copy(b.obj.position); sp.position.y = 0.0012; town.add(sp); splats.push({ obj: sp, t: 0 });
+  sfx.squash(); buzz(30);
+}
+// выстрел лучом
+const ray = new THREE.Ray();
+function shootRay(origin, dir) {
+  ray.set(origin, dir);
+  let best = null, bestD = 1e9;
+  const wp = new THREE.Vector3();
+  for (const b of bugs) {
+    if (b.dead) continue;
+    b.obj.getWorldPosition(wp);
+    const rad = (b.big ? 0.05 : 0.03) * sizeK;
+    const d = ray.distanceSqToPoint(wp);
+    if (d < rad * rad) { const along = wp.distanceTo(origin); if (along < bestD) { bestD = along; best = b; } }
+  }
+  // луч-трассер
+  const end = origin.clone().add(dir.clone().multiplyScalar(best ? bestD : 1.5));
+  const geo = new THREE.BufferGeometry().setFromPoints([origin.clone().add(dir.clone().multiplyScalar(0.05)), end]);
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x9cfaff, transparent: true }));
+  scene.add(line); sparks.push({ obj: line, t: 0 });
+  if (!best) { sfx.miss(); return; }
+  best.hp--;
+  if (best.hp <= 0) killBug(best); else { sfx.hit(); best.obj.position.multiplyScalar(1.12); }
+}
+function placeTown(matrix) {
+  const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+  matrix.decompose(p, q, s);
+  town.position.copy(p);
+  const cp = viewerPos;
+  town.rotation.set(0, Math.atan2(cp.x - p.x, cp.z - p.z), 0);
+  placed = true; town.visible = true; reticle.visible = false;
+  $('#scan').style.display = 'none';
+  sfx.place(); buzz(40);
+  town.scale.setScalar(0.01); appearT = 0;
+  setTimeout(beginGame, 1200);
+}
+let appearT = 1;
+function beginGame() {
+  for (const b of bugs) town.remove(b.obj); for (const h of holes) town.remove(h.obj); for (const s of splats) town.remove(s.obj);
+  bugs = []; holes = []; splats = [];
+  castleHp = 10; score = 0; wave = 0; playing = true; castleObj.position.x = 0;
+  startWave();
+  setTimeout(() => showHint('Можно ходить вокруг стола и смотреть с любой стороны', 3500), 2500);
+}
+function gameOver() {
+  playing = false;
+  const b = best.get('stol'); let line = 'Рекорд: ' + b;
+  if (score > b) { best.set('stol', score); line = 'Новый рекорд!'; }
+  $('#overBody').innerHTML = `<p>Очки: <b>${score}</b></p><p>Волна: <b>${wave}</b></p><p>${line}</p>`;
+  [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.1, 1, i * 0.22));
+  if (renderer.xr.isPresenting) { showBanner('Замок пал!', 'Тапни, чтобы начать снова', 4000); waitingRestart = true; }
+  else setTimeout(() => $('#overScr').classList.remove('hide'), 1000);
+}
+let waitingRestart = false;
+
+function update(dt) {
+  time += dt;
+  if (appearT < 1) { appearT = Math.min(1, appearT + dt / 0.8); const e = 1 - Math.pow(1 - appearT, 3); town.scale.setScalar(sizeK * Math.max(0.01, e * (1 + Math.sin(appearT * Math.PI) * 0.15))); }
+  castleObj.userData.flag.rotation.y = Math.sin(time * 4) * 0.3;
+  const fp = castleObj.userData.flag.geometry.attributes.position;
+  for (let i = 0; i < fp.count; i++) { const x = fp.getX(i) + 0.011; fp.setZ(i, Math.sin(time * 8 - x * 300) * 0.002 * (x / 0.022)); }
+  fp.needsUpdate = true;
+  if (castleHitT > 0) { castleHitT -= dt; castleObj.position.x = Math.sin(time * 80) * 0.003 * castleHitT; }
+  // жители гуляют по дорожке и подпрыгивают; когда жуки близко - прячутся к замку
+  const danger = bugs.some(b => !b.dead && b.obj.position.length() < 0.12);
+  for (const p of people) {
+    const u = p.userData; u.a += u.sp * dt * (danger ? 2 : 1);
+    const r = danger ? 0.055 : u.r;
+    u.rr = (u.rr || r) + (r - (u.rr || r)) * dt * 3;
+    p.position.set(Math.cos(u.a) * u.rr, 0.0085 + Math.abs(Math.sin(time * 8 + u.hop)) * 0.003, Math.sin(u.a) * u.rr);
+    p.rotation.y = -u.a + (u.sp > 0 ? 0 : Math.PI);
+  }
+  for (const s of sparks) { s.t += dt; s.obj.material.opacity = 1 - s.t / 0.15; if (s.t > 0.15) scene.remove(s.obj); }
+  sparks = sparks.filter(s => s.t <= 0.15);
+  for (const s of splats) { s.t += dt; if (s.t > 3) { s.obj.material.opacity = Math.max(0, 0.8 - (s.t - 3)); if (s.t > 4) town.remove(s.obj); } }
+  splats = splats.filter(s => s.t <= 4);
+  // норы растут, из них вылезают жуки
+  for (const h of holes) {
+    h.t += dt;
+    h.obj.scale.setScalar(Math.min(1, h.t / 0.8));
+    if (h.t > 1 && !h.spawned) { h.spawned = true; spawnBug(h); }
+    if (h.t > 4) h.obj.scale.setScalar(Math.max(0.01, 1 - (h.t - 4)));
+  }
+  holes = holes.filter(h => { if (h.t > 5) { town.remove(h.obj); return false; } return true; });
+  for (const b of bugs) {
+    b.t += dt;
+    if (b.dead) { b.squash += dt; b.obj.scale.y = Math.max(0.05, (b.big ? 2 : 1) * (1 - b.squash * 6)); if (b.squash > 0.6) town.remove(b.obj); continue; }
+    const pos = b.obj.position;
+    if (b.out < 1) { b.out = Math.min(1, b.out + dt / 0.7); pos.y = -0.02 * (1 - b.out); }
+    else {
+      // ползёт к замку, слегка виляя
+      const toC = new THREE.Vector3(-pos.x, 0, -pos.z), dist = toC.length();
+      toC.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(b.t * 2 + b.wob) * 0.5);
+      pos.addScaledVector(toC, b.speed * dt);
+      b.obj.rotation.y = Math.atan2(toC.x, toC.z);
+      if (dist < 0.055) {
+        b.dead = true; b.squash = 0.4; castleHp -= b.big ? 3 : 1; castleHitT = 0.5; sfx.castle(); buzz([100, 50, 100]); updateHud();
+        if (castleHp <= 0 && playing) gameOver();
+      }
+    }
+    for (const leg of b.obj.userData.legs) leg.rotation.x = Math.sin(b.t * 25 + leg.userData.phase * 2) * 0.5;
+  }
+  bugs = bugs.filter(b => !(b.dead && b.squash > 0.6));
+  if (!playing) return;
+  if (toSpawn > 0) { spawnT -= dt; if (spawnT <= 0) { toSpawn--; openHole(wave % 3 === 0 && toSpawn === 0); spawnT = Math.max(0.9, 2.6 - wave * 0.2) * rnd(0.6, 1.3); } }
+  else if (!bugs.length && !holes.length) { waveT += dt; if (waveT > 0.1 && waveT - dt <= 0.1) { showBanner('Волна ' + wave + ' отбита!', castleHp < 10 ? 'Замок починили' : ''); castleHp = Math.min(10, castleHp + 2); updateHud(); } if (waveT > 3) startWave(); }
+}
+
+// ---------- AR-сессия ----------
+let hitSource = null, xrSession = null;
+const clock = new THREE.Clock();
+renderer.setAnimationLoop((t, frame) => {
+  const dt = Math.min(0.05, clock.getDelta());
+  if (frame) {
+    const vp = frame.getViewerPose(renderer.xr.getReferenceSpace());
+    if (vp) { const p = vp.transform.position; viewerPos.set(p.x, p.y, p.z); }
+  }
+  if (frame && hitSource && !placed) {
+    const res = frame.getHitTestResults(hitSource);
+    if (res.length) {
+      const pose = res[0].getPose(renderer.xr.getReferenceSpace());
+      reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix);
+    } else reticle.visible = false;
+  }
+  if (placed || !renderer.xr.isPresenting) update(dt);
+  if (!renderer.xr.isPresenting && demo) demoCam();
+  renderer.render(scene, camera);
+});
+async function startAR() {
+  initAudio();
+  try {
+    xrSession = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], domOverlay: { root: $('#overlay') } });
+  } catch (e) { $('#supportMsg').textContent = 'Не удалось запустить AR: ' + e.message; return; }
+  renderer.xr.setReferenceSpaceType('local');
+  await renderer.xr.setSession(xrSession);
+  $('#startScr').classList.add('hide'); $('#hud').style.display = 'flex'; $('#scan').style.display = 'block';
+  placed = false; town.visible = false; playing = false; updateHud();
+  const viewer = await xrSession.requestReferenceSpace('viewer');
+  hitSource = await xrSession.requestHitTestSource({ space: viewer });
+  xrSession.addEventListener('select', e => {
+    if (!placed) { if (reticle.visible) placeTown(reticle.matrix); return; }
+    if (waitingRestart) { waitingRestart = false; beginGame(); return; }
+    if (!playing) return;
+    const pose = e.frame.getPose(e.inputSource.targetRaySpace, renderer.xr.getReferenceSpace());
+    if (!pose) return;
+    const m = new THREE.Matrix4().fromArray(pose.transform.matrix);
+    const o = new THREE.Vector3().setFromMatrixPosition(m);
+    const d = new THREE.Vector3(0, 0, -1).transformDirection(m);
+    shootRay(o, d);
+  });
+  xrSession.addEventListener('end', () => {
+    hitSource = null; xrSession = null; playing = false; placed = false; town.visible = false;
+    $('#hud').style.display = 'none'; $('#scan').style.display = 'none'; $('#startScr').classList.remove('hide');
+  });
+}
+// кнопки в AR не должны считаться выстрелом
+for (const el of document.querySelectorAll('#overlay .hbtn')) el.addEventListener('beforexrselect', e => e.preventDefault());
+$('#btnExit').onclick = () => { if (xrSession) xrSession.end(); else location.href = './'; };
+$('#btnSound').onclick = () => { soundOn = !soundOn; $('#btnSound').textContent = soundOn ? '🔊' : '🔇'; };
+$('#btnSize').onclick = () => {
+  sizeK = sizeK === 1 ? 2.5 : 1; town.scale.setScalar(sizeK);
+  showHint(sizeK > 1 ? 'Большой городок - для пола' : 'Маленький городок - для стола', 1800);
+};
+$('#btnAgain').onclick = () => { $('#overScr').classList.add('hide'); beginGame(); };
+
+// ---------- Демо без AR (ПК или телефон без ARCore) ----------
+let demo = false, orbitA = 0.5, orbitE = 0.75, orbitR = 0.7;
+function startDemo() {
+  initAudio(); demo = true;
+  scene.background = new THREE.Color(0x26303a);
+  const table = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.03, 48), M(0x9a6a3a)); table.position.y = -0.015; table.receiveShadow = true; scene.add(table);
+  $('#startScr').classList.add('hide'); $('#hud').style.display = 'flex';
+  town.position.set(0, 0, 0); town.visible = true; placed = true; town.scale.setScalar(0.01); appearT = 0;
+  sfx.place(); setTimeout(beginGame, 1000);
+  showHint('Демо: крути стол пальцем, тапай по жукам', 3000);
+  let down = null;
+  renderer.domElement.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, m: 0 }; });
+  renderer.domElement.addEventListener('pointermove', e => {
+    if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y; down.m += Math.abs(dx) + Math.abs(dy); down.x = e.clientX; down.y = e.clientY;
+    orbitA -= dx * 0.008; orbitE = clamp(orbitE + dy * 0.006, 0.2, 1.4);
+  });
+  renderer.domElement.addEventListener('pointerup', e => {
+    if (down && down.m < 10) {
+      if (waitingRestart) { waitingRestart = false; beginGame(); }
+      else if (playing) { const rc = new THREE.Raycaster(); rc.setFromCamera({ x: e.clientX / innerWidth * 2 - 1, y: -(e.clientY / innerHeight) * 2 + 1 }, camera); shootRay(rc.ray.origin.clone(), rc.ray.direction.clone()); }
+    }
+    down = null;
+  });
+}
+function demoCam() {
+  camera.position.set(Math.cos(orbitA) * Math.cos(orbitE) * orbitR, Math.sin(orbitE) * orbitR, Math.sin(orbitA) * Math.cos(orbitE) * orbitR);
+  camera.lookAt(0, 0.03, 0);
+}
+
+// ---------- Проверка поддержки ----------
+(async () => {
+  let ok = false;
+  try { ok = !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-ar')); } catch (e) {}
+  if (ok) { $('#supportMsg').textContent = 'AR работает на этом телефоне!'; $('#supportMsg').style.color = '#9cff6a'; $('#btnAR').style.display = 'inline-block'; }
+  else $('#supportMsg').innerHTML = 'Этот браузер не умеет AR. Нужен <b>Chrome на Android</b> и приложение «Сервисы Google Play для AR» (ARCore). Можно посмотреть демо.';
+  $('#btnDemo').style.display = 'inline-block';
+  if (ok) { $('#btnDemo').className = 'small'; }
+})();
+$('#btnAR').onclick = startAR;
+$('#btnDemo').onclick = startDemo;
+</script>
+</body>
+</html>

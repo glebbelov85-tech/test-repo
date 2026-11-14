@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Отмахнись рукой</title>
+<link rel="stylesheet" href="core.css">
+</head>
+<body>
+<script src="core.js"></script>
+<script src="monstry.js"></script>
+<script>
+"use strict";
+// ===== Отмахнись рукой =====
+// Камера следит за движением в кадре (сравнивает кадры между собой).
+// Мухи летят издалека к экрану. Махни перед камерой рукой - и муха отлетит.
+// Если муха долетела - она садится на "стекло" и ползает, пока не прогонишь.
+const MAX_LIVES = 5;
+let flies = [], stuck = [], score = 0, lives = MAX_LIVES, spawnT = 0, level = 1, killed = 0, combo = 0, comboT = 0;
+
+// ---------- Датчик движения ----------
+const AW = 64; // ширина маленькой копии кадра
+let AH = 48, an = null, actx = null, prevLum = null, motion = null, motionFrac = 0, steady = true, steadyT = 0;
+function senseMotion() {
+  if (!camOn || !cam.videoWidth) return;
+  AH = Math.round(AW * cam.videoHeight / cam.videoWidth);
+  if (!an || an.height !== AH) {
+    an = document.createElement('canvas'); an.width = AW; an.height = AH;
+    actx = an.getContext('2d', { willReadFrequently: true });
+    prevLum = null; motion = new Uint8Array(AW * AH);
+  }
+  actx.drawImage(cam, 0, 0, AW, AH);
+  const d = actx.getImageData(0, 0, AW, AH).data;
+  const lum = new Float32Array(AW * AH);
+  for (let i = 0, j = 0; i < lum.length; i++, j += 4) lum[i] = d[j] * 0.3 + d[j + 1] * 0.59 + d[j + 2] * 0.11;
+  let cnt = 0;
+  if (prevLum) for (let i = 0; i < lum.length; i++) { const m = Math.abs(lum[i] - prevLum[i]) > 28 ? 1 : 0; motion[i] = m; cnt += m; }
+  prevLum = lum;
+  motionFrac = cnt / lum.length;
+  // если двигается почти весь кадр - это качнули телефон, а не рука
+  steady = motionFrac < 0.35 && turnSpeed < 1.2;
+  steadyT = steady ? steadyT + 1 : 0;
+}
+// доля "движущихся" пикселей в круге экрана
+function motionAt(x, y, r) {
+  if (!motion || !steady || steadyT < 3) return { f: 0 };
+  const fit = videoFit(), k = AW / fit.vw;
+  const c = screenToVideo(x, y, fit), rr = Math.max(2, (r / fit.s) * k);
+  const cx = c.x * k, cy = c.y * k;
+  let tot = 0, hit = 0, sx = 0, sy = 0;
+  for (let yy = Math.floor(cy - rr); yy <= cy + rr; yy++) for (let xx = Math.floor(cx - rr); xx <= cx + rr; xx++) {
+    if (xx < 0 || yy < 0 || xx >= AW || yy >= AH) continue;
+    if ((xx - cx) ** 2 + (yy - cy) ** 2 > rr * rr) continue;
+    tot++; if (motion[yy * AW + xx]) { hit++; sx += xx - cx; sy += yy - cy; }
+  }
+  return { f: tot ? hit / tot : 0, dx: hit ? sx / hit : 0, dy: hit ? sy / hit : 0 };
+}
+
+const sfx = {
+  buzzOn: null,
+  swat() { noise(0.12, 0.35, 2500, 0, 'bandpass'); tone(500, 0.1, 'triangle', 0.08, 1.8); },
+  splat() { noise(0.25, 0.4, 600); tone(120, 0.3, 'sawtooth', 0.12, 0.5); },
+  combo(n) { tone(600 + n * 120, 0.12, 'triangle', 0.09); },
+  gold() { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.15, 'triangle', 0.09, 1, i * 0.07)); }
+};
+// постоянное жужжание, громче когда мухи близко
+let buzzOsc = null, buzzGain = null;
+function updateBuzz() {
+  if (!AC) return;
+  if (!buzzOsc) {
+    buzzOsc = AC.createOscillator(); buzzGain = AC.createGain(); const f = AC.createBiquadFilter();
+    buzzOsc.type = 'sawtooth'; buzzOsc.frequency.value = 180; f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 2;
+    buzzGain.gain.value = 0; buzzOsc.connect(f).connect(buzzGain).connect(AC.destination); buzzOsc.start();
+  }
+  let near = 0; for (const f of flies) near = Math.max(near, 1 - f.z);
+  if (stuck.length) near = Math.max(near, 0.8);
+  const want = soundOn && ARGame.state === 'play' ? near * near * 0.06 : 0;
+  buzzGain.gain.setTargetAtTime(want, AC.currentTime, 0.1);
+  buzzOsc.frequency.setTargetAtTime(170 + Math.sin(time * 9) * 25 + near * 60, AC.currentTime, 0.05);
+}
+
+function spawnFly() {
+  const r = Math.random();
+  const type = r < 0.08 ? 'gold' : (level >= 2 && r < 0.35) ? 'wasp' : 'fly';
+  flies.push({
+    type, t: 0, z: 1, seed: Math.random() * 10,
+    // откуда летит (точка вдали) и куда (точка на экране)
+    x0: rnd(0.3, 0.7), y0: rnd(0.3, 0.55), x1: rnd(0.12, 0.88), y1: rnd(0.18, 0.82),
+    speed: (type === 'wasp' ? 0.2 : type === 'gold' ? 0.16 : 0.12) * (1 + level * 0.08),
+    color: type === 'wasp' ? '#e8b400' : type === 'gold' ? '#ffd700' : '#2c3a2e', hitT: 0
+  });
+}
+// экранная позиция и размер мухи
+function flyPos(f) {
+  const k = 1 - f.z, ease = k * k;
+  const wob = (1 - ease) * 0.06 + 0.02;
+  const x = (f.x0 + (f.x1 - f.x0) * ease + Math.sin(f.t * 5 + f.seed) * wob) * W;
+  const y = (f.y0 + (f.y1 - f.y0) * ease + Math.cos(f.t * 4 + f.seed * 2) * wob) * H;
+  const r = (8 + 70 * ease) * Math.min(W, H) / 400;
+  return { x, y, r };
+}
+function swat(f, p, dx, dy, how) {
+  f.dead = true;
+  const pts = (f.type === 'gold' ? 50 : f.type === 'wasp' ? 20 : 10) * (combo >= 2 ? combo : 1);
+  combo++; comboT = 1.2;
+  score += pts; killed++; updateHud();
+  // улетает, кувыркаясь, в сторону от руки
+  const len = Math.hypot(dx, dy) || 1;
+  flyingOff.push({ f, x: p.x, y: p.y, r: p.r, vx: -dx / len * 900 + rnd(-200, 200), vy: -dy / len * 900 - 200, rot: 0, life: 1 });
+  floatText(p.x, p.y - p.r, '+' + pts + (combo >= 3 ? ' x' + combo : ''), f.type === 'gold' ? '#ffd700' : '#fff');
+  burst(p.x, p.y, f.type === 'gold' ? '#ffd700' : '#9effa0', 14);
+  f.type === 'gold' ? sfx.gold() : sfx.swat(); if (combo >= 2) sfx.combo(combo);
+  buzz(25);
+}
+let flyingOff = [], sparks = [];
+function updateHud() {
+  hud('<span style="font-size:20px">' + '❤'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, MAX_LIVES - lives)) + '</span><br>' + score + ' <small>· уровень ' + level + '</small>');
+}
+function tap(x, y) {
+  for (const f of flies) { const p = flyPos(f); if (Math.hypot(x - p.x, y - p.y) < Math.max(p.r * 1.3, 26) && f.z < 0.75) { swat(f, p, p.x - x || 1, p.y - y, 'tap'); return; } }
+  for (const s of stuck) if (Math.hypot(x - s.x, y - s.y) < s.r * 1.3) { s.dead = true; score += 5; updateHud(); sfx.swat(); burst(s.x, s.y, '#9effa0', 10); return; }
+}
+
+ARGame.setup({
+  title: 'Отмахнись рукой',
+  colors: { bg1: '#0f3020', glow: '#6dff9e', b1: '#3fd47a', b2: '#1a8a46', b3: '#0b4a24' },
+  intro: ['К тебе летят мухи - сначала крошечные вдалеке, потом всё ближе и громче.',
+    '<b>Держи телефон неподвижно</b> одной рукой, а другой <b>махни перед камерой</b> - муха отлетит! Отогнать можно, когда муха уже близко и большая.',
+    'Можно включить переднюю камеру 📷 и отгонять мух от своего лица. Пальцем тапать тоже можно.'],
+  startText: 'Поехали',
+  useGyro: true, // гироскоп нужен, чтобы понимать, когда телефон качнули
+  buttons: [{ text: '📷', onclick: async () => { const ok = await startCamera(camFacing === 'user' ? 'environment' : 'user'); prevLum = null; showHint(ok ? (camFacing === 'user' ? 'Передняя камера' : 'Задняя камера') : 'Камера не переключилась', 1500); } }],
+  fakeWorld: false,
+  drawIcon: (c, t) => { c.scale(1.2, 1.2); drawFly(c, { t, hitT: 0 }); },
+  onBegin() {
+    flies = []; stuck = []; flyingOff = []; score = 0; lives = MAX_LIVES; level = 1; killed = 0; spawnT = 1.5; combo = 0;
+    updateHud(); showBanner('Мухи летят!', 'Махни рукой перед камерой');
+    if (!camOn) setTimeout(() => showHint('Без камеры - тапай по мухам пальцем', 3000), 2000);
+  },
+  onTap: tap,
+  update(dt) {
+    senseMotion(); updateBuzz();
+    for (const s of sparks) s.life -= dt; sparks = sparks.filter(s => s.life > 0);
+    for (const o of flyingOff) { o.x += o.vx * dt; o.y += o.vy * dt; o.vy += 900 * dt; o.rot += dt * 14; o.life -= dt; }
+    flyingOff = flyingOff.filter(o => o.life > 0);
+    if (comboT > 0) { comboT -= dt; if (comboT <= 0) combo = 0; }
+    if (ARGame.state !== 'play') return;
+    level = 1 + Math.floor(killed / 12);
+    spawnT -= dt;
+    if (spawnT <= 0 && flies.length < 3 + level) { spawnFly(); spawnT = Math.max(0.6, 2.4 - level * 0.2) * rnd(0.6, 1.3); }
+    // искры там, где движется рука
+    if (motion && steady && steadyT > 3 && motionFrac > 0.004) {
+      const fit = videoFit(), k = AW / fit.vw;
+      for (let n = 0; n < 30; n++) {
+        const i = Math.floor(Math.random() * motion.length); if (!motion[i]) continue;
+        let x = ((i % AW) / k) * fit.s + fit.ox, y = (Math.floor(i / AW) / k) * fit.s + fit.oy;
+        if (fit.mirror) x = W - x;
+        sparks.push({ x, y, life: 0.4, s: rnd(2, 5) });
+      }
+    }
+    for (const f of flies) {
+      f.t += dt; f.z -= f.speed * dt * (f.type === 'wasp' ? (Math.sin(f.t * 3) > 0 ? 1.6 : 0.3) : 1);
+      const p = flyPos(f);
+      if (f.z < 0.7) {
+        const m = motionAt(p.x, p.y, p.r * 1.2);
+        if (m.f > 0.16) { swat(f, p, m.dx, m.dy, 'hand'); continue; }
+      }
+      if (f.z <= 0) {
+        // села на экран
+        f.dead = true; lives--; updateHud(); sfx.splat(); ARGame.hurt(); combo = 0;
+        stuck.push({ x: p.x, y: p.y, r: p.r, t: 0, a: rnd(0, 6), type: f.type, color: f.color, hitT: 0 });
+        if (lives <= 0) {
+          const b = best.get('ruka'); let line = 'Рекорд: ' + b;
+          if (score > b) { best.set('ruka', score); line = 'Новый рекорд!'; }
+          ARGame.over('Мухи захватили экран!', `<p>Очки: <b>${score}</b></p><p>Отогнано мух: <b>${killed}</b></p><p>${line}</p>`);
+        } else showHint('Муха села на экран! Махни рукой, чтобы прогнать', 2000);
+      }
+    }
+    flies = flies.filter(f => !f.dead);
+    for (const s of stuck) {
+      s.t += dt; s.a += Math.sin(s.t * 1.3) * dt * 2;
+      const sp = Math.sin(s.t * 3) > 0 ? 40 : 0;
+      s.x = clamp(s.x + Math.cos(s.a) * sp * dt, s.r, W - s.r); s.y = clamp(s.y + Math.sin(s.a) * sp * dt, s.r + 60, H - s.r);
+      const m = motionAt(s.x, s.y, s.r * 1.3);
+      if (m.f > 0.2) { s.dead = true; score += 5; updateHud(); sfx.swat(); burst(s.x, s.y, '#9effa0', 10);
+        flyingOff.push({ f: { type: s.type, t: s.t, color: s.color, hitT: 0 }, x: s.x, y: s.y, r: s.r, vx: rnd(-600, 600), vy: -500, rot: 0, life: 1 }); }
+    }
+    stuck = stuck.filter(s => !s.dead);
+  },
+  render() {
+    if (!camOn) drawFakeWorld('#0c2a1c', '#020805');
+    // искры от руки
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const s of sparks) { ctx.globalAlpha = s.life * 2; ctx.fillStyle = '#7dffb0'; ctx.beginPath(); ctx.arc(s.x, s.y, s.s, 0, 7); ctx.fill(); }
+    ctx.restore(); ctx.globalAlpha = 1;
+    // мухи: дальние сначала, дальние - бледные
+    flies.slice().sort((a, b) => b.z - a.z).forEach(f => {
+      const p = flyPos(f);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.globalAlpha = clamp((1 - f.z) * 3, 0.15, 1);
+      ctx.rotate(Math.sin(f.t * 7 + f.seed) * 0.4); ctx.scale(p.r / 40, p.r / 40);
+      drawFly(ctx, f);
+      if (f.type === 'wasp') { ctx.fillStyle = '#111'; for (let i = 0; i < 3; i++) ctx.fillRect(-16, 4 + i * 9, 32, 4); }
+      if (f.type === 'gold') { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,220,80,.35)'; ctx.beginPath(); ctx.arc(0, 0, 50, 0, 7); ctx.fill(); }
+      ctx.restore();
+      // когда муха близко, вокруг неё кольцо "можно отогнать"
+      if (f.z < 0.7) { ctx.strokeStyle = `rgba(255,255,255,${0.15 + Math.sin(time * 10) * 0.1})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 1.25, 0, 7); ctx.stroke(); }
+    });
+    ctx.globalAlpha = 1;
+    for (const o of flyingOff) {
+      ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.rot); ctx.globalAlpha = clamp(o.life * 2, 0, 1); ctx.scale(o.r / 40, o.r / 40); drawFly(ctx, o.f); ctx.restore();
+    }
+  },
+  renderTop() {
+    // мухи, севшие на "стекло", поверх всего + пятнышко
+    for (const s of stuck) {
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a + Math.PI / 2); ctx.scale(s.r / 40, s.r / 40);
+      drawFly(ctx, { t: Math.sin(s.t * 3) > 0 ? s.t : 0, hitT: 0, color: s.color });
+      ctx.restore();
+    }
+    if (ARGame.state === 'play' && camOn && !steady && motionFrac > 0.35) {
+      ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, H - 60, W, 34);
+      ctx.fillStyle = '#ffd34d'; ctx.font = '600 15px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('Держи телефон ровнее - махать надо рукой', W / 2, H - 38);
+    }
+  }
+});
+</script>
+</body>
+</html>

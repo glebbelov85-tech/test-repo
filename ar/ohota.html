@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Охота на монстров</title>
+<link rel="stylesheet" href="core.css">
+</head>
+<body>
+<script src="core.js"></script>
+<script src="monstry.js"></script>
+<script>
+"use strict";
+// ===== Классическая охота: миры-фильтры + монстры вокруг игрока =====
+// Монстры теперь появляются далеко (в тумане, маленькие) из тёмного портала
+// и идут к игроку по полу - чем ближе, тем больше и ниже на экране.
+const THEMES = [
+  { name: 'Призрачная ночь', filter: 'grayscale(1) sepia(1) hue-rotate(180deg) saturate(2.2) brightness(.6) contrast(1.25)', vig: '0,10,40', part: 'fog' },
+  { name: 'Адское пламя', filter: 'grayscale(1) sepia(1) hue-rotate(-35deg) saturate(4) contrast(1.3) brightness(.8)', vig: '60,0,0', part: 'ember' },
+  { name: 'Ночное видение', filter: 'grayscale(1) sepia(1) hue-rotate(65deg) saturate(3) brightness(1.1) contrast(1.4)', vig: '0,25,0', part: 'scan' },
+  { name: 'Изнанка', filter: 'invert(1) hue-rotate(180deg) saturate(1.8) contrast(1.1)', vig: '40,0,60', part: 'spore' },
+  { name: 'Обычный мир', filter: 'none', vig: '0,0,0', part: 'none' }
+];
+let themeIdx = 0, ambient = [];
+function setTheme(i, announce) {
+  themeIdx = (i + THEMES.length) % THEMES.length;
+  cam.style.filter = THEMES[themeIdx].filter;
+  ambient = [];
+  if (announce) showHint('Мир: ' + THEMES[themeIdx].name, 1600);
+}
+
+const MAX_LIVES = 5, FAR = 14;
+// size - "радиус" монстра в метрах, h - на какой высоте его центр
+const TYPES = {
+  ghost: { hp: 1, speed: 1.1, size: 0.42, pts: 10 },
+  bug:   { hp: 1, speed: 1.8, size: 0.28, pts: 15 },
+  boss:  { hp: 6, speed: 0.7, size: 0.8,  pts: 60 }
+};
+let monsters = [], portals = [];
+let score = 0, lives = 5, wave = 1, toSpawn = 0, spawnT = 0, spawnEvery = 2, bossPending = false, waveClearT = 0, idSeq = 0;
+let lasers = [];
+
+function startWave(n) {
+  wave = n; toSpawn = 3 + n * 2;
+  spawnEvery = Math.max(0.8, 2.6 - n * 0.15);
+  spawnT = 1.2; bossPending = n % 3 === 0; waveClearT = 0;
+  setTheme(n - 1, false);
+  showBanner('Волна ' + n, THEMES[themeIdx].name);
+  sfx.wave(); updateHud();
+}
+function updateHud() {
+  hud('<span style="font-size:20px">' + '❤'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, MAX_LIVES - lives)) + '</span><br>' + score + ' <small>· волна ' + wave + '</small>');
+}
+// портал открывается вдалеке, через секунду из него выходит монстр
+function openPortal() {
+  let type = 'ghost';
+  if (bossPending && toSpawn === 1) { type = 'boss'; bossPending = false; }
+  else if (wave >= 2 && Math.random() < 0.35) type = 'bug';
+  const off = Math.random() < 0.3 ? rnd(-30, 30) : (Math.random() < 0.5 ? -1 : 1) * rnd(35, 180);
+  portals.push({ yaw: camHeading() + off * D2R, d: FAR, t: 0, type });
+  if (type === 'boss') { sfx.boss(); showHint('БОСС! Ищи его по красной стрелке', 2200); } else sfx.portal();
+}
+function spawnFrom(pt) {
+  const T = TYPES[pt.type];
+  const m = {
+    id: ++idSeq, type: pt.type, yaw: pt.yaw, d: pt.d - 0.3,
+    h0: pt.type === 'ghost' ? rnd(1.1, 1.7) : T.size, h: 0,
+    speed: T.speed * (1 + (wave - 1) * 0.08) * rnd(0.85, 1.15),
+    hp: pt.type === 'boss' ? T.hp + Math.floor(wave / 3) : T.hp, size: T.size, t: 0, seed: Math.random() * 10, hitT: 0, dead: false
+  };
+  m.maxHp = m.hp; m.h = m.h0;
+  monsters.push(m);
+}
+function attack(m) {
+  m.dead = true; lives--; updateHud(); sfx.hurt(); ARGame.hurt();
+  if (lives <= 0) {
+    sfx.over();
+    const b = best.get('ohota'); let line = 'Рекорд: ' + b;
+    if (score > b) { best.set('ohota', score); line = 'Новый рекорд!'; }
+    ARGame.over('Монстры победили!', `<p>Очки: <b>${score}</b></p><p>Волна: <b>${wave}</b></p><p>${line}</p>`);
+  }
+}
+
+const sfx = {
+  shot() { tone(1100, 0.12, 'square', 0.06, 0.25); },
+  hit() { noise(0.12, 0.25, 2000); tone(260, 0.12, 'sawtooth', 0.08, 0.6); },
+  kill() { noise(0.25, 0.3, 900); tone(520, 0.08, 'square', 0.08); tone(780, 0.1, 'square', 0.08, 1, 0.08); tone(1040, 0.14, 'square', 0.07, 1, 0.16); },
+  portal() { tone(60, 0.9, 'sawtooth', 0.05, 2.2); noise(0.8, 0.06, 400); },
+  hurt() { tone(140, 0.45, 'sawtooth', 0.22, 0.4); noise(0.3, 0.3, 500); },
+  wave() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.18, 'triangle', 0.1, 1, i * 0.11)); },
+  over() { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.1, 1, i * 0.22)); },
+  boss() { tone(55, 1.2, 'sawtooth', 0.12, 0.7); tone(58, 1.2, 'square', 0.06, 0.7); }
+};
+
+const proj = m => project3(worldVec(m.yaw, m.d, m.h), m.size);
+// дальние монстры тонут в тумане
+const fogAlpha = d => clamp((FAR - d) / 5, 0.12, 1);
+
+function shoot(tx, ty) {
+  sfx.shot(); lasers.push({ x: tx, y: ty, life: 0.12 });
+  const list = monsters.map(m => ({ m, p: proj(m) })).filter(o => o.p.vis).sort((a, b) => a.m.d - b.m.d);
+  for (const { m, p } of list) {
+    if (Math.hypot(tx - p.sx, ty - p.sy) < Math.max(p.r * 1.1, 22)) {
+      m.hp--; m.hitT = 0.15;
+      burst(tx, ty, m.type === 'boss' ? '#ff5050' : '#ffffff', 10);
+      if (m.hp <= 0) {
+        m.dead = true;
+        // далёкий монстр стоит больше очков
+        const bonus = m.d > 7 ? 2 : 1, pts = TYPES[m.type].pts * wave * bonus;
+        score += pts; updateHud();
+        burst(p.sx, p.sy, m.type === 'ghost' ? '#cfe8ff' : m.type === 'bug' ? '#b4ff5a' : '#ff7a2a', 34);
+        floatText(p.sx, p.sy - p.r, '+' + pts + (bonus > 1 ? ' снайпер!' : ''));
+        sfx.kill(); buzz(40);
+      } else { m.d += 0.8; sfx.hit(); buzz(20); }
+      return;
+    }
+  }
+  burst(tx, ty, '#ffe066', 5);
+}
+
+ARGame.setup({
+  title: 'Охота на монстров',
+  intro: ['Мир вокруг меняется, а из тёмных порталов вдалеке выходят монстры и идут к тебе.',
+    '<b>Крутись с телефоном</b>, ищи их по стрелкам и радару и <b>тапай</b>, пока не подошли. Попал издалека - двойные очки!'],
+  startText: 'Начать охоту',
+  useGyro: true,
+  buttons: [{ text: 'Мир', onclick: () => setTheme(themeIdx + 1, true) }],
+  drawIcon: (c, t) => drawGhost(c, { t, seed: 1, hitT: 0 }),
+  onBegin() {
+    monsters = []; portals = []; lasers = []; score = 0; lives = MAX_LIVES;
+    startWave(1);
+    setTimeout(() => showHint('Монстры приходят издалека - смотри на радар внизу', 3500), 2200);
+  },
+  onTap: shoot,
+  update(dt) {
+    for (const l of lasers) l.life -= dt;
+    lasers = lasers.filter(l => l.life > 0);
+    for (const pt of portals) { pt.t += dt; if (pt.t > 1.1 && !pt.spawned) { pt.spawned = true; spawnFrom(pt); } }
+    portals = portals.filter(pt => pt.t < 2.2);
+    if (ARGame.state !== 'play') return;
+    if (waveClearT > 0) { waveClearT -= dt; if (waveClearT <= 0) startWave(wave + 1); }
+    else if (toSpawn > 0) { spawnT -= dt; if (spawnT <= 0) { openPortal(); toSpawn--; spawnT = spawnEvery * rnd(0.6, 1.4); } }
+    else if (monsters.length === 0 && portals.length === 0) {
+      waveClearT = 2.6; let extra = '';
+      if (wave % 2 === 0 && lives < MAX_LIVES) { lives++; extra = '+1 жизнь'; updateHud(); }
+      showBanner('Волна ' + wave + ' пройдена!', extra); tone(880, 0.3, 'triangle', 0.1);
+    }
+    for (const m of monsters) {
+      m.t += dt; m.hitT = Math.max(0, m.hitT - dt);
+      m.d -= m.speed * dt;
+      if (m.type === 'ghost') { m.yaw += Math.sin(m.t * 0.9 + m.seed) * 0.12 * dt; m.h = m.h0 + Math.sin(m.t * 1.3 + m.seed) * 0.15; }
+      else if (m.type === 'bug') { m.yaw += Math.sin(m.t * 3 + m.seed) * 0.35 * dt; m.h = m.h0 + Math.abs(Math.sin(m.t * 7)) * 0.04; }
+      else m.h = m.h0 + Math.abs(Math.sin(m.t * 2.5)) * 0.08;
+      if (m.d < 0.9) attack(m);
+    }
+    monsters = monsters.filter(m => !m.dead);
+  },
+  render(dt) {
+    drawAtmosphere(dt);
+    const roll = screenRoll();
+    // порталы: чёрная воронка на полу вдалеке
+    for (const pt of portals) {
+      const p = project3(worldVec(pt.yaw, pt.d, 0.05), 1.2);
+      if (!p.vis) continue;
+      const k = pt.t < 1.1 ? pt.t / 1.1 : Math.max(0, 1 - (pt.t - 1.1) / 1.1);
+      ctx.save(); ctx.translate(p.sx, p.sy); ctx.rotate(roll); ctx.scale(1, 0.35);
+      const R = p.r * k;
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+      const col = pt.type === 'boss' ? '255,40,20' : '170,90,255';
+      g.addColorStop(0, 'rgba(0,0,0,.95)'); g.addColorStop(0.6, `rgba(${col},.6)`); g.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+      ctx.strokeStyle = `rgba(${col},.9)`; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, 0, R * (0.3 + i * 0.22), time * 4 + i, time * 4 + i + 3.5); ctx.stroke(); }
+      ctx.restore();
+    }
+    const items = monsters.map(m => ({ m, p: proj(m) }));
+    items.filter(o => o.p.vis).sort((a, b) => b.m.d - a.m.d).forEach(({ m, p }) => {
+      // тень на полу под монстром
+      const sp = project3(worldVec(m.yaw, m.d, 0), m.size);
+      ctx.globalAlpha = 0.3 * fogAlpha(m.d); ctx.fillStyle = '#000';
+      if (sp.vis) { ctx.beginPath(); ctx.ellipse(sp.sx, sp.sy, sp.r * 0.8, sp.r * 0.22, roll, 0, 7); ctx.fill(); }
+      ctx.save(); ctx.translate(p.sx, p.sy); ctx.rotate(roll);
+      ctx.globalAlpha = fogAlpha(m.d);
+      // выход из портала: сначала растёт из точки
+      const grow = Math.min(1, m.t / 0.6);
+      ctx.scale(p.r / 50 * grow, p.r / 50 * grow);
+      drawMonsterBody(ctx, m);
+      ctx.restore(); ctx.globalAlpha = 1;
+      if (m.type === 'boss') {
+        const w = p.r * 1.4, x = p.sx - w / 2, y = p.sy - p.r * 1.6;
+        ctx.fillStyle = '#000a'; ctx.fillRect(x - 2, y - 2, w + 4, 10);
+        ctx.fillStyle = '#ff3b3b'; ctx.fillRect(x, y, w * (m.hp / m.maxHp), 6);
+      }
+    });
+    items.filter(o => !o.p.vis).forEach(o => drawPointer(o.p.c, o.m.type === 'boss' || o.m.d < 4 ? '#ff3b3b' : '#fff', o.m.d < 4));
+    for (const pt of portals) { const p = project3(worldVec(pt.yaw, pt.d, 0), 1); if (!p.vis) drawPointer(p.c, 'rgba(190,120,255,.8)', false); }
+    for (const l of lasers) {
+      const k = l.life / 0.12;
+      ctx.strokeStyle = `rgba(120,255,255,${k})`; ctx.lineWidth = 6 * k; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(W / 2, H + 10); ctx.lineTo(l.x, l.y); ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${k})`; ctx.beginPath(); ctx.arc(l.x, l.y, 16 * k, 0, 7); ctx.fill();
+    }
+  },
+  renderTop() {
+    if (ARGame.state === 'play' || ARGame.state === 'pause')
+      drawRadar([...monsters.map(m => ({ yaw: m.yaw, dist: m.d, color: m.type === 'boss' ? '#ff3b3b' : m.d < 4 ? '#ff9a3b' : '#fff', big: m.type === 'boss' })),
+        ...portals.map(p => ({ yaw: p.yaw, dist: p.d, color: '#b97aff' }))], FAR);
+  }
+});
+
+function drawAtmosphere(dt) {
+  const th = THEMES[themeIdx];
+  const want = th.part === 'none' || th.part === 'scan' ? 0 : 40;
+  while (ambient.length < want) ambient.push(newAmbient(th.part, true));
+  ctx.save();
+  for (const a of ambient) {
+    a.x += a.vx * dt; a.y += a.vy * dt; a.life -= dt;
+    if (a.life <= 0 || a.y < -60 || a.y > H + 60 || a.x < -80 || a.x > W + 80) Object.assign(a, newAmbient(th.part, false));
+    if (th.part === 'fog') {
+      const g = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, a.s);
+      g.addColorStop(0, 'rgba(170,200,255,.10)'); g.addColorStop(1, 'rgba(170,200,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(a.x - a.s, a.y - a.s, a.s * 2, a.s * 2);
+    } else if (th.part === 'ember') {
+      ctx.globalAlpha = Math.min(1, a.life); ctx.fillStyle = a.c; ctx.beginPath(); ctx.arc(a.x, a.y, a.s, 0, 7); ctx.fill();
+    } else if (th.part === 'spore') {
+      ctx.globalAlpha = 0.5 + Math.sin(time * 3 + a.s) * 0.3; ctx.fillStyle = '#e07bff';
+      ctx.beginPath(); ctx.arc(a.x + Math.sin(time + a.s) * 10, a.y, a.s * 0.5, 0, 7); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  if (th.part === 'scan') {
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    for (let y = (time * 40) % 4; y < H; y += 4) ctx.fillRect(0, y, W, 1.5);
+    ctx.fillStyle = 'rgba(180,255,180,.25)';
+    for (let i = 0; i < 120; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 1.5, 1.5);
+  }
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+  g.addColorStop(0, `rgba(${th.vig},0)`); g.addColorStop(1, `rgba(${th.vig},${th.part === 'none' ? 0.35 : 0.8})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+function newAmbient(kind, anywhere) {
+  const r = Math.random;
+  if (kind === 'fog') return { x: r() * W, y: r() * H, vx: 10 + r() * 20, vy: (r() - 0.5) * 6, s: 80 + r() * 140, life: 20 };
+  if (kind === 'ember') return { x: r() * W, y: anywhere ? r() * H : H + 20, vx: (r() - 0.5) * 30, vy: -40 - r() * 80, s: 1 + r() * 3, life: 3 + r() * 4, c: r() < 0.5 ? '#ffb030' : '#ff5a1a' };
+  return { x: r() * W, y: anywhere ? r() * H : H + 20, vx: (r() - 0.5) * 10, vy: -15 - r() * 25, s: 2 + r() * 6, life: 30 };
+}
+</script>
+</body>
+</html>
