@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Комната чудес</title>
+<link rel="stylesheet" href="core.css">
+<style>
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #000; }
+#cam { display: none; }
+#hud { display: none; }
+#bar { position: fixed; z-index: 5; left: 0; right: 0; bottom: 0; display: none; align-items: center; justify-content: center; gap: 10px;
+  padding: 10px 10px calc(env(safe-area-inset-bottom) + 14px); background: linear-gradient(#0000, #000b); }
+#bar .hbtn { font-size: 22px; padding: 10px 16px; }
+#fxName { min-width: 170px; text-align: center; font: 800 19px system-ui; text-shadow: 0 2px 6px #000; }
+#fxName small { display: block; font: 600 12px system-ui; opacity: .8; margin-top: 2px; }
+#hint { bottom: calc(env(safe-area-inset-bottom) + 96px); }
+.hbtn.on { background: #ffd34d; color: #000; }
+#vrExit { position: fixed; z-index: 6; left: 0; top: 0; width: 90px; height: 90px; display: none; }
+#vrLine { position: fixed; z-index: 5; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: #222; display: none; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<video id="cam" playsinline muted autoplay></video>
+<div id="hud">
+  <a class="hbtn" href="./">←</a>
+  <span class="grow"></span>
+  <button class="hbtn" id="btnFlip" title="Другая камера">🔄</button>
+  <button class="hbtn" id="btnStrobe" title="Стробоскоп">⚡</button>
+  <button class="hbtn" id="btnAuto" title="Автосмена">▶</button>
+  <button class="hbtn" id="btnVR" title="VR-шлем">👓</button>
+</div>
+<div id="bar">
+  <button class="hbtn" id="btnPrev">◀</button>
+  <div id="fxName"></div>
+  <button class="hbtn" id="btnNext">▶</button>
+</div>
+<div id="banner"></div><div id="hint"></div>
+<div id="vrLine"></div><div id="vrExit"></div>
+
+<div class="screen" id="startScr" style="--bg1:#3a0f4a;--glow:#ff7ae0;--b1:#ff5ad0;--b2:#8a1aa0;--b3:#45085a">
+  <h1>Комната чудес</h1>
+  <p>Кривые зеркала, эхо времени, радужные призраки, калейдоскоп и неон - твоя настоящая комната превращается в аттракцион.</p>
+  <p><b>Водишь пальцем</b> - двигается центр эффекта. <b>◀ ▶</b> - другие чудеса. 🔄 - передняя камера, чтобы смотреть на себя.</p>
+  <p>Есть режим для <b>VR-шлема</b> с телефоном: две картинки для двух глаз, телефон кладётся горизонтально.</p>
+  <p class="note">В эффекте «Стробоскоп» и с кнопкой ⚡ картинка мелькает. Если от мелькания неприятно - не включай.</p>
+  <div class="btnrow">
+    <button class="big" id="btnStart">Начать</button>
+    <button class="big" id="btnStartVR" style="--b1:#4a6aff;--b2:#1a2a9a;--b3:#0b1350">👓 В шлеме</button>
+  </div>
+  <a class="small" href="./">← Все режимы</a>
+  <p class="note warn" id="noGL" style="display:none">Этот браузер не умеет WebGL2 - эффекты не заработают. Открой в Chrome.</p>
+</div>
+
+<script src="core.js"></script>
+<script>
+"use strict";
+// ===== Комната чудес =====
+// Картинка с камеры идёт в видеокарту (WebGL2), там шейдер её искажает.
+// Прошлые кадры хранятся в "ленте" (массив текстур), поэтому можно
+// показывать разные части картинки из разного времени.
+cam = $('#cam');
+const canvas = $('#gl');
+const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
+if (!gl) $('#noGL').style.display = 'block';
+
+const EFFECTS = [
+  { id: 0,  e: '🔮', name: 'Пузырь',         grp: 'Кривое зеркало', hint: 'Води пальцем - пузырь двигается. Наведи на лицо!' },
+  { id: 1,  e: '🌊', name: 'Волны',          grp: 'Кривое зеркало', hint: 'Как в комнате смеха. Подойди ближе к камере' },
+  { id: 2,  e: '🤸', name: 'Худой и толстый', grp: 'Кривое зеркало', hint: 'Встань в центр - станешь то худым, то толстым' },
+  { id: 3,  e: '🦋', name: 'Симметрия',       grp: 'Кривое зеркало', hint: 'Лево = право. Двигай пальцем линию зеркала' },
+  { id: 4,  e: '❄️', name: 'Калейдоскоп',     grp: 'Кривое зеркало', hint: 'Медленно крути телефон' },
+  { id: 13, e: '🕳️', name: 'Воронка',         grp: 'Кривое зеркало', hint: 'Комнату затягивает в воронку. Тапни, где центр' },
+  { id: 5,  e: '⏳', name: 'Эхо времени',     grp: 'Время', hint: 'Внизу - сейчас, вверху - секунду назад. Помаши рукой!' },
+  { id: 6,  e: '🌀', name: 'Время из центра', grp: 'Время', hint: 'В центре - сейчас, по краям - прошлое. Покрутись' },
+  { id: 7,  e: '🧩', name: 'Мозаика времени', grp: 'Время', hint: 'Каждый кусочек - из своего времени. Двигайся!' },
+  { id: 8,  e: '🌈', name: 'Радужное время',  grp: 'Время', hint: 'Неподвижное - обычное, движущееся - радужное' },
+  { id: 9,  e: '👻', name: 'Призраки',        grp: 'Время', hint: 'За всем, что движется, тянется призрачный след' },
+  { id: 10, e: '📸', name: 'Стробоскоп',      grp: 'Время', hint: 'Махни рукой - останутся чёткие копии' },
+  { id: 11, e: '⚡', name: 'Неон',            grp: 'Цвет', hint: 'Мир из светящихся линий' },
+  { id: 12, e: '🔥', name: 'Тепловизор',      grp: 'Цвет', hint: 'Всё, что движется, становится горячим' },
+  { id: 14, e: '🍬', name: 'Конфетный мир',   grp: 'Цвет', hint: 'Цвета плывут по радуге' }
+];
+let fxIdx = 0, touch = [0.5, 0.5], vr = false, strobe = false, auto = false, autoT = 0;
+
+// ---------- Шейдеры ----------
+const VS = `#version 300 es
+in vec2 aPos; out vec2 vUV;
+void main() { vUV = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+const COPY_FS = `#version 300 es
+precision mediump float; in vec2 vUV; uniform sampler2D uCam; out vec4 o;
+void main() { o = texture(uCam, vUV); }`;
+const FX_FS = `#version 300 es
+precision highp float;
+precision mediump sampler2DArray;
+in vec2 vUV; out vec4 o;
+uniform sampler2D uCam;
+uniform sampler2DArray uHist;
+uniform int uHead, uN, uMode, uFreeze;
+uniform float uTime, uMirror, uVR, uPulse;
+uniform vec2 uRes, uScale, uOff, uTouch;
+const float PI = 3.14159265;
+vec2 cuv(vec2 p) { if (uMirror > 0.5) p.x = 1.0 - p.x; return clamp(p * uScale + uOff, 0.001, 0.999); }
+vec3 past(vec2 p, int k) {
+  k = clamp(k, 0, uN - 2);
+  int l = (uHead - k + uN * 4) % uN;
+  return texture(uHist, vec3(cuv(p), float(l))).rgb;
+}
+vec3 pastF(vec2 p, float k) { float f = floor(k); return mix(past(p, int(f)), past(p, int(f) + 1), k - f); }
+vec3 now(vec2 p) { if (uFreeze >= 0) return past(p, uFreeze); return texture(uCam, cuv(p)).rgb; }
+float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+vec3 hsv(float h, float s, float v) { vec3 k = clamp(abs(mod(h * 6.0 + vec3(0, 4, 2), 6.0) - 3.0) - 1.0, 0.0, 1.0); return v * mix(vec3(1), k, s); }
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float edge(vec2 p, int k) {
+  vec2 e = 1.5 / uRes;
+  float tl = lum(k < 0 ? now(p + vec2(-e.x, e.y)) : past(p + vec2(-e.x, e.y), k)), t = lum(k < 0 ? now(p + vec2(0, e.y)) : past(p + vec2(0, e.y), k)), tr = lum(k < 0 ? now(p + e) : past(p + e, k));
+  float l = lum(k < 0 ? now(p - vec2(e.x, 0)) : past(p - vec2(e.x, 0), k)), r = lum(k < 0 ? now(p + vec2(e.x, 0)) : past(p + vec2(e.x, 0), k));
+  float bl = lum(k < 0 ? now(p - e) : past(p - e, k)), b = lum(k < 0 ? now(p - vec2(0, e.y)) : past(p - vec2(0, e.y), k)), br = lum(k < 0 ? now(p + vec2(e.x, -e.y)) : past(p + vec2(e.x, -e.y), k));
+  float gx = -tl - 2.0 * l - bl + tr + 2.0 * r + br, gy = tl + 2.0 * t + tr - bl - 2.0 * b - br;
+  return length(vec2(gx, gy));
+}
+vec3 heat(float t) {
+  vec3 c = mix(vec3(0.0, 0.0, 0.15), vec3(0.3, 0.0, 0.7), smoothstep(0.0, 0.25, t));
+  c = mix(c, vec3(0.9, 0.1, 0.3), smoothstep(0.25, 0.5, t));
+  c = mix(c, vec3(1.0, 0.6, 0.0), smoothstep(0.5, 0.75, t));
+  return mix(c, vec3(1.0, 1.0, 0.85), smoothstep(0.75, 1.0, t));
+}
+void main() {
+  vec2 p = vUV;
+  float a = uRes.x / uRes.y;
+  float vign = 1.0;
+  if (uVR > 0.5) {
+    // предыскажение "бочкой" под линзы шлема
+    vec2 c = (p - 0.5) * vec2(a, 1.0);
+    float r2 = dot(c, c);
+    c *= (1.0 + 0.24 * r2 + 0.06 * r2 * r2) * 0.82;
+    p = c / vec2(a, 1.0) + 0.5;
+    if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) { o = vec4(0, 0, 0, 1); return; }
+    vign = smoothstep(0.75, 0.55, length((vUV - 0.5) * vec2(a, 1.0)));
+  }
+  vec3 col;
+  float t = uTime;
+  int N = uN - 2;
+  if (uMode == 0) { // пузырь
+    vec2 d = (p - uTouch) * vec2(a, 1.0);
+    float r = length(d), R = 0.42;
+    if (r < R) { float pw = 1.0 + 0.8 * (0.6 + 0.4 * sin(t * 1.6)); d *= pow(r / R, pw) * R / max(r, 1e-4); }
+    col = now(uTouch + d / vec2(a, 1.0));
+    col += vec3(0.08) * smoothstep(0.03, 0.0, abs(r - R)) ;
+  } else if (uMode == 1) { // волны
+    vec2 q = p;
+    q.x += sin(p.y * 11.0 + t * 1.3) * 0.04 + sin(p.y * 29.0 - t * 0.8) * 0.012;
+    q.y += sin(p.x * 7.0 + t * 0.9) * 0.025;
+    q.y = q.y + 0.07 * sin(q.y * PI * 2.0 + t * 0.4);
+    col = now(q);
+  } else if (uMode == 2) { // худой и толстый
+    float f = 1.0 + 0.65 * sin(t * 0.7);
+    float c = p.x - uTouch.x, s = smoothstep(0.0, 0.45, abs(c));
+    float q = uTouch.x + c * mix(1.0 / f, 1.0, s * s);
+    float cy = p.y - 0.5;
+    col = now(vec2(q, 0.5 + cy * mix(f * 0.92, 1.0, smoothstep(0.0, 0.6, abs(cy)))));
+  } else if (uMode == 3) { // симметрия
+    vec2 q = p; if (q.x > uTouch.x) q.x = 2.0 * uTouch.x - q.x;
+    col = now(q);
+  } else if (uMode == 4) { // калейдоскоп
+    vec2 d = (p - 0.5) * vec2(a, 1.0);
+    float r = length(d), an = atan(d.y, d.x) + t * 0.12, seg = PI / 4.0;
+    an = mod(an, seg * 2.0); if (an > seg) an = seg * 2.0 - an;
+    vec2 q = uTouch + vec2(cos(an), sin(an)) * r * 0.8 / vec2(a, 1.0);
+    col = now(fract(q));
+  } else if (uMode == 13) { // воронка
+    vec2 d = (p - uTouch) * vec2(a, 1.0);
+    float r = length(d), an = atan(d.y, d.x);
+    an += (0.9 + 0.5 * sin(t * 0.5)) * exp(-r * 3.0) * 4.0 * sin(t * 0.3 + 1.0);
+    r = pow(r, 1.0 + 0.25 * sin(t * 0.8));
+    col = now(uTouch + vec2(cos(an), sin(an)) * r / vec2(a, 1.0));
+  } else if (uMode == 5) { // эхо времени (щелевая съёмка)
+    col = pastF(p, p.y * float(N));
+  } else if (uMode == 6) { // время из центра
+    float r = length((p - uTouch) * vec2(a, 1.0));
+    col = pastF(p, clamp(r * 1.6, 0.0, 1.0) * float(N));
+  } else if (uMode == 7) { // мозаика времени
+    vec2 cell = floor(p * vec2(6.0, 6.0 / a));
+    float k = floor(hash(cell + floor(t * 0.25)) * float(N));
+    col = past(p, int(k));
+    vec2 f = fract(p * vec2(6.0, 6.0 / a));
+    col *= 0.85 + 0.15 * smoothstep(0.0, 0.04, min(min(f.x, f.y), min(1.0 - f.x, 1.0 - f.y)));
+  } else if (uMode == 8) { // радужное время
+    col = vec3(now(p).r, past(p, 7).g, past(p, 14).b);
+  } else if (uMode == 9) { // призраки
+    vec3 c0 = now(p); col = c0 * 0.5; float w = 0.5;
+    for (int i = 1; i <= 7; i++) { float wi = 0.5 * (1.0 - float(i) / 8.0) / 3.5; col += past(p, i * 3) * wi * vec3(0.75, 0.85, 1.15); w += wi; }
+    col /= w;
+  } else if (uMode == 10) { // стробоскоп: чёткие копии движущегося
+    vec3 c0 = now(p); col = c0;
+    for (int i = 1; i <= 5; i++) {
+      vec3 c = past(p, i * 4);
+      float m = smoothstep(0.1, 0.3, length(c - c0));
+      col = mix(col, c, m * (0.7 - float(i) * 0.1));
+    }
+  } else if (uMode == 11) { // неон
+    float e0 = edge(p, -1), e1 = edge(p, 8);
+    float h = fract(p.y * 0.4 + t * 0.08 + lum(now(p)) * 0.3);
+    col = hsv(h, 0.9, 1.0) * smoothstep(0.08, 0.45, e0) * 1.4 + hsv(h + 0.5, 0.9, 1.0) * smoothstep(0.1, 0.5, e1) * 0.5;
+  } else if (uMode == 12) { // тепловизор
+    vec3 c0 = now(p);
+    float m = length(c0 - past(p, 5));
+    col = heat(clamp(lum(c0) * 0.55 + m * 2.5, 0.0, 1.0));
+  } else { // конфетный мир
+    vec3 c0 = now(p);
+    float l = lum(c0);
+    col = hsv(fract(l * 1.5 + t * 0.1 + p.x * 0.2), 0.75, 0.35 + l * 0.75);
+    col = mix(col, c0, 0.25);
+  }
+  col *= 1.0 + uPulse;
+  o = vec4(col * vign, 1.0);
+}`;
+function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+function prog(fs) {
+  const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, 'aPos'); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); u[info.name] = gl.getUniformLocation(p, info.name); }
+  return { p, u };
+}
+let copyP, fxP, camTex, histTex, fbo, HW = 0, HH = 0;
+const HN = 48; // сколько прошлых кадров помним (при 30 кадрах/с это 1.6 секунды)
+let head = 0, histCount = 0, frameNo = 0;
+if (gl) {
+  copyP = prog(COPY_FS); fxP = prog(FX_FS);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  camTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, camTex);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+  fbo = gl.createFramebuffer();
+}
+function makeHist(vw, vh) {
+  HW = 320; HH = Math.round(320 * vh / vw);
+  if (histTex) gl.deleteTexture(histTex);
+  histTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, histTex);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, HW, HH, HN);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D_ARRAY, k, v);
+  histCount = 0;
+}
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+}
+addEventListener('resize', resize); resize();
+
+// ---------- Камера ----------
+async function camOnFacing(f) {
+  const ok = await startCamera(f);
+  cam.classList.remove('mirror');
+  histTex = null;
+  return ok;
+}
+
+// ---------- Кадр ----------
+let last = 0, running = false;
+function frame(ts) {
+  requestAnimationFrame(frame);
+  if (!running || !gl) return;
+  const dt = Math.min(0.05, last ? (ts - last) / 1000 : 0); last = ts;
+  time += dt; frameNo++;
+  if (auto) { autoT += dt; if (autoT > 14) { autoT = 0; setFx(fxIdx + 1); } }
+  if (!cam.videoWidth) { gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); return; }
+  if (!histTex || HW !== 320 || HH !== Math.round(320 * cam.videoHeight / cam.videoWidth)) makeHist(cam.videoWidth, cam.videoHeight);
+  // 1. новый кадр камеры
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, camTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cam);
+  // 2. каждый второй кадр кладём уменьшенную копию в ленту прошлого
+  if (frameNo % 2 === 0) {
+    head = (head + 1) % HN; histCount++;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, histTex, 0, head);
+    gl.viewport(0, 0, HW, HH);
+    gl.useProgram(copyP.p); gl.uniform1i(copyP.u.uCam, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // в первые секунды лента ещё пустая - заполняем её текущим кадром
+    if (histCount === 1) for (let i = 0; i < HN; i++) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, histTex, 0, i);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+  // 3. эффект на экран
+  gl.useProgram(fxP.p);
+  const U = fxP.u;
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, histTex);
+  gl.uniform1i(U.uCam, 0); gl.uniform1i(U.uHist, 1);
+  gl.uniform1i(U.uHead, head); gl.uniform1i(U.uN, HN); gl.uniform1i(U.uMode, EFFECTS[fxIdx].id);
+  gl.uniform1f(U.uTime, time); gl.uniform1f(U.uMirror, camFacing === 'user' ? 1 : 0);
+  // стробоскоп: держим один кадр 0.2 с, потом прыгаем на свежий
+  let freeze = -1, pulse = 0;
+  if (strobe) { const P = 6; freeze = histCount % P; pulse = freeze === 0 ? 0.12 : 0; }
+  gl.uniform1i(U.uFreeze, freeze); gl.uniform1f(U.uPulse, pulse);
+  gl.uniform2f(U.uTouch, touch[0], touch[1]);
+  const eyes = vr ? 2 : 1, ew = canvas.width / eyes, eh = canvas.height;
+  // как растянуть видео на область (object-fit: cover)
+  const vw = cam.videoWidth, vh = cam.videoHeight, s = Math.max(ew / vw, eh / vh) * (vr ? 1.15 : 1);
+  gl.uniform2f(U.uScale, ew / (vw * s), eh / (vh * s));
+  gl.uniform2f(U.uOff, (1 - ew / (vw * s)) / 2, (1 - eh / (vh * s)) / 2);
+  gl.uniform2f(U.uRes, ew, eh); gl.uniform1f(U.uVR, vr ? 1 : 0);
+  for (let e = 0; e < eyes; e++) { gl.viewport(e * ew, 0, ew, eh); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+}
+requestAnimationFrame(frame);
+
+// ---------- Управление ----------
+function setFx(i, quiet) {
+  fxIdx = (i + EFFECTS.length) % EFFECTS.length;
+  const f = EFFECTS[fxIdx];
+  $('#fxName').innerHTML = f.e + ' ' + f.name + '<small>' + f.grp + ' · ' + (fxIdx + 1) + '/' + EFFECTS.length + '</small>';
+  if (!quiet) { tone(500 + fxIdx * 40, 0.08, 'triangle', 0.06); if (!vr) showHint(f.hint, 2600); }
+  try { localStorage.setItem('ar_chudesa_fx', fxIdx); } catch (e) {}
+}
+$('#btnPrev').onclick = () => { autoT = 0; setFx(fxIdx - 1); };
+$('#btnNext').onclick = () => { autoT = 0; setFx(fxIdx + 1); };
+$('#btnFlip').onclick = async () => { const ok = await camOnFacing(camFacing === 'user' ? 'environment' : 'user'); showHint(ok ? (camFacing === 'user' ? 'Передняя камера - смотри на себя' : 'Задняя камера') : 'Камера не переключилась', 1600); };
+$('#btnStrobe').onclick = () => { strobe = !strobe; $('#btnStrobe').classList.toggle('on', strobe); showHint(strobe ? 'Стробоскоп включён: движения рывками' : 'Стробоскоп выключен', 1500); };
+$('#btnAuto').onclick = () => { auto = !auto; autoT = 0; $('#btnAuto').classList.toggle('on', auto); showHint(auto ? 'Чудеса меняются сами каждые 14 секунд' : 'Автосмена выключена', 1500); };
+$('#btnVR').onclick = () => enterVR();
+// палец двигает центр эффекта; свайп влево-вправо по низу экрана - смена эффекта
+let down = null;
+canvas.addEventListener('pointerdown', e => {
+  if (vr) { setFx(fxIdx + 1); autoT = 0; return; } // в шлеме: кнопка шлема (касание) = следующее чудо
+  down = { x: e.clientX, y: e.clientY }; moveTouch(e);
+});
+canvas.addEventListener('pointermove', e => { if (down && !vr) moveTouch(e); });
+canvas.addEventListener('pointerup', () => { down = null; });
+function moveTouch(e) { touch = [clamp(e.clientX / W, 0.05, 0.95), clamp(1 - e.clientY / H, 0.05, 0.95)]; }
+addEventListener('keydown', e => { if (e.key === 'ArrowRight') setFx(fxIdx + 1); if (e.key === 'ArrowLeft') setFx(fxIdx - 1); });
+
+async function start(withVR) {
+  if (!gl) return;
+  initAudio();
+  try { document.documentElement.requestFullscreen && await document.documentElement.requestFullscreen(); } catch (e) {}
+  $('#startScr').classList.add('hide');
+  const ok = await camOnFacing('environment');
+  if (!ok) showBanner('Камера не включилась', 'Разреши доступ к камере', 4000);
+  running = true;
+  let saved = 0; try { saved = +localStorage.getItem('ar_chudesa_fx') || 0; } catch (e) {}
+  setFx(saved, true);
+  if (withVR) enterVR(); else { showUI(true); showHint(EFFECTS[fxIdx].hint, 3000); }
+}
+function showUI(on) { $('#hud').style.display = on ? 'flex' : 'none'; $('#bar').style.display = on ? 'flex' : 'none'; }
+async function enterVR() {
+  vr = true; showUI(false);
+  $('#vrLine').style.display = 'block'; $('#vrExit').style.display = 'block';
+  if (camFacing === 'user') await camOnFacing('environment');
+  try { document.fullscreenElement || await document.documentElement.requestFullscreen(); } catch (e) {}
+  try { await screen.orientation.lock('landscape'); } catch (e) {}
+  if (!auto) { auto = true; autoT = 0; $('#btnAuto').classList.add('on'); }
+  showBanner('Поверни телефон боком<br>и вставь в шлем', 'Касание экрана - следующее чудо.<br>Выйти - тап в левый верхний угол', 4500);
+}
+$('#vrExit').addEventListener('pointerdown', e => {
+  e.stopPropagation();
+  vr = false; showUI(true); $('#vrLine').style.display = 'none'; $('#vrExit').style.display = 'none';
+  try { screen.orientation.unlock(); } catch (e2) {}
+  showHint('Обычный режим', 1500);
+});
+$('#btnStart').onclick = () => start(false);
+$('#btnStartVR').onclick = () => start(true);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) last = 0; });
+</script>
+</body>
+</html>
