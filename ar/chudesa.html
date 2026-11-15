@@ -20,6 +20,20 @@
 #vrExit { position: fixed; z-index: 6; left: 0; top: 0; width: 90px; height: 90px; display: none; }
 #vrLine { position: fixed; z-index: 5; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: #222; display: none; }
 .btnrow { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+#shoot { position: fixed; z-index: 5; right: 12px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; gap: 16px; align-items: center; }
+.shut { width: 64px; height: 64px; border-radius: 50%; border: 4px solid #fff; background: #fff3; font-size: 26px; color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px #0008; }
+.shut:active { transform: scale(.92); }
+#btnRec .dot { width: 26px; height: 26px; border-radius: 50%; background: #ff2a2a; transition: all .2s; }
+#btnRec.rec .dot { border-radius: 6px; width: 22px; height: 22px; }
+#recTime { font: 800 15px system-ui; text-shadow: 0 2px 4px #000; min-height: 18px; color: #ff6b6b; }
+#thumb { width: 52px; height: 52px; border-radius: 12px; border: 2px solid #fff; object-fit: cover; display: none; background: #000; }
+#flash { position: fixed; inset: 0; z-index: 7; background: #fff; opacity: 0; pointer-events: none; transition: opacity .35s; }
+#viewer { position: fixed; inset: 0; z-index: 12; background: #000e; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px; box-sizing: border-box; }
+#viewer.show { display: flex; }
+#viewer img, #viewer video { max-width: 100%; max-height: 68vh; border-radius: 14px; box-shadow: 0 6px 30px #000; }
+#viewer .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#viewer .big { margin-top: 0; font-size: 18px; padding: 13px 22px; }
+#micBtn.off { opacity: .45; }
 </style>
 </head>
 <body>
@@ -39,6 +53,22 @@
   <button class="hbtn" id="btnNext">▶</button>
 </div>
 <div id="banner"></div><div id="hint"></div>
+<div id="shoot">
+  <button class="shut" id="btnPhoto" title="Фото">📷</button>
+  <button class="shut" id="btnRec" title="Видео"><span class="dot"></span></button>
+  <div id="recTime"></div>
+  <button class="hbtn" id="micBtn" title="Звук в видео">🎤</button>
+  <img id="thumb" alt="">
+</div>
+<div id="flash"></div>
+<div id="viewer">
+  <div id="viewBox"></div>
+  <div class="row">
+    <button class="big" id="vSave" style="--b1:#3fd47a;--b2:#1a8a46;--b3:#0b4a24">💾 Сохранить</button>
+    <button class="big" id="vShare" style="--b1:#29b6f6;--b2:#0277bd;--b3:#01416b">📤 Отправить</button>
+  </div>
+  <button class="small" id="vClose">Закрыть и снимать дальше</button>
+</div>
 <div id="vrLine"></div><div id="vrExit"></div>
 
 <div class="screen" id="startScr" style="--bg1:#3a0f4a;--glow:#ff7ae0;--b1:#ff5ad0;--b2:#8a1aa0;--b3:#45085a">
@@ -257,7 +287,7 @@ addEventListener('resize', resize); resize();
 
 // ---------- Камера ----------
 async function camOnFacing(f) {
-  const ok = await startCamera(f);
+  const ok = await startCamera(f, true);
   cam.classList.remove('mirror');
   histTex = null;
   return ok;
@@ -312,6 +342,13 @@ function frame(ts) {
   gl.uniform2f(U.uOff, (1 - ew / (vw * s)) / 2, (1 - eh / (vh * s)) / 2);
   gl.uniform2f(U.uRes, ew, eh); gl.uniform1f(U.uVR, vr ? 1 : 0);
   for (let e = 0; e < eyes; e++) { gl.viewport(e * ew, 0, ew, eh); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+  // фото: копируем картинку сразу после рисования (в этом же кадре)
+  if (photoReq) {
+    photoReq = false;
+    const c2 = document.createElement('canvas'); c2.width = canvas.width; c2.height = canvas.height;
+    c2.getContext('2d').drawImage(canvas, 0, 0);
+    c2.toBlob(b => gotMedia(b, 'jpg'), 'image/jpeg', 0.93);
+  }
 }
 requestAnimationFrame(frame);
 
@@ -352,7 +389,7 @@ async function start(withVR) {
   setFx(saved, true);
   if (withVR) enterVR(); else { showUI(true); showHint(EFFECTS[fxIdx].hint, 3000); }
 }
-function showUI(on) { $('#hud').style.display = on ? 'flex' : 'none'; $('#bar').style.display = on ? 'flex' : 'none'; }
+function showUI(on) { for (const id of ['#hud', '#bar', '#shoot']) $(id).style.display = on ? 'flex' : 'none'; }
 async function enterVR() {
   vr = true; showUI(false);
   $('#vrLine').style.display = 'block'; $('#vrExit').style.display = 'block';
@@ -368,6 +405,77 @@ $('#vrExit').addEventListener('pointerdown', e => {
   try { screen.orientation.unlock(); } catch (e2) {}
   showHint('Обычный режим', 1500);
 });
+// ---------- Фото и видео ----------
+let photoReq = false, rec = null, recChunks = [], recStart = 0, recTimer = 0, micOn = true, micStream = null, lastMedia = null;
+const stamp = () => { const d = new Date(), z = n => String(n).padStart(2, '0'); return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '_' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()); };
+$('#btnPhoto').onclick = () => {
+  photoReq = true;
+  const f = $('#flash'); f.style.transition = 'none'; f.style.opacity = 0.8; requestAnimationFrame(() => { f.style.transition = 'opacity .35s'; f.style.opacity = 0; });
+  noise(0.06, 0.25, 4000, 0, 'highpass'); noise(0.08, 0.2, 2000, 0.07, 'highpass'); buzz(20);
+};
+$('#micBtn').onclick = () => { micOn = !micOn; $('#micBtn').classList.toggle('off', !micOn); showHint(micOn ? 'Видео со звуком' : 'Видео без звука', 1300); };
+function pickMime() {
+  for (const m of ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'])
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+$('#btnRec').onclick = async () => {
+  if (rec) { rec.stop(); return; }
+  if (!window.MediaRecorder || !canvas.captureStream) { showHint('Этот браузер не умеет записывать видео', 2500); return; }
+  const stream = canvas.captureStream(30);
+  if (micOn) {
+    try { micStream = micStream || await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true } }); micStream.getAudioTracks().forEach(t => stream.addTrack(t)); }
+    catch (e) { micOn = false; $('#micBtn').classList.add('off'); showHint('Микрофон не разрешён - снимаю без звука', 2200); }
+  }
+  const mime = pickMime();
+  try { rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: 8000000 }); }
+  catch (e) { rec = new MediaRecorder(stream); }
+  recChunks = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+  rec.onstop = () => {
+    clearInterval(recTimer); $('#recTime').textContent = ''; $('#btnRec').classList.remove('rec');
+    const type = rec.mimeType || mime || 'video/webm';
+    const blob = new Blob(recChunks, { type: type.split(';')[0] });
+    rec = null; tone(500, 0.1, 'sine', 0.08);
+    gotMedia(blob, type.includes('mp4') ? 'mp4' : 'webm');
+  };
+  rec.start(500); recStart = Date.now();
+  $('#btnRec').classList.add('rec'); tone(880, 0.1, 'sine', 0.08); buzz(30);
+  recTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - recStart) / 1000);
+    $('#recTime').textContent = '● ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    if (s >= 120 && rec) rec.stop(); // не больше 2 минут
+  }, 250);
+};
+function gotMedia(blob, ext) {
+  if (!blob) return;
+  const url = URL.createObjectURL(blob);
+  if (lastMedia) URL.revokeObjectURL(lastMedia.url);
+  lastMedia = { blob, url, ext, name: 'chudesa_' + stamp() + '.' + ext };
+  const th = $('#thumb'); th.style.display = 'block';
+  if (ext === 'jpg') th.src = url; else { th.removeAttribute('src'); th.style.background = '#c2289a'; }
+  if (ext !== 'jpg') openViewer(); else showHint('Фото готово! Нажми на миниатюру, чтобы сохранить', 2000);
+}
+function openViewer() {
+  if (!lastMedia) return;
+  const box = $('#viewBox'); box.innerHTML = '';
+  const el = document.createElement(lastMedia.ext === 'jpg' ? 'img' : 'video');
+  el.src = lastMedia.url;
+  if (el.tagName === 'VIDEO') { el.controls = true; el.loop = true; el.playsInline = true; el.autoplay = true; }
+  box.appendChild(el);
+  $('#vShare').style.display = navigator.canShare && navigator.canShare({ files: [new File([lastMedia.blob], lastMedia.name, { type: lastMedia.blob.type })] }) ? '' : 'none';
+  $('#viewer').classList.add('show');
+}
+$('#thumb').onclick = openViewer;
+$('#vClose').onclick = () => { $('#viewer').classList.remove('show'); $('#viewBox').innerHTML = ''; };
+$('#vSave').onclick = () => {
+  const a = document.createElement('a'); a.href = lastMedia.url; a.download = lastMedia.name; document.body.appendChild(a); a.click(); a.remove();
+  showHint('Сохранено в «Загрузки» - видно в галерее', 2500);
+};
+$('#vShare').onclick = async () => {
+  try { await navigator.share({ files: [new File([lastMedia.blob], lastMedia.name, { type: lastMedia.blob.type })], title: 'Комната чудес' }); } catch (e) {}
+};
+
 $('#btnStart').onclick = () => start(false);
 $('#btnStartVR').onclick = () => start(true);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) last = 0; });

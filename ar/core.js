@@ -89,13 +89,13 @@ function project3(v, size) {
 
 // ---------- Камера ----------
 let camOn = false, camFacing = 'environment', camStream = null;
-async function startCamera(facing) {
+async function startCamera(facing, hiRes) {
   camFacing = facing || 'environment';
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
   try {
     if (camStream) camStream.getTracks().forEach(t => t.stop());
     camStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: camFacing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
+      video: { facingMode: { ideal: camFacing }, width: { ideal: hiRes ? 1920 : 1280 }, height: { ideal: hiRes ? 1080 : 720 } }, audio: false
     });
     cam.srcObject = camStream;
     cam.classList.toggle('mirror', camFacing === 'user');
