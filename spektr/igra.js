@@ -4,7 +4,7 @@
 // Engine, flight model, input and OSD come from «Муха» (muha/).
 if(!window.THREE){document.body.innerHTML='<p style="padding:24px">Не загрузился 3D-движок (three.min.js). Обнови страницу.</p>';throw new Error('no three');}
 const $=id=>document.getElementById(id);
-const VERSION='1.0 от 18.11.2026'; // bump on every release so testers can tell builds apart
+const VERSION='1.1 от 18.11.2026'; // bump on every release so testers can tell builds apart
 document.querySelectorAll('.ver').forEach(e=>e.textContent='Версия '+VERSION);
 document.title='Спектр: зал · v'+VERSION.split(' ')[0];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -192,7 +192,7 @@ const anim={};
    x: 0 = stage (west) wall → 11.5 = blackboard (east) wall; z: 0 = north wall (computer nook behind the columns) → 7.3 = south wall with 4 windows; height 2.9.
    Columns 0.45 m square on the line z 1.65..2.1 (5.2 m from the windows), at x 3.4 (3.4 m from the stage wall) and 2.9 m further east. */
 const L=11.5, W=7.3, H=2.9;
-const COLS=[[3.4,3.85],[6.75,7.2]], CZ=[1.65,2.1];
+const COLS=[[3.4,3.85],[6.75,7.2],[10.1,10.55]], CZ=[1.65,2.1]; // third column added 18.11 from Alexandr's note, exact place to be checked on his photos
 const STAGE={x0:0,x1:2.5,z0:2.3,z1:7.0,h:0.45};
 
 // polished granite tiles 0.6 m: beige and grey in a checker, texture = 2x2 tiles = 1.2 m
