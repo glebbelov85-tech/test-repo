@@ -2,128 +2,268 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
-<title>Фильтры для кино: проба</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кинофильтры: проба эффектов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
 <style>
-html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
-#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-#src { display: none; }
-#top { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 8px; align-items: center; padding: calc(env(safe-area-inset-top) + 8px) 10px 8px; background: linear-gradient(#000a, #0000); flex-wrap: wrap; }
+/* Одна тема: тёмная монтажная. Сверху кадр на весь экран, снизу выдвижной пульт с вкладками. */
+:root {
+  --bg: #0b0c10; --panel: rgba(16, 18, 26, .86); --line: rgba(255, 255, 255, .13); --ink: #f1efe9; --mute: #a3a6b3;
+  --acc: #ff9a3d; --acc-ink: #1a0f02; --good: #7be39a; --warn: #ffd34d; --bad: #ff6b6b;
+  --display: 'Unbounded', 'Arial Black', sans-serif; --body: 'Golos Text', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { display: flex; flex-direction: column; }
+#stage { flex: 1; min-height: 0; min-width: 0; position: relative; background: #000; }
+html, body { background: var(--bg); color: var(--ink); font: 14px/1.35 var(--body); overflow: hidden; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+#ekran { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #000; }
+video.src { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+button { font: 500 13px var(--body); color: var(--ink); background: rgba(255, 255, 255, .08); border: 1px solid var(--line); border-radius: 10px; padding: 7px 11px; cursor: pointer; white-space: nowrap; }
+button:hover { background: rgba(255, 255, 255, .14); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+button.on { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); font-weight: 700; }
+#top { position: absolute; top: 0; left: 0; right: 0; display: flex; gap: 6px; align-items: center; padding: 8px 12px; background: linear-gradient(rgba(0, 0, 0, .7), rgba(0, 0, 0, 0)); z-index: 3; flex-wrap: wrap; }
+#top h1 { font: 700 13px var(--display); margin: 0 6px 0 0; letter-spacing: .02em; }
 #top .grow { flex: 1; }
-button, label.btn { font: 600 15px system-ui; color: #fff; background: #ffffff22; border: 1px solid #ffffff44; border-radius: 12px; padding: 8px 12px; cursor: pointer; backdrop-filter: blur(6px); }
-button.on { background: #ffd34d; color: #000; }
-#fps { font: 600 13px ui-monospace, monospace; opacity: .85; text-shadow: 0 1px 3px #000; }
-#panel { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 14px calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(#0000, #000c 35%); }
-#name { text-align: center; font: 800 20px system-ui; text-shadow: 0 2px 6px #000; margin-bottom: 4px; }
-#name small { display: block; font: 600 12px system-ui; opacity: .75; }
-.row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
-.row span { min-width: 64px; font: 600 13px system-ui; opacity: .85; }
-input[type=range] { flex: 1; height: 34px; accent-color: #ff5ad0; }
-#bPrev, #bNext { font-size: 24px; padding: 10px 22px; }
-#hint { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); background: #000b; padding: 12px 18px; border-radius: 14px; font: 600 16px system-ui; text-align: center; max-width: 80vw; opacity: 0; transition: opacity .4s; pointer-events: none; }
-#noGL { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; font-size: 18px; }
+select { font: 500 13px var(--body); color: var(--ink); background: #1a1c26; border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; }
+#fps { font: 700 12px ui-monospace, monospace; padding: 6px 8px; border-radius: 8px; background: rgba(0, 0, 0, .55); min-width: 60px; text-align: center; font-variant-numeric: tabular-nums; }
+#fps.ok { color: var(--good); } #fps.mid { color: var(--warn); } #fps.bad { color: var(--bad); }
+#now { position: absolute; left: 12px; bottom: 10px; font: 700 15px var(--display); text-shadow: 0 2px 10px #000, 0 0 2px #000; z-index: 2; pointer-events: none; max-width: 70vw; }
+#now small { display: block; font: 500 12px var(--body); color: var(--mute); margin-top: 3px; text-shadow: 0 1px 4px #000; }
+#dock { flex: none; background: #10121a; border-top: 1px solid var(--line); display: flex; flex-direction: column; max-height: 56%; min-height: 0; }
+body.nodock #dock { display: none; }
+#tabs { display: flex; gap: 4px; padding: 6px 10px; overflow-x: auto; flex: none; align-items: center; }
+#tabs button { border-radius: 999px; }
+#tabs .grow { flex: 1; min-width: 6px; }
+.pane { display: none; padding: 4px 12px 12px; overflow-y: auto; }
+.pane.on { display: block; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .grp { flex-basis: 100%; font: 700 10px var(--display); color: var(--mute); letter-spacing: .08em; text-transform: uppercase; margin-top: 6px; }
+.chips button { display: inline-flex; align-items: center; gap: 6px; }
+.chips button i { font-style: normal; width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.c1 { background: var(--good); } .c2 { background: var(--warn); } .c3 { background: var(--bad); }
+.chips button b { font: 700 9px var(--display); color: var(--acc); letter-spacing: .04em; }
+.chips button.on b { color: var(--acc-ink); }
+.rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 18px; margin-top: 8px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row label { flex: 0 0 96px; color: var(--mute); font-size: 13px; }
+.row input[type=range] { flex: 1; min-width: 0; height: 28px; accent-color: var(--acc); }
+.row output { flex: 0 0 34px; text-align: right; font: 12px ui-monospace, monospace; color: var(--mute); font-variant-numeric: tabular-nums; }
+.hint { color: var(--mute); font-size: 12px; margin: 6px 0 0; max-width: 70ch; }
+.legend { display: flex; gap: 12px; align-items: center; color: var(--mute); font-size: 12px; margin-top: 8px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+.modal { position: fixed; inset: 0; display: none; background: rgba(0, 0, 0, .82); z-index: 6; padding: 16px; overflow: auto; }
+.modal.show { display: block; }
+.card { background: #14161f; border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; max-width: 1100px; margin: 0 auto; }
+.card h2 { font: 700 18px var(--display); margin: 0 0 6px; text-wrap: balance; }
+.card p { color: var(--mute); margin: 6px 0; max-width: 70ch; }
+.card table { border-collapse: collapse; margin: 10px 0; width: 100%; max-width: 520px; }
+.card td { padding: 5px 6px; border-bottom: 1px solid var(--line); }
+.card td.n { text-align: right; font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 12px; }
+.gal figure { margin: 0; cursor: pointer; }
+.gal img { width: 100%; display: block; border-radius: 10px; border: 1px solid var(--line); }
+.gal figcaption { margin-top: 5px; font-weight: 700; }
+.gal figcaption span { display: block; font-weight: 400; color: var(--mute); font-size: 12px; }
+.closeRow { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+#msg { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, .75); padding: 12px 18px; border-radius: 12px; display: none; z-index: 5; text-align: center; max-width: 80vw; }
+@media (max-width: 700px) { #top h1 { display: none; } .row label { flex-basis: 84px; } }
+/* телефон боком: пульт справа, кадр слева */
+@media (max-height: 520px) and (min-width: 560px) { body { flex-direction: row; } #dock { width: 44%; max-height: none; border-top: 0; border-left: 1px solid var(--line); } #tabs { flex-wrap: wrap; } #now { font-size: 13px; } }
+@media (max-width: 700px) { #now { font-size: 13px; } }
 </style>
 </head>
 <body>
-<canvas id="gl"></canvas>
-<video id="src" playsinline muted loop></video>
+<div id="stage">
+<canvas id="ekran"></canvas>
+<video class="src" id="v" muted playsinline webkit-playsinline loop preload="auto"></video>
+
 <div id="top">
-  <label class="btn">📁 Своё видео<input id="file" type="file" accept="video/*" hidden></label>
-  <button id="bCam">📷 Камера</button>
-  <button id="bPlay">⏸</button>
-  <button id="bStory" title="Плавно перейти в Неон, как в сюжете">🎞 Сюжет</button>
-  <button id="bRec">⏺ Запись</button>
+  <h1>Кинофильтры</h1>
+  <select id="clip" aria-label="Отрезок видео"></select>
+  <button id="bFile" title="Показать на своём ролике с этого устройства">Своё видео</button>
+  <input id="file" type="file" accept="video/*" hidden>
   <span class="grow"></span>
-  <button id="bQ" title="Качество картинки">100%</button>
-  <button id="bFit" title="Вписать / на весь экран">⤢</button>
-  <button id="bFull">⛶</button>
-  <span id="fps"></span>
+  <button id="bCmp" title="Слева исходное видео, справа эффект. Линию можно двигать">До / после</button>
+  <span id="fps">-- к/с</span>
+  <button id="bQ" title="Качество: авто снижает само, если тормозит">Авто</button>
+  <button id="bHide" class="on" title="Спрятать или показать пульт">Пульт</button>
 </div>
-<div id="panel">
-  <div class="row" style="justify-content:center"><button id="bPrev">◀</button><div id="name" style="flex:1"></div><button id="bNext">▶</button></div>
-  <div class="row"><span>Сила</span><input id="amt" type="range" min="0" max="1" step="0.01" value="1"></div>
+<div id="now"></div>
 </div>
-<div id="hint"></div>
-<div id="noGL">Этот браузер не умеет WebGL2, фильтры не заработают. Откройте в Chrome.</div>
+<div id="msg"></div>
+
+<div id="dock">
+  <div id="tabs">
+    <button data-t="looks" class="on">Образы</button>
+    <button data-t="style">Стиль</button>
+    <button data-t="atmos">Атмосфера</button>
+    <button data-t="light">Свет</button>
+    <button data-t="grade">Цвет</button>
+    <button data-t="knobs">Ручки</button>
+    <span class="grow"></span>
+    <button id="bGal">Галерея</button>
+    <button id="bBench">Скорость</button>
+  </div>
+  <div class="pane on" id="p-looks">
+    <div class="chips" id="looks"></div>
+    <p class="hint">Образ включает сразу всё: стиль кадра, погоду, свет и цвет. Переход между образами плавный, как будет в сюжете.</p>
+  </div>
+  <div class="pane" id="p-style">
+    <div class="rows"><div class="row"><label for="amt">Сила</label><input id="amt" type="range" min="0" max="1" step="0.01" value="1"><output id="amtO">100</output></div></div>
+    <div class="chips" id="styles"></div>
+    <div class="legend"><span><i class="c1"></i>лёгкий</span><span><i class="c2"></i>средний</span><span><i class="c3"></i>тяжёлый для слабого телефона</span><span><b style="color:var(--acc);font:700 9px var(--display)">НОВЫЙ</b> добавлен сейчас</span></div>
+  </div>
+  <div class="pane" id="p-atmos">
+    <div class="rows">
+      <div class="row"><label for="aAmt">Густота</label><input id="aAmt" type="range" min="0" max="1" step="0.01" value="0.6"><output id="aAmtO">60</output></div>
+      <div class="row"><label for="wind">Ветер</label><input id="wind" type="range" min="-1" max="1" step="0.01" value="0"><output id="windO">0</output></div>
+    </div>
+    <div class="chips" id="atmos"></div>
+    <p class="hint">Можно включить два слоя сразу, например снег и туман. Ветер сносит всё, что летит: влево или вправо.</p>
+  </div>
+  <div class="pane" id="p-light">
+    <div class="rows"><div class="row"><label for="lAmt">Сила света</label><input id="lAmt" type="range" min="0" max="1" step="0.01" value="1"><output id="lAmtO">100</output></div></div>
+    <div class="chips" id="lights"></div>
+    <p class="hint">Коснитесь кадра, чтобы поставить солнце в это место. Смена времени суток идёт плавно.</p>
+  </div>
+  <div class="pane" id="p-grade">
+    <div class="rows"><div class="row"><label for="gAmt">Сила цвета</label><input id="gAmt" type="range" min="0" max="1" step="0.01" value="1"><output id="gAmtO">100</output></div></div>
+    <div class="chips" id="grades"></div>
+  </div>
+  <div class="pane" id="p-knobs">
+    <div class="rows" id="knobs"></div>
+    <div class="rows">
+      <div class="row"><label for="fade">Переход, с</label><input id="fade" type="range" min="0" max="6" step="0.1" value="2"><output id="fadeO">2.0</output></div>
+      <div class="row"><label for="trans">Вид перехода</label><select id="trans" style="flex:1"></select></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="galBox"><div class="card">
+  <div class="closeRow"><div><h2>До и после</h2><p>Слева исходный кадр, справа образ. Нажмите на картинку, чтобы включить этот образ на видео.</p></div><button id="galClose">Закрыть</button></div>
+  <div class="gal" id="gal"></div>
+</div></div>
+<div class="modal" id="benchBox"><div class="card" style="max-width:620px">
+  <div class="closeRow"><h2>Проверка скорости</h2><button id="benchClose">Закрыть</button></div>
+  <div id="benchBody"></div>
+</div></div>
 
 <script src="shader.js"></script>
 <script src="filtry.js"></script>
-<script src="kamera.js"></script>
-<script src="zapis.js"></script>
 <script>
 "use strict";
-const $ = s => document.querySelector(s);
-const video = $('#src'), canvas = $('#gl');
-const F = new Filtry(canvas, { fit: 'contain' });
-if (!F.ok) $('#noGL').style.display = 'flex';
-const E = Filtry.EFFECTS;
+const $ = s => document.querySelector(s), v = $('#v');
+const CLIPS = [['primer.mp4', 'Кабина в движении']];
+const GALLERY = ['zimnee_utro', 'metel', 'zakat', 'zolotoy_chas', 'siyanie', 'liven', 'kiberpank', 'neon_son', 'eho', 'oskolki', 'skazka', 'u_kostra', 'vospominanie', 'pogonya', 'burya', 'nuar'];
+const F = new Filtry($('#ekran'), { fit: 'contain' });
+const say = (t, ms) => { const m = $('#msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(say.t); if (ms) say.t = setTimeout(() => m.style.display = 'none', ms); };
+if (!F.ok) say('В этом браузере нет WebGL2, фильтры не запустятся. Попробуйте Chrome или Safari поновее.');
 
-let hintT = 0;
-function hint(t, ms = 1800) { const h = $('#hint'); h.innerHTML = t; h.style.opacity = 1; clearTimeout(hintT); hintT = setTimeout(() => h.style.opacity = 0, ms); }
-function showName() {
-  const i0 = Math.floor(F.pos), f = F.pos - i0, e = E[Math.round(F.pos)];
-  const mix = f > 0.02 && f < 0.98 ? ' → ' + E[i0 + 1].e : '';
-  $('#name').innerHTML = e.e + ' ' + e.name + mix + '<small>' + e.grp + ' · ' + (Math.round(F.pos) + 1) + '/' + E.length + (e.cost === 3 ? ' · тяжёлый' : '') + '</small>';
+// ---------- видео ----------
+CLIPS.forEach(([src, name], i) => { const o = document.createElement('option'); o.value = i; o.textContent = name; $('#clip').appendChild(o); });
+function play(src) { v.src = src; v.play().catch(() => say('Нажмите на кадр, чтобы запустить видео', 4000)); F.resetHistory(); }
+$('#clip').onchange = e => play(CLIPS[+e.target.value][0]);
+$('#bFile').onclick = () => $('#file').click();
+$('#file').onchange = e => { const f = e.target.files[0]; if (f) play(URL.createObjectURL(f)); };
+v.addEventListener('error', () => say('Видео не загрузилось. Выберите другой отрезок.', 4000));
+if (F.ok) { F.setSource(v); play(CLIPS[0][0]); }
+
+// ---------- состояние пульта ----------
+let fade = 2, look = 'chisto', atmSel = [], splitOn = false;
+const chip = (box, key, e, name, cost, isNew, fn) => { const b = document.createElement('button'); b.dataset.k = key; b.innerHTML = (cost ? '<i class="c' + cost + '"></i>' : '') + e + ' ' + name + (isNew ? ' <b>' + (isNew === 2 ? 'ЛУЧШЕ' : 'НОВЫЙ') + '</b>' : ''); b.onclick = () => fn(key); box.appendChild(b); return b; };
+const grp = (box, t) => { const d = document.createElement('div'); d.className = 'grp'; d.textContent = t; box.appendChild(d); };
+const mark = (box, keys) => box.querySelectorAll('button').forEach(b => b.classList.toggle('on', keys.includes(b.dataset.k)));
+
+for (const k in Filtry.LOOKS) chip($('#looks'), k, Filtry.LOOKS[k].e, Filtry.LOOKS[k].name, 0, 0, setLook);
+let g = ''; for (const e of Filtry.EFFECTS) { if (e.grp !== g) { g = e.grp; grp($('#styles'), g); } chip($('#styles'), e.key, e.e, e.name, e.cost, e.isNew, k => { F.setStyle(k, fade, $('#trans').value); F.set({ amount: +$('#amt').value }, 0); look = ''; sync(); }); }
+chip($('#atmos'), 'none', '🚫', 'Ничего', 0, 0, () => { atmSel = []; applyAtm(); });
+for (const k in Filtry.ATMOS) chip($('#atmos'), k, Filtry.ATMOS[k].e, Filtry.ATMOS[k].name, Filtry.ATMOS[k].cost, 0, k => { atmSel = atmSel.includes(k) ? atmSel.filter(x => x !== k) : atmSel.concat(k).slice(-2); applyAtm(); });
+chip($('#lights'), 'none', '🚫', 'Как снято', 0, 0, k => { F.setLight('none', fade); look = ''; sync(); });
+for (const k in Filtry.LIGHTS) chip($('#lights'), k, Filtry.LIGHTS[k].e, Filtry.LIGHTS[k].name, 0, 0, k => { F.setLight(k, fade, +$('#lAmt').value); look = ''; sync(); });
+chip($('#grades'), 'none', '🚫', 'Как снято', 0, 0, k => { F.setGrade('none', fade); look = ''; sync(); });
+for (const k in Filtry.GRADES) chip($('#grades'), k, Filtry.GRADES[k].e, Filtry.GRADES[k].name, 0, 0, k => { F.setGrade(k, fade, +$('#gAmt').value); look = ''; sync(); });
+Filtry.TRANS.forEach(t => { const o = document.createElement('option'); o.value = t.key; o.textContent = t.name; $('#trans').appendChild(o); }); $('#trans').value = 'pyatna';
+const KNOBS = [['bloom', 'Свечение'], ['rays', 'Лучи света'], ['flare', 'Блик объектива'], ['grain', 'Зерно плёнки'], ['vign', 'Виньетка'], ['ca', 'Цветная кайма'], ['bars', 'Киношные полосы']];
+for (const [k, n] of KNOBS) { const d = document.createElement('div'); d.className = 'row'; d.innerHTML = '<label for="k_' + k + '">' + n + '</label><input id="k_' + k + '" type="range" min="0" max="1" step="0.01" value="0"><output id="k_' + k + 'O">0</output>'; $('#knobs').appendChild(d); d.querySelector('input').oninput = e => { F.set({ [k]: +e.target.value }, 0); $('#k_' + k + 'O').textContent = Math.round(e.target.value * 100); look = ''; }; }
+
+function applyAtm() { F.setAtmos(atmSel.length ? atmSel : 'none', fade, +$('#aAmt').value); look = ''; sync(); }
+function setLook(k) {
+  const L = Filtry.LOOKS[k]; look = k; F.setLook(k, fade);
+  atmSel = (L.atmos || []).map(a => a[0]);
+  if (L.atmos && L.atmos[0]) slide('aAmt', L.atmos[0][1]);
+  slide('amt', L.amount != null ? L.amount : 1); slide('wind', L.wind || 0); slide('lAmt', L.lightAmt != null ? L.lightAmt : 1); slide('gAmt', L.gradeAmt != null ? L.gradeAmt : 1);
+  const LI = Filtry.LIGHTS[L.light] || {};
+  for (const [kn] of KNOBS) slide('k_' + kn, L[kn] != null ? L[kn] : (kn === 'rays' || kn === 'flare' ? (LI[kn] || 0) * (L.lightAmt != null ? L.lightAmt : 1) : 0));
+  sync();
 }
+function slide(id, val) { const el = $('#' + id); el.value = val; const o = $('#' + id + 'O'); if (o) o.textContent = id === 'fade' ? (+val).toFixed(1) : Math.round(val * 100); }
+function sync() {
+  const st = Filtry.info(F.styleTarget), L = Filtry.LOOKS[look];
+  mark($('#looks'), [look]); mark($('#styles'), [st.key]); mark($('#atmos'), atmSel.length ? atmSel : ['none']); mark($('#lights'), [F.lightName]); mark($('#grades'), [F.gradeName]);
+  const parts = [];
+  if (st.id) parts.push(st.name); atmSel.forEach(a => parts.push(Filtry.ATMOS[a].name.toLowerCase()));
+  if (F.lightName !== 'none') parts.push(Filtry.LIGHTS[F.lightName].name.toLowerCase()); if (F.gradeName !== 'none') parts.push('цвет: ' + Filtry.GRADES[F.gradeName].name.toLowerCase());
+  $('#now').innerHTML = (L ? L.e + ' ' + L.name : (parts.length ? 'Своя смесь' : 'Чистое видео')) + '<small>' + (L && L.mood ? 'Настроение: ' + L.mood : parts.join(' + ')) + '</small>';
+}
+$('#amt').oninput = e => { F.set({ amount: +e.target.value }, 0); slide('amt', e.target.value); };
+$('#aAmt').oninput = e => { slide('aAmt', e.target.value); if (atmSel.length) F.setAtmos(atmSel, 0.3, +e.target.value); };
+$('#wind').oninput = e => { F.set({ wind: +e.target.value }, 0); slide('wind', e.target.value); };
+$('#lAmt').oninput = e => { slide('lAmt', e.target.value); if (F.lightName !== 'none') F.setLight(F.lightName, 0.2, +e.target.value); };
+$('#gAmt').oninput = e => { slide('gAmt', e.target.value); if (F.gradeName !== 'none') F.setGrade(F.gradeName, 0.2, +e.target.value); };
+$('#fade').oninput = e => { fade = +e.target.value; slide('fade', fade); };
+document.querySelectorAll('#tabs button[data-t]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#tabs button[data-t]').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.t));
+});
+$('#bHide').onclick = () => { const h = document.body.classList.toggle('nodock'); $('#bHide').classList.toggle('on', !h); };
 
-// ---- плавный переход к нужному фильтру (как смена стиля по сюжету) ----
-let anim = null;
-function goTo(target, sec = 1.2) { anim = { from: F.pos, to: Math.max(0, Math.min(E.length - 1, target)), t: 0, dur: sec }; }
-$('#amt').oninput = e => { F.amount = +e.target.value; };
-$('#bPrev').onclick = () => goTo(Math.round(F.pos) - 1, 0.8);
-$('#bNext').onclick = () => goTo(Math.round(F.pos) + 1, 0.8);
-$('#bStory').onclick = () => {
-  const neon = E.findIndex(e => e.id === 13), tgt = Math.round(F.pos) === neon ? 0 : neon;
-  goTo(tgt, 2.5); hint(tgt ? 'Мир становится неоновым…' : 'Мир возвращается…', 2000);
-};
-addEventListener('keydown', e => { if (e.key === 'ArrowRight') $('#bNext').onclick(); if (e.key === 'ArrowLeft') $('#bPrev').onclick(); });
+// ---------- кадр: касание ставит солнце и центр эффектов, линия «до/после» двигается ----------
+function pt(e) {     // точка касания в координатах кадра видео (0..1, ноль снизу)
+  const c = $('#ekran'), R = c.getBoundingClientRect(), vw = v.videoWidth || 16, vh = v.videoHeight || 9, s = Math.min(R.width / vw, R.height / vh);
+  const w = vw * s, h = vh * s, x = (e.clientX - R.left - (R.width - w) / 2) / w, y = 1 - (e.clientY - R.top - (R.height - h) / 2) / h;
+  return [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))];
+}
+function touch(e) { const p = pt(e); if (splitOn) { F.split = Math.max(0.02, Math.min(0.98, p[0])); return; } F.touch = p; F.set({ sunX: p[0], sunY: p[1] }, 0); }
+$('#ekran').addEventListener('pointerdown', e => { if (v.paused) v.play().catch(() => {}); $('#msg').style.display = 'none'; touch(e); });
+$('#ekran').addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') touch(e); });
+$('#bCmp').onclick = () => { splitOn = !splitOn; F.split = splitOn ? 0.5 : 0; $('#bCmp').classList.toggle('on', splitOn); if (splitOn) say('Двигайте линию по кадру: слева исходное видео', 2500); };
 
-// палец по картинке двигает центр эффекта (пузырь, воронка, симметрия...)
-canvas.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') F.touch = [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; });
-canvas.addEventListener('pointerdown', e => { F.touch = [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; });
+// ---------- качество и счётчик ----------
+function qLabel() { $('#bQ').textContent = (F.auto ? 'Авто: ' : '') + F.tierName(); }
+F.onTier = (i, why) => { qLabel(); if (why === 'auto') say('Подстраиваю качество: ' + F.tierName(), 1800); };
+$('#bQ').onclick = () => { if (F.auto) { F.auto = false; F.setTier(0); } else if (F.tier < Filtry.TIERS.length - 1) F.setTier(F.tier + 1); else { F.auto = true; F.setTier(1); } qLabel(); };
+let benching = null;
+requestAnimationFrame(function loop(ts) { F.render(ts); if (benching) benching.n++; requestAnimationFrame(loop); });
+setInterval(() => { const f = F.fps, el = $('#fps'); if (!f) return; el.textContent = Math.round(f) + ' к/с'; el.className = f >= 45 ? 'ok' : f >= 25 ? 'mid' : 'bad'; }, 500);
+if (F.ok) { setTimeout(() => { try { F.calibrate(); } catch (e) {} qLabel(); F.warmup(); }, 400); qLabel(); sync(); }
 
-// ---- источники ----
-playVideoUrl(video, 'primer.mp4');
-F.setSource(video);
-video.addEventListener('seeked', () => F.resetHistory()); // склейка/перемотка: забываем прошлые кадры
-$('#file').onchange = e => { const f = e.target.files[0]; if (!f) return; playVideoFile(video, f); F.setSource(video); $('#bCam').classList.remove('on'); hint('Видео: ' + f.name); };
-let camFacing = null;
-$('#bCam').onclick = async () => {
-  camFacing = camFacing === 'environment' ? 'user' : 'environment';
-  const ok = await startCamera(video, camFacing);
-  if (!ok) { hint('Камера не включилась'); camFacing = null; return; }
-  F.setSource(video, camFacing === 'user'); $('#bCam').classList.add('on');
-  hint(camFacing === 'user' ? 'Передняя камера (нажми ещё раз - задняя)' : 'Задняя камера');
-};
-$('#bPlay').onclick = () => { if (video.paused) { video.play(); $('#bPlay').textContent = '⏸'; } else { video.pause(); $('#bPlay').textContent = '▶'; } };
-const Q = [1, 0.7, 0.5]; let qi = 0;
-$('#bQ').onclick = () => { qi = (qi + 1) % Q.length; F.quality = Q[qi]; $('#bQ').textContent = Math.round(Q[qi] * 100) + '%'; hint('Разрешение ' + Math.round(Q[qi] * 100) + '%: меньше = быстрее на слабом телефоне'); };
-$('#bFit').onclick = () => { F.fit = F.fit === 'contain' ? 'cover' : 'contain'; hint(F.fit === 'cover' ? 'На весь экран (края обрезаны)' : 'Вписать целиком'); };
-$('#bFull').onclick = () => { const d = document; d.fullscreenElement ? d.exitFullscreen() : d.documentElement.requestFullscreen && d.documentElement.requestFullscreen().catch(() => {}); };
-let rec = null;
-$('#bRec').onclick = async () => {
-  if (rec) { const r = rec; rec = null; $('#bRec').classList.remove('on'); $('#bRec').textContent = '⏺ Запись'; const b = await r.stop(); saveBlob(b, 'kino_filtr.' + (b.type.includes('mp4') ? 'mp4' : 'webm')); hint('Видео сохранено в «Загрузки»'); return; }
-  rec = startRecording(canvas); if (!rec) { hint('Этот браузер не умеет записывать'); return; }
-  $('#bRec').classList.add('on'); $('#bRec').textContent = '⏹ Стоп';
-};
-
-// ---- главный цикл + счётчик кадров ----
-let fc = 0, ft = 0, lastTs = 0;
-function loop(ts) {
-  requestAnimationFrame(loop);
-  const dt = lastTs ? (ts - lastTs) / 1000 : 0; lastTs = ts;
-  if (anim) {
-    anim.t += dt; const k = Math.min(1, anim.t / anim.dur), s = k * k * (3 - 2 * k);
-    F.setPos(anim.from + (anim.to - anim.from) * s); showName();
-    if (k >= 1) anim = null;
+// ---------- проверка скорости: прогон тяжёлых образов ----------
+$('#bBench').onclick = async () => {
+  const list = ['chisto', 'zimnee_utro', 'metel', 'zakat', 'neon_son', 'kiberpank', 'eho', 'skazka', 'liven', 'pogonya'], keepAuto = F.auto, res = []; F.auto = false;
+  for (let i = 0; i < list.length; i++) {
+    setLook(list[i]); F.setLook(list[i], 0); say('Проверка скорости: ' + Filtry.LOOKS[list[i]].name + ' (' + (i + 1) + ' из ' + list.length + ')');
+    await new Promise(r => setTimeout(r, 700)); benching = { n: 0 }; const t0 = performance.now();
+    await new Promise(r => setTimeout(r, 2500)); res.push([Filtry.LOOKS[list[i]].name, benching.n / ((performance.now() - t0) / 1000)]); benching = null;
   }
-  F.render(ts);
-  fc++; ft += dt; if (ft >= 1) { $('#fps').textContent = Math.round(fc / ft) + ' к/с'; fc = 0; ft = 0; }
-}
-showName(); requestAnimationFrame(loop);
-// со звуком/без касания мобильный браузер может не запустить видео - запустим по первому касанию
-addEventListener('pointerdown', () => { if (video.paused && $('#bPlay').textContent === '⏸') video.play().catch(() => {}); }, { once: true });
+  F.auto = keepAuto; setLook('chisto'); $('#msg').style.display = 'none';
+  const gl = F.gl, dbg = gl.getExtension('WEBGL_debug_renderer_info'), gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'неизвестно';
+  const dot = f => '<i class="' + (f >= 45 ? 'c1' : f >= 25 ? 'c2' : 'c3') + '" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px"></i>';
+  $('#benchBody').innerHTML = '<p>Качество: ' + F.tierName() + ', картинка ' + $('#ekran').width + '×' + $('#ekran').height + ' точек.</p><p style="font-size:12px">Видеокарта: ' + gpu + (F.calMs ? '. Пробный тяжёлый кадр: ' + F.calMs.toFixed(1) + ' мс' : '') + '</p>' +
+    '<table>' + res.map(r => '<tr><td>' + dot(r[1]) + r[0] + '</td><td class="n">' + Math.round(r[1]) + ' к/с</td></tr>').join('') + '</table>' +
+    '<p>30 кадров в секунду и выше подходит. Если ниже, кнопка качества вверху справа снижает нагрузку, а в режиме «Авто» это происходит само.</p>';
+  $('#benchBox').classList.add('show');
+};
+$('#benchClose').onclick = () => $('#benchBox').classList.remove('show');
+
+// ---------- галерея ----------
+for (const k of GALLERY) { const L = Filtry.LOOKS[k], f = document.createElement('figure'); f.innerHTML = '<img loading="lazy" src="gallery/' + k + '.jpg" alt="До и после: ' + L.name + '"><figcaption>' + L.e + ' ' + L.name + '<span>' + L.mood + '</span></figcaption>'; f.onclick = () => { $('#galBox').classList.remove('show'); setLook(k); }; $('#gal').appendChild(f); }
+$('#bGal').onclick = () => $('#galBox').classList.add('show');
+$('#galClose').onclick = () => $('#galBox').classList.remove('show');
+addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal').forEach(m => m.classList.remove('show')); if (e.key === ' ' && e.target === document.body) { e.preventDefault(); v.paused ? v.play() : v.pause(); } });
 </script>
 </body>
 </html>
