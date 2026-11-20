@@ -1,7 +1,8 @@
 # Turns the old github.io addresses into redirects to the GitVerse copy.
 # https://glebbelov85-tech.github.io/test-repo/scp/  →  https://<owner>.gitverse.site/<repo>/scp/
 # The games themselves stay in main untouched (GitVerse gets them via gitverse-mirror.yml);
-# GitHub Pages only gets small redirect pages built here.
+# GitHub Pages only gets small redirect pages built here, plus test copies from the
+# «preview» branch at /test/<folder>/ (run this workflow by hand after pushing there).
 # Switch on: variable GITVERSE_PAGES_URL = https://<owner>.gitverse.site/<repo>
 # and Settings → Pages → Source: «GitHub Actions».
 name: GitHub Pages → GitVerse redirect
@@ -34,6 +35,18 @@ jobs:
         env:
           TARGET: ${{ vars.GITVERSE_PAGES_URL }}
         run: python3 .github/redirect/build.py "$TARGET" _site
+
+      # Test copies: folders named in the PREVIEW file of the «preview» branch are served
+      # for real at /test/<folder>/ (GitHub only, they never reach GitVerse).
+      - name: Add test copies from the preview branch
+        run: |
+          if git fetch --depth=1 origin preview 2>/dev/null; then
+            git worktree add _preview FETCH_HEAD
+            for d in $(cat _preview/PREVIEW 2>/dev/null); do
+              case "$d" in */*|.*) continue;; esac
+              if [ -d "_preview/$d" ]; then mkdir -p _site/test; cp -r "_preview/$d" "_site/test/$d"; fi
+            done
+          fi
 
       - uses: actions/upload-pages-artifact@v3
         with:
