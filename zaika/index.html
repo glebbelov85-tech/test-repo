@@ -20,6 +20,11 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 .btn.green { background: #4cc257; box-shadow: 0 1.2vmin 0 #2e8b3a, 0 1.6vmin 4vmin rgba(0,0,0,.22); }
 #top, #fin, #start { position: fixed; inset: 0; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s; }
 #top.on, #fin.on, #start.on { opacity: 1; visibility: visible; }
+#lvl { position: fixed; right: calc(2vmin + env(safe-area-inset-right)); top: calc(2vmin + env(safe-area-inset-top)); display: flex; gap: 1.4vmin; opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s; pointer-events: none; }
+#lvl.on { opacity: 1; visibility: visible; }
+#lvl .btn { position: relative; width: 11.5vmin; height: 11.5vmin; max-width: 92px; max-height: 92px; padding: 1.3vmin; background: rgba(255,255,255,.7); }
+#lvl .btn svg { opacity: .45; }
+#lvl .btn.sel { background: #fff; outline: .7vmin solid #ffb300; } #lvl .btn.sel svg { opacity: 1; }
 #bHome { left: calc(2.5vmin + env(safe-area-inset-left)); top: calc(2.5vmin + env(safe-area-inset-top)); }
 #bRep { right: calc(2.5vmin + env(safe-area-inset-right)); top: calc(2.5vmin + env(safe-area-inset-top)); }
 #stars { position: absolute; left: 50%; top: calc(3.5vmin + env(safe-area-inset-top)); transform: translateX(-50%); display: flex; gap: 1.2vmin; background: rgba(255,255,255,.35); padding: 1.2vmin 2.4vmin; border-radius: 6vmin; }
@@ -50,14 +55,15 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 </div>
 <div id="start">
   <div class="btn green" id="bPlay"><svg viewBox="0 0 100 100"><path d="M36 24 L78 50 L36 76Z" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round"/></svg></div>
-  <div id="ver">v3.1</div>
+  <div id="ver">v3.2</div>
 </div>
+<div id="lvl"></div>
 <div id="wipe"></div>
 <script src="three.min.js"></script>
-<script src="frazy.js?v=3.1"></script>
-<script src="voice/zapisi.js?v=3.1"></script>
-<script src="modeli.js?v=3.1"></script>
-<script src="igra.js?v=3.1"></script>
-<script src="komnaty2.js?v=3.1"></script>
+<script src="frazy.js?v=3.2"></script>
+<script src="voice/zapisi.js?v=3.2"></script>
+<script src="modeli.js?v=3.2"></script>
+<script src="igra.js?v=3.2"></script>
+<script src="komnaty2.js?v=3.2"></script>
 </body>
 </html>

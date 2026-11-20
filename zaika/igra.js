@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '3.1';
+const VERSION = '3.2';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -464,6 +464,15 @@ tapBtn($('bHome'), () => { SFX.tap(); go(goHome); });
 tapBtn($('bRep'), () => { SFX.tap(); current && current.repeat && current.repeat(); });
 tapBtn($('bAgain'), () => { SFX.tap(); const k = current && current.key; if (k) go(() => runRoom(k)); });
 tapBtn($('bHome2'), () => { SFX.tap(); go(goHome); });
+const LVL = $('lvl');
+const STAR_P = 'M50 6 L62 37 L95 39 L69 60 L78 93 L50 74 L22 93 L31 60 L5 39 L38 37Z';
+function updLvl() { [...LVL.children].forEach((b, i) => b.classList.toggle('sel', i === lvlOf())); }
+[[[25, 25, 0.5]], [[3, 27, 0.46], [51, 27, 0.46]], [[27, 3, 0.46], [3, 48, 0.46], [51, 48, 0.46]]].forEach((ps, i) => {
+  const b = document.createElement('div'); b.className = 'btn';
+  b.innerHTML = `<svg viewBox="0 0 100 100">${ps.map(([x, y, k]) => `<path transform="translate(${x} ${y}) scale(${k})" d="${STAR_P}" fill="#ffd23f" stroke="#f59e0b" stroke-width="8" stroke-linejoin="round"/>`).join('')}</svg>`;
+  tapBtn(b, () => { S.diff = i; save(); updLvl(); for (let k = 0; k <= i; k++) tone(660 + k * 220, k * 0.11, 0.16, 'triangle', 0.13); });
+  LVL.appendChild(b);
+});
 
 // ---------- смена сцен ----------
 let session = 0, current = null, busyWipe = false;
@@ -478,7 +487,7 @@ function clearWorld() {
   for (let i = cam.children.length - 1; i >= 0; i--) cam.remove(cam.children[i]);
   if (scene.background && scene.background.isTexture) scene.background.dispose();
   world = new T.Group(); scene.add(world);
-  UI.fin.classList.remove('on'); UI.top.classList.remove('on'); UI.start.classList.remove('on');
+  UI.fin.classList.remove('on'); UI.top.classList.remove('on'); UI.start.classList.remove('on'); LVL.classList.remove('on');
   return session;
 }
 async function go(fn) {
@@ -493,7 +502,8 @@ async function go(fn) {
 
 // ---------- комнаты ----------
 const ROOMS = {};
-function lvlOf(key) { return Math.min(2, Math.floor((S.stars[key] || 0) / 2)); }
+// уровень сложности выбирают кнопками-звёздочками в домике: 0 — легко, 1 — средне, 2 — сложно
+function lvlOf() { return S.diff === undefined ? 1 : S.diff; }
 
 function runRoom(key, keepRound) {
   const Rm = ROOMS[key];
@@ -582,17 +592,17 @@ ROOMS.kraski = {
   round(g) {
     g.balls.forEach(b => { unpick(b); world.remove(b); }); g.balls = [];
     const pal = Object.keys(COLORS); // все шесть цветов с самого начала
-    const n = [2, 3, 4][g.lvl];
+    const n = [3, 4, 6][g.lvl];
     let target; do target = pick(pal); while (target === g.prev); g.prev = target;
     const cols = shuffle([target, ...shuffle(pal.filter(c => c !== target)).slice(0, n - 1)]);
     g.vedro.userData.paint.forEach(m => m.color.copy(C(COLORS[target]))); squash(g.vedro);
     const P = landscape
-      ? cols.map((c, i) => [-1.6 + (8.2 / n) * (i + 0.5), 4.9 + (i % 2) * 0.9])
-      : { 2: [[-2.1, 9.6], [2.1, 8.3]], 3: [[-2.3, 10.2], [2.3, 9.6], [1.3, 5.9]], 4: [[-2.4, 10.4], [2.3, 9.9], [-0.3, 6.6], [2.6, 5.8]] }[n];
+      ? (n === 6 ? [[-1.2, 6.4], [2.2, 6.7], [5.6, 6.4], [0.5, 3.5], [3.9, 3.3], [7.0, 3.6]] : cols.map((c, i) => [-1.6 + (8.2 / n) * (i + 0.5), 4.9 + (i % 2) * 0.9]))
+      : { 6: [[-3.0, 10.7], [0, 11.1], [3.0, 10.7], [-3.0, 7.3], [0.1, 7.0], [3.0, 7.4]], 2: [[-2.1, 9.6], [2.1, 8.3]], 3: [[-2.3, 10.2], [2.3, 9.6], [1.3, 5.9]], 4: [[-2.4, 10.4], [2.3, 9.9], [-0.3, 6.6], [2.6, 5.8]] }[n];
     let done = false;
     cols.forEach((c, i) => {
       const b = mkShar(COLORS[c]); const U = b.userData; U.c = c; U.by = P[i][1]; U.cy = 0;
-      const sc = landscape ? (n > 3 ? 1.2 : 1.35) : 1.35;
+      const sc = n === 6 ? (landscape ? 1.05 : 1.1) : landscape ? (n > 3 ? 1.2 : 1.35) : 1.35;
       b.position.set(P[i][0], -5, 0.3 * (i % 2)); b.scale.setScalar(sc);
       hitBox(b, 2.1, 2.6, 2, 0, -0.1, 0);
       world.add(b); g.balls.push(b);
@@ -632,7 +642,8 @@ ROOMS.figury = {
     // коврик и кубики для уюта
     const rug = mesh(new T.CylinderGeometry(7, 7, 0.06, 40), M('#ff9eb5', 1), 0, 0.03, 1.5); rug.castShadow = false; rug.receiveShadow = true; rug.scale.z = 0.45; world.add(rug);
     [['#4fc3f7', -7.2, 0.5, -1.5, 0.3], ['#ffd54f', -6.3, 0.45, -2.2, -0.2], ['#81c784', 7.0, 0.5, -1.8, 0.5], ['#ff8a65', -6.9, 1.4, -1.8, 0.7]].forEach(([c, x, y, z, r]) => { if (!landscape && Math.abs(x) > 4.6) x *= 0.52; const b = rbox(M(c, 0.5), 0.95, 0.95, 0.95, 0.14, x, y, z); b.rotation.y = r; world.add(b); });
-    g.set = FIGS.slice(0, [3, 4, 5][g.lvl]);
+    g.set = g.lvl ? FIGS : FIGS.slice(0, 4);
+    g.cnt = [3, 4, 5][g.lvl]; // сколько окошек в ящике
     g.prev = null; g.sorter = null; g.shape = null;
     g.zaika = actor(mkZaika());
     world.add(g.zaika);
@@ -641,7 +652,7 @@ ROOMS.figury = {
   round(g) {
     if (g.sorter) world.remove(g.sorter);
     if (g.shape) { unpick(g.shape); world.remove(g.shape); }
-    const order = shuffle(g.set), n = order.length, sp = landscape ? 2.72 : 2.55;
+    const order = shuffle(g.set).slice(0, g.cnt), n = order.length, sp = landscape ? 2.72 : 2.55;
     let w, h, cy, holes;
     if (landscape || n <= 3) { w = sp * n + 0.9; h = 3.4; cy = 2.75; holes = order.map((k, i) => ({ kind: k, x: (i - (n - 1) / 2) * sp, y: 0 })); }
     else { const per = Math.ceil(n / 2); w = sp * per + 0.9; h = 6.2; cy = 4.0; holes = order.map((k, i) => { const r = i < per ? 0 : 1, cnt = r ? n - per : per, j = r ? i - per : i; return { kind: k, x: (j - (cnt - 1) / 2) * sp, y: r ? -1.4 : 1.4 }; }); }
@@ -656,7 +667,7 @@ ROOMS.figury = {
     st.scale.setScalar(1); st.updateMatrixWorld(true);
     const targets = holes.map(o => { const tgt = grp(); tgt.position.copy(st.localToWorld(V(o.x, o.y, 0.05))); tgt.userData.fig = o.kind; hitBox(tgt, 2.4, 2.6, 1.2); world.add(tgt); return tgt; });
     st.scale.setScalar(0.001);
-    let target; do target = pick(g.set); while (target === g.prev && n > 1); g.prev = target;
+    let target; do target = pick(order); while (target === g.prev && n > 1); g.prev = target;
     const sh = g.shape = mkFigura(target); const sy = landscape ? 6.5 : 10.3;
     sh.userData.by = sy; sh.userData.cy = 0; sh.position.set(landscape ? 1.2 : 0.6, sy, 1.6); sh.scale.setScalar(0.001);
     hitBox(sh, 2.6, 2.6, 1.5); world.add(sh); tws(sh, 1.15, 500, 'back', 250);
@@ -753,7 +764,7 @@ ROOMS.schet = {
     const two = g.two;
     let N, Mz = 0;
     if (two) { do { N = 1 + rnd(3); Mz = 1 + rnd(3); } while (N === Mz || (N === g.prevN && Mz === g.prevM)); g.prevM = Mz; }
-    else { const pool = [[1, 2, 3], [2, 3, 4, 5]][g.lvl]; do N = pick(pool); while (N === g.prevN); }
+    else { const pool = [[1, 2, 3], [3, 4, 5]][g.lvl]; do N = pick(pool); while (N === g.prevN); }
     g.prevN = N;
     g.tables.forEach(t => world.remove(t));
     const sp = landscape ? 0.95 : 0.86;
@@ -838,14 +849,14 @@ ROOMS.mishki = {
     g.shelfY = landscape ? 3.55 : 6.5;
     const sh = rbox(M('#c98a55', 0.6), 4.2, 0.3, 1.6, 0.1, 0, g.shelfY - 0.15, -2.6); sh.receiveShadow = true; world.add(sh);
     for (const s of [-1, 1]) world.add(rbox(M('#a86c3d', 0.7), 0.22, 0.5, 1.1, 0.08, s * 1.6, g.shelfY - 0.5, -2.9));
-    g.sizes = g.lvl < 2 ? ['bolshoy', 'malenky'] : ['bolshoy', 'sredniy', 'malenky'];
+    g.sizes = g.lvl < 1 ? ['bolshoy', 'malenky'] : ['bolshoy', 'sredniy', 'malenky'];
     g.prev = []; g.beds = []; g.bear = null;
     g.tick = t => { bulbs.forEach((b, i) => b.scale.setScalar(0.16 * (1 + Math.sin(t * 3 + i * 1.3) * 0.25))); st.forEach((s, i) => s.scale.setScalar(0.1 * (1 + Math.sin(t * 2 + i * 2) * 0.35))); };
   },
   round(g) {
     g.beds.forEach(b => { unpick(b); world.remove(b); b.userData.bear && world.remove(b.userData.bear); }); g.beds = [];
     if (g.bear) { unpick(g.bear); world.remove(g.bear); }
-    const BS = { bolshoy: 1.5, sredniy: 1.13, malenky: 0.8 };
+    const BS = g.lvl < 2 ? { bolshoy: 1.5, sredniy: 1.13, malenky: 0.8 } : { bolshoy: 1.38, sredniy: 1.14, malenky: 0.93 }; // на сложном размеры ближе друг к другу
     const order = shuffle(g.sizes), n = order.length;
     const k = landscape ? (n === 3 ? 1.0 : 1.08) : (n === 3 ? 0.7 : 1.0), gap = landscape ? 1.0 : 0.45;
     const widths = order.map(s => 3.3 * BS[s] * k), total = widths.reduce((a, b) => a + b, 0) + gap * (n - 1);
@@ -906,7 +917,7 @@ ROOMS.zveri = {
   intro: 'zveri_intro',
   voice: ['zveri_intro', ...ZVERI.flatMap(z => ['kto_' + z, 'eto_' + z, 'zvuk_' + z])],
   setup(g) {
-    const n = [3, 4, 6][g.lvl];
+    const n = [4, 6, 6][g.lvl];
     setFrame(landscape ? (n > 4 ? { cy: 3.85, halfW: 8.3, halfH: 5.1 } : { cy: 2.7, halfW: 7.9, halfH: 4.3 }) : { cy: n > 4 ? 5.5 : 4.6, halfW: 4.8, halfH: 7.7 });
     lights(world); meadow(world);
     g.set = shuffle(ZVERI).slice(0, n);
@@ -943,23 +954,24 @@ ROOMS.zveri = {
     g.cards.forEach(unhalo);
     let t; do t = pick(g.set); while (t === g.prev); g.prev = t;
     let busy = false;
-    const whoFor = c => id => (id.startsWith('zvuk_') ? c : null);
+    const whoFor = c => id => (id === 'zvuk_' + c.userData.z ? c : null);
+    const q = g.lvl >= 2 ? 'zvuk_' + t : 'kto_' + t; // на сложном только голос зверя, без подсказки «кто говорит»
     g.tap = async c => {
       if (busy) return;
       hop(c, 0.8); SFX.boing();
       if (c.userData.z === t) {
         busy = true; g.cards.forEach(unhalo);
-        g.solved(c.position.clone().add(V(0, 2.2, 1)), 'zvuk_' + t, c);
+        g.solved(c.position.clone().add(V(0, 2.2, 1)), g.lvl >= 2 ? ['eto_' + t, 'zvuk_' + t] : 'zvuk_' + t, whoFor(c));
       } else {
         const hint = g.miss();
         const tc = g.cards.find(x => x.userData.z === t);
         if (hint && tc) halo(tc, 1.35, 1.25);
-        Voice.say(['eto_' + c.userData.z, 'zvuk_' + c.userData.z, hint ? 'podskazka' : null, 'kto_' + t], whoFor(c));
+        Voice.say(['eto_' + c.userData.z, 'zvuk_' + c.userData.z, hint ? 'podskazka' : null, q], whoFor(c));
       }
     };
-    g.repeat = () => Voice.say('kto_' + t, null);
-    g.say('kto_' + t, null);
-    Idle.set(() => Voice.say('kto_' + t, null));
+    g.repeat = () => Voice.say(q, null);
+    g.say(q, null);
+    Idle.set(() => Voice.say(q, null));
   },
 };
 
@@ -983,14 +995,38 @@ function cellIcon(key) {
   else if (key === 'zveri') { const c = actor(mkZver('korova')); c.scale.setScalar(0.9); c.rotation.y = 0.55; c.position.set(-0.1, 0, -0.2); g.add(c); }
   return g;
 }
+// дверь: нажмёшь — откроется, и выглянет ёжик. standalone = отдельный маленький домик (в лежачем положении экрана)
+function homeDoor(x, y, z, k, standalone) {
+  const r = grp(x, y, z); r.scale.setScalar(k); world.add(r);
+  if (standalone) {
+    r.add(rbox(M('#fff6e2', 0.9), 2.7, 3.3, 2.0, 0.2, 0, 1.65, -1.05));
+    const rf = mesh(new T.CylinderGeometry(0.1, 2.5, 1.5, 4), M('#f0655a', 0.6), 0, 4.0, -1.05); rf.rotation.y = Math.PI / 4; r.add(rf);
+  }
+  const hole = rbox(M('#5a3a2a', 1), 1.7, 2.6, 0.1, 0.5, 0, 1.3, 0.02); hole.castShadow = false; r.add(hole);
+  const door = grp(-0.85, 0, 0.14); door.add(rbox(M('#c0563f', 0.6), 1.7, 2.6, 0.16, 0.5, 0.85, 1.3, 0)); door.add(ball(M('#ffd54f', 0.3), 0.11, 1.4, 1.3, 0.12)); r.add(door);
+  const guest = actor(mkEzhik()); guest.position.set(0, 0, 0.3); guest.rotation.y = -0.3; guest.scale.setScalar(0.001); guest.visible = false; r.add(guest);
+  const dh = grp(0, 1.3, 0.3); hitBox(dh, 2.3, 3.0, 1.0); dh.userData.cy = 0; r.add(dh);
+  let busy = false;
+  pickable(dh, async () => {
+    if (busy) return; busy = true; SFX.whoosh();
+    await tw(door.rotation, { y: -2.0 }, 380, 'out');
+    guest.visible = true; SFX.boing(); tws(guest, 0.62, 350, 'back');
+    await tw(guest.position, { z: 1.5 }, 420, 'out');
+    burst(r.localToWorld(V(0, 1.6, 1.6)), 10); SFX.good(); hop(guest, 0.4);
+    await wait(700); hop(guest, 0.4); await wait(800);
+    tws(guest, 0.001, 300, 'in'); await tw(guest.position, { z: 0.3 }, 300, 'in');
+    guest.visible = false; await tw(door.rotation, { y: 0 }, 350, 'inout'); SFX.thunk(); busy = false;
+  });
+}
 function goHome() {
   const my = clearWorld();
   current = { name: 'home', rebuild: () => goHome() };
+  LVL.classList.add('on'); updLvl();
   const cw = 4.3, ch = 3.6, cd = 2.6, fl = 0.55;
   const cols = landscape ? 4 : 3, rows = ROOM_KEYS.length / cols;
   const y0 = landscape ? 0 : 3.5; // в портретном положении дом стоит на высоком крыльце, Зайка перед ним
   const Wd = cw * cols, Ht = (ch + fl) * rows, roofH = landscape ? 3.0 : 2.5, topY = y0 + Ht + fl + roofH;
-  setFrame(landscape ? { cx: -1.55, cy: topY / 2 + 0.1, halfW: Wd / 2 + 2.95, halfH: topY / 2 + 0.7, pitch: 5 } : { cy: topY / 2 + 0.2, halfW: Wd / 2 + 0.55, halfH: topY / 2 + 0.9, pitch: 4 });
+  setFrame(landscape ? { cx: -0.6, cy: topY / 2 + 0.1, halfW: Wd / 2 + 4.3, halfH: topY / 2 + 0.7, pitch: 5 } : { cy: topY / 2 + 0.2, halfW: Wd / 2 + 0.55, halfH: topY / 2 + 0.9, pitch: 4 });
   lights(world, { lx: 4, ly: 11, ty: topY / 2, sh: 23 }); meadow(world);
   const house = grp(0, y0, -0.5); world.add(house);
   const wallM = M('#fff6e2', 0.9), trimM = M('#ffffff', 0.7);
@@ -1009,11 +1045,11 @@ function goHome() {
   const sx = Wd * 0.3, sy = roofTop + roofH * 0.55 + 1.1;
   // Зайка живёт снаружи: сбоку от дома или перед крыльцом
   const zaika = actor(mkZaika()); zaika.userData.wave = true; world.add(zaika);
-  if (landscape) { zaika.position.set(-Wd / 2 - 2.75, 0, 1.2); zaika.scale.setScalar(1.5); zaika.rotation.y = 0.3; }
+  if (landscape) { zaika.position.set(-Wd / 2 - 2.75, 0, 1.2); zaika.scale.setScalar(1.5); zaika.rotation.y = 0.3; homeDoor(Wd / 2 + 1.75, 0, -1.2, 1.0, true); }
   else {
     const base = rbox(M('#e6cfa8', 0.9), Wd + 0.7, y0 + 0.2, cd + 0.5, 0.2, 0, y0 / 2 - 0.1, -cd / 2 - 0.4); base.receiveShadow = true; world.add(base);
     const fz = -0.1;
-    world.add(rbox(M('#c0563f', 0.6), 1.7, 2.6, 0.2, 0.5, 3.3, 1.3, fz)); world.add(ball(M('#ffd54f', 0.3), 0.11, 3.85, 1.3, fz + 0.15));
+    homeDoor(3.3, 0, fz, 1);
     const wn = cyl(M('#ffffff', 0.7), 0.75, 0.75, 0.16, -3.9, 2.0, fz, 28); wn.rotation.x = Math.PI / 2; world.add(wn);
     const wg = cyl(M('#7fd0ff', 0.2), 0.58, 0.58, 0.2, -3.9, 2.0, fz, 28); wg.rotation.x = Math.PI / 2; wg.castShadow = false; world.add(wg);
     zaika.position.set(-0.3, 0, 1.3); zaika.scale.setScalar(0.84);
