@@ -74,6 +74,11 @@ class Filtry {
     this.sB = id; this._sAnim = { t: 0, dur: fade }; this._prog('s' + id);
     return true;
   }
+  // два стиля одновременно: постоянная смесь (mix 0..1 - доля второго). Без второго: setStyle(a)
+  setBlend(a, b, mix = 0.5) {
+    const ia = Filtry.styleId(a), ib = Filtry.styleId(b); if (ia == null || ib == null) return false;
+    this._sAnim = null; this.sA = ia; this.sB = ib; this.mix = Math.max(0.001, Math.min(1, mix)); this.trans = 0; this._dirty = true; return true;
+  }
   get styleTarget() { return this._sAnim || this.mix > 0 ? this.sB : this.sA; }
   // --- старый способ: позиция на ползунке (дробная = смесь соседних) ---
   get pos() { const E = Filtry.EFFECTS, ia = E.findIndex(e => e.id === this.sA); if (this.mix <= 0) return ia; const ib = E.findIndex(e => e.id === this.sB); return ia + (ib - ia) * this.mix; }
