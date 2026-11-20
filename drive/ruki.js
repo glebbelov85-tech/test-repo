@@ -6,81 +6,67 @@
   const R = (window.RUKI = {});
   const D = Math.PI / 180;
 
-  function skinMat() {
-    const tex = K.canvasTex(128, 128, (g, w, h) => {
-      g.fillStyle = '#d9ab90'; g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 500; i++) {
-        const r = 4 + K.rnd() * 10; g.fillStyle = K.rnd() < 0.5 ? 'rgba(200,120,105,0.035)' : 'rgba(240,200,170,0.035)';
-        g.beginPath(); g.arc(K.rnd() * w, K.rnd() * h, r, 0, 7); g.fill();
-      }
-      for (let i = 0; i < 1400; i++) { g.fillStyle = 'rgba(120,70,55,0.06)'; g.fillRect(K.rnd() * w, K.rnd() * h, 1, 1 + K.rnd() * 3); }
-    }, { repeat: [2, 2] });
-    return new T.MeshStandardMaterial({ color: 0xd9b8a6, map: tex, roughness: 0.62, metalness: 0 });
+  // ---- кисть: цельная сетка из kist.js со скелетом (ладонь, 4 пальца по 3 фаланги, большой палец) ----
+  const KI = window.KIST;
+  function b64(str, Type) { const bin = atob(str), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Type(u.buffer); }
+  let handGeo = null;
+  function geo() {
+    if (handGeo) return handGeo;
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(b64(KI.pos, Float32Array), 3));
+    g.setAttribute('normal', new T.BufferAttribute(b64(KI.nor, Int8Array), 3, true));
+    const c8 = b64(KI.col, Uint8Array), c = new Float32Array(c8.length);
+    for (let i = 0; i < c8.length; i++) c[i] = Math.pow(c8[i] / 255, 2.2) * 0.8;
+    g.setAttribute('color', new T.BufferAttribute(c, 3));
+    g.setAttribute('skinIndex', new T.BufferAttribute(new Uint16Array(b64(KI.skinI, Uint8Array)), 4));
+    g.setAttribute('skinWeight', new T.BufferAttribute(b64(KI.skinW, Uint8Array), 4, true));
+    g.setIndex(new T.BufferAttribute(b64(KI.idx, KI.idx32 ? Uint32Array : Uint16Array), 1));
+    return (handGeo = g);
   }
-
-  const FINGERS = [
-    { x: -0.0305, y: 0.092, L: [0.043, 0.026, 0.021], r: 0.0098, splay: 0.07 },
-    { x: -0.0100, y: 0.097, L: [0.047, 0.030, 0.022], r: 0.0100, splay: 0.01 },
-    { x: 0.0100, y: 0.093, L: [0.043, 0.028, 0.021], r: 0.0094, splay: -0.05 },
-    { x: 0.0285, y: 0.084, L: [0.033, 0.020, 0.019], r: 0.0083, splay: -0.12 },
-  ];
+  // позы: 12 сгибов пальцев (указательный..мизинец, по 3 сустава), разведение, большой палец [отведение, противопоставление, сгиб, сгиб]
+  const POSE = {
+    grip: [0.8, 1.65, 0.9, 0.82, 1.68, 0.9, 0.85, 1.7, 0.9, 0.9, 1.7, 0.95, 0.35, 0.1, 0.35, 0.45, 0.5],
+    open: [0.1, 0.14, 0.1, 0.08, 0.12, 0.1, 0.1, 0.14, 0.1, 0.14, 0.18, 0.12, 1.5, 0.25, -0.1, 0.1, 0.1],
+    point: [0.12, 0.2, 0.12, 0.3, 0.4, 0.25, 0.75, 1.0, 0.5, 0.85, 1.05, 0.55, 1.0, 0.0, 0.25, 0.3, 0.3],
+    relax: [0.45, 0.6, 0.35, 0.45, 0.62, 0.35, 0.5, 0.65, 0.38, 0.55, 0.7, 0.4, 1.0, 0.1, 0.0, 0.2, 0.2],
+  };
+  R.POSE = POSE;
 
   function makeHand(side, skin, nail) {
     const root = new T.Group();
     const h = new T.Group(); h.scale.x = side; root.add(h);
-    const mesh = (geo, mat, x, y, z, parent) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); (parent || h).add(m); m.castShadow = true; return m; };
-    // palm: narrower at the wrist, slightly cupped
-    const pg = K.sbox(0.088, 0.104, 0.031, 0.0145, 8);
-    const pp = pg.attributes.position;
-    for (let i = 0; i < pp.count; i++) {
-      const x = pp.getX(i), y = pp.getY(i), z = pp.getZ(i), t = (y + 0.052) / 0.104;
-      pp.setXYZ(i, x * (0.74 + 0.26 * t) + 0.002 * (1 - t), y, z * (1.05 - 0.12 * t) + (z > 0 ? 0.002 * Math.sin(t * 3.1) : 0));
-    }
-    pg.computeVertexNormals();
-    mesh(pg, skin, -0.001, 0.047, 0);
-    // thumb base muscle and the edge of the palm
-    mesh(new T.SphereGeometry(1, 16, 12), skin, -0.026, 0.036, -0.011).scale.set(0.02, 0.034, 0.014);
-    mesh(new T.SphereGeometry(1, 16, 12), skin, 0.027, 0.04, -0.008).scale.set(0.013, 0.036, 0.012);
-    // wrist
-    const wr = mesh(K.capsule(0.0235, 0.0245, 0.05, 16), skin, 0, -0.045, 0); wr.scale.set(1.22, 1, 0.82);
-    // fingers
-    const fingers = [];
-    FINGERS.forEach((f, fi) => {
-      const g0 = new T.Group(); g0.position.set(f.x, f.y, 0.001); g0.rotation.z = f.splay; h.add(g0);
-      mesh(new T.SphereGeometry(f.r * 1.12, 12, 10), skin, 0, -0.002, 0.004, g0); // knuckle
-      const joints = []; let parent = g0, rr = f.r;
-      for (let k = 0; k < 3; k++) {
-        const j = new T.Group(); if (k > 0) j.position.y = f.L[k - 1]; parent.add(j);
-        mesh(K.capsule(rr, rr * 0.9, f.L[k], 12), skin, 0, 0, 0, j);
-        if (k === 2) { const n = mesh(new T.SphereGeometry(1, 12, 8), nail, 0, f.L[k] * 0.62, rr * 0.62, j); n.scale.set(rr * 0.74, f.L[k] * 0.4, rr * 0.3); n.castShadow = false; }
-        joints.push(j); parent = j; rr *= 0.9;
-      }
-      fingers.push(joints);
+    const bones = KI.bones.map((b) => { const o = new T.Bone(); o.name = b.name; return o; });
+    const m4 = new T.Matrix4(), sc = new T.Vector3();
+    KI.bones.forEach((b, i) => {
+      const r = b.r; m4.makeBasis(new T.Vector3(r[0], r[1], r[2]), new T.Vector3(r[3], r[4], r[5]), new T.Vector3(r[6], r[7], r[8]));
+      bones[i].quaternion.setFromRotationMatrix(m4); bones[i].position.set(b.p[0], b.p[1], b.p[2]);
+      if (b.parent >= 0) bones[b.parent].add(bones[i]);
     });
-    // thumb
-    const t0 = new T.Group(); t0.position.set(-0.031, 0.02, -0.006); h.add(t0);
-    const TL = [0.037, 0.027, 0.023], tj = []; let tp = t0, tr = 0.0128;
-    for (let k = 0; k < 3; k++) {
-      const j = new T.Group(); if (k > 0) j.position.y = TL[k - 1]; tp.add(j);
-      mesh(K.capsule(tr, tr * 0.88, TL[k], 12), skin, 0, 0, 0, j);
-      if (k === 2) { const n = mesh(new T.SphereGeometry(1, 12, 8), nail, 0, TL[k] * 0.62, tr * 0.62, j); n.scale.set(tr * 0.78, TL[k] * 0.4, tr * 0.3); n.castShadow = false; }
-      tj.push(j); tp = j; tr *= 0.88;
+    const mesh = new T.SkinnedMesh(geo(), skin);
+    mesh.add(bones[0]); h.add(mesh);
+    h.updateMatrixWorld(true);
+    mesh.bind(new T.Skeleton(bones));
+    mesh.frustumCulled = false; mesh.castShadow = true;
+    const by = {}; bones.forEach((b) => (by[b.name] = b));
+    const t0q = by.t0.quaternion.clone(), e = new T.Euler(), q = new T.Quaternion();
+    for (let i = 0; i < 4; i++) by['f' + i + '0'].rotation.order = 'ZXY';
+    // ногти
+    function addNail(bone, L, r) {
+      const g = new T.CylinderGeometry(r * 0.99, r * 0.86, L * 0.5, 10, 1, true, -0.95, 1.9);
+      const n = new T.Mesh(g, nail); n.position.set(0, L * 0.66, r * 0.07); n.scale.z = 0.92; bone.add(n);
     }
-    function setCurl(c, spread) {
-      // c: 0 open hand .. 1 fist around the rim
-      fingers.forEach((j, fi) => {
-        const k = 1 + (fi - 1.5) * 0.05;
-        j[0].rotation.x = -(0.10 + c * 0.98 * k);
-        j[1].rotation.x = -(0.12 + c * 1.55);
-        j[2].rotation.x = -(0.08 + c * 0.9);
-        j[0].parent.rotation.z = FINGERS[fi].splay * (1 + (spread || 0) * 2.2 * (1 - c));
-      });
-      tj[0].rotation.set(-0.25 - 0.12 * c, 0, 0.78 - 0.4 * c);
-      tj[1].rotation.z = 0.12 + 0.1 * c;
-      tj[2].rotation.z = 0.08 + 0.5 * c;
+    for (let i = 0; i < 4; i++) addNail(by['f' + i + '2'], KI.fingers[i].L[2], KI.fingers[i].r[2]);
+    addNail(by.t2, KI.thumb.L[2], KI.thumb.r[2]);
+    function setPose(p) {
+      for (let i = 0; i < 4; i++) {
+        by['f' + i + '0'].rotation.set(-p[i * 3], 0, KI.splay[i] * p[12]);
+        by['f' + i + '1'].rotation.x = -p[i * 3 + 1]; by['f' + i + '2'].rotation.x = -p[i * 3 + 2];
+      }
+      e.set(-p[14], 0, p[13], 'ZXY'); by.t0.quaternion.copy(t0q).multiply(q.setFromEuler(e));
+      by.t1.rotation.x = -p[15]; by.t2.rotation.x = -p[16];
     }
-    setCurl(1);
-    return { root: root, setCurl: setCurl };
+    setPose(POSE.grip);
+    return { root: root, setPose: setPose };
   }
 
   function sleeveTex() {
@@ -109,8 +95,8 @@
   }
 
   R.build = function (cab) {
-    const skin = skinMat();
-    const nail = new T.MeshStandardMaterial({ color: 0xe9c3b4, roughness: 0.32 });
+    const skin = new T.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, skinning: true, roughness: 0.58 });
+    const nail = new T.MeshStandardMaterial({ color: 0xe6bcae, roughness: 0.25 });
     const sleeveM = new T.MeshStandardMaterial({ map: sleeveTex(), roughness: 0.9, side: T.DoubleSide });
     const cuffTex = K.canvasTex(128, 16, (g, w, h) => { g.fillStyle = '#0b0b0d'; g.fillRect(0, 0, w, h); g.fillStyle = '#1d1e21'; for (let x = 0; x < w; x += 4) g.fillRect(x, 0, 2, h); }, { repeat: [3, 1] });
     const cuffM = new T.MeshStandardMaterial({ map: cuffTex, roughness: 1 });
@@ -118,14 +104,16 @@
     mount.updateMatrix();
     const mq = mount.quaternion.clone(), mp = mount.position.clone();
     const L1 = 0.31, L2 = 0.275;
+    let GRIP_Y = 0.0876, GRIP_Z = 0.028;
+    R.tune = function (y, z) { GRIP_Y = y; GRIP_Z = z; };
 
     const hands = [];
     for (const side of [1, -1]) {
       const hand = makeHand(side, skin, nail);
       cab.add(hand.root);
       const fore = new T.Group(); cab.add(fore);
-      const fm = new T.Mesh(tubeGeo(0.056, 0.039, L2 - 0.035, 0.035), sleeveM); fm.castShadow = true; fore.add(fm);
-      const cf = new T.Mesh(tubeGeo(0.038, 0.033, 0.04, 0.0), cuffM); cf.position.y = L2 - 0.038; fore.add(cf);
+      const fm = new T.Mesh(tubeGeo(0.054, 0.037, L2 - 0.03, 0.035), sleeveM); fm.castShadow = true; fore.add(fm);
+      const cf = new T.Mesh(tubeGeo(0.0365, 0.0315, 0.045, 0.0), cuffM); cf.position.y = L2 - 0.034; cf.scale.z = 0.86; fore.add(cf);
       const up = new T.Group(); cab.add(up);
       const um = new T.Mesh(tubeGeo(0.072, 0.058, L1 + 0.02, 0.03), sleeveM); um.castShadow = true; up.add(um);
       const el = new T.Mesh(new T.SphereGeometry(0.058, 16, 12), new T.MeshStandardMaterial({ color: 0x0d0e10, roughness: 0.9 })); fore.add(el);
@@ -134,9 +122,9 @@
         side: side, hand: hand, fore: fore, up: up,
         shoulder: new T.Vector3(K.DRV_X + side * 0.215, 1.0, 0.2),
         home: side * 58 * D, phi: side * 58 * D,
-        min: side > 0 ? 6 * D : -116 * D, max: side > 0 ? 116 * D : -6 * D,
+        min: side > 0 ? 8 * D : -102 * D, max: side > 0 ? 102 * D : -8 * D,
         mode: 'wheel', blend: null, idle: 0,
-        cur: { p: new T.Vector3(), q: new T.Quaternion(), c: 1 },
+        cur: { p: new T.Vector3(), q: new T.Quaternion(), pose: POSE.grip.slice() },
       });
     }
     R.hands = hands;
@@ -145,28 +133,28 @@
     // --- target poses (in the wheel mount frame) ---
     const vX = new T.Vector3(), vY = new T.Vector3(), vZ = new T.Vector3(), m4 = new T.Matrix4(), tp = new T.Vector3(), tq = new T.Quaternion();
     function setBasis(out) { m4.makeBasis(vX, vY, vZ); out.q.setFromRotationMatrix(m4); }
+    const BETA = 38 * D, CB = Math.cos(BETA), SB = Math.sin(BETA);
     function gripPose(h, th, out) {
+      // ладонь лежит на ободе сверху-снаружи, пальцы уходят за обод, запястье к водителю
       const s = Math.sin(th), c = Math.cos(th);
-      // lean the hand's «outward» direction a little towards «up», the way a wrist really sits
-      vY.set(s, c + 0.35, 0).normalize();
-      vZ.set(s * 0.3, c * 0.3, 0.95).normalize();
-      vX.crossVectors(vY, vZ).normalize(); vY.crossVectors(vZ, vX).normalize();
-      out.p.set(s * K.WHEEL_R, c * K.WHEEL_R, 0).addScaledVector(vZ, 0.0295).addScaledVector(vY, -0.107);
-      setBasis(out); out.c = 1; out.spread = 0;
+      vZ.set(s * CB, c * CB, SB); vY.set(s * SB, c * SB, -CB);
+      vX.crossVectors(vY, vZ).normalize();
+      out.p.set(s * K.WHEEL_R, c * K.WHEEL_R, 0).addScaledVector(vZ, GRIP_Z).addScaledVector(vY, -GRIP_Y);
+      setBasis(out); out.pose = POSE.grip;
     }
     function hornPose(h, press, out) {
       vZ.set(0, 0.12, 1).normalize(); vY.set(-h.side * 0.5, 0.86, 0).normalize();
       vX.crossVectors(vY, vZ).normalize(); vY.crossVectors(vZ, vX).normalize();
       out.p.set(h.side * 0.045, -0.085, 0.045 - press * 0.008);
-      setBasis(out); out.c = 0.1; out.spread = 0.5;
+      setBasis(out); out.pose = POSE.open;
     }
     function stalkPose(h, dy, out) {
       vY.set(0.22, 0.25, -1).normalize(); vZ.set(0.45, 0.9, 0.2).normalize();
       vX.crossVectors(vY, vZ).normalize(); vZ.crossVectors(vX, vY).normalize();
       out.p.set(0.215, 0.022 + dy, -0.09).addScaledVector(vY, -0.16).addScaledVector(vZ, 0.012);
-      setBasis(out); out.c = 0.2; out.spread = 0.2;
+      setBasis(out); out.pose = POSE.point;
     }
-    const tgt = { p: new T.Vector3(), q: new T.Quaternion(), c: 1, spread: 0 };
+    const tgt = { p: new T.Vector3(), q: new T.Quaternion(), pose: POSE.grip };
     function target(h, st) {
       if (h.mode === 'horn') hornPose(h, st.hornPress, tgt);
       else if (h.mode === 'stalk') stalkPose(h, st.stalkDy, tgt);
@@ -176,7 +164,7 @@
       return tgt;
     }
     function startBlend(h, dur, lift) {
-      h.blend = { t: 0, dur: dur, lift: lift, p: h.cur.p.clone(), q: h.cur.q.clone(), c: h.cur.c };
+      h.blend = { t: 0, dur: dur, lift: lift, p: h.cur.p.clone(), q: h.cur.q.clone(), pose: h.cur.pose.slice() };
     }
     R.setMode = function (h, mode, dur) { if (h.mode !== mode) { h.mode = mode; startBlend(h, dur || 0.2, 0.03); if (mode === 'wheel') h.phi = h.home + (h.side > 0 ? 6 : -6) * D - R.lastWheel; if (mode === 'wheel') h.phi = clampTo(h, R.lastWheel + h.phi) - R.lastWheel; } };
     function clampTo(h, th) { return Math.max(h.min + 8 * D, Math.min(h.max - 8 * D, th)); }
@@ -211,16 +199,16 @@
         const t = target(h, st);
         if (h.blend) {
           const b = h.blend; b.t += dt / b.dur;
-          if (b.t >= 1) { h.blend = null; h.cur.p.copy(t.p); h.cur.q.copy(t.q); h.cur.c = t.c; }
+          if (b.t >= 1) { h.blend = null; h.cur.p.copy(t.p); h.cur.q.copy(t.q); for (let i = 0; i < 17; i++) h.cur.pose[i] = t.pose[i]; }
           else {
             const e = b.t * b.t * (3 - 2 * b.t), up = Math.sin(Math.PI * b.t);
             h.cur.p.lerpVectors(b.p, t.p, e).addScaledVector(axisCab, b.lift * up);
             h.cur.q.copy(b.q).slerp(t.q, e);
-            h.cur.c = b.c + (t.c - b.c) * e - 0.45 * up * Math.min(b.c, t.c);
+            for (let i = 0; i < 17; i++) { const v = b.pose[i] + (t.pose[i] - b.pose[i]) * e; h.cur.pose[i] = v + (POSE.relax[i] - v) * up * 0.6; }
           }
-        } else { h.cur.p.copy(t.p); h.cur.q.copy(t.q); h.cur.c = t.c; }
+        } else { h.cur.p.copy(t.p); h.cur.q.copy(t.q); for (let i = 0; i < 17; i++) h.cur.pose[i] = t.pose[i]; }
         h.hand.root.position.copy(h.cur.p); h.hand.root.quaternion.copy(h.cur.q);
-        h.hand.setCurl(h.cur.c, t.spread);
+        h.hand.setPose(h.cur.pose);
 
         // two-bone arm: shoulder -> elbow -> wrist
         tmp.set(0, 1, 0).applyQuaternion(h.cur.q);
