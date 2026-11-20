@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Фильтры для кино: проба</title>
+<style>
+html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#src { display: none; }
+#top { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 8px; align-items: center; padding: calc(env(safe-area-inset-top) + 8px) 10px 8px; background: linear-gradient(#000a, #0000); flex-wrap: wrap; }
+#top .grow { flex: 1; }
+button, label.btn { font: 600 15px system-ui; color: #fff; background: #ffffff22; border: 1px solid #ffffff44; border-radius: 12px; padding: 8px 12px; cursor: pointer; backdrop-filter: blur(6px); }
+button.on { background: #ffd34d; color: #000; }
+#fps { font: 600 13px ui-monospace, monospace; opacity: .85; text-shadow: 0 1px 3px #000; }
+#panel { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 14px calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(#0000, #000c 35%); }
+#name { text-align: center; font: 800 20px system-ui; text-shadow: 0 2px 6px #000; margin-bottom: 4px; }
+#name small { display: block; font: 600 12px system-ui; opacity: .75; }
+.row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.row span { min-width: 64px; font: 600 13px system-ui; opacity: .85; }
+input[type=range] { flex: 1; height: 34px; accent-color: #ff5ad0; }
+#ticks { display: flex; font-size: 11px; justify-content: space-between; margin: -4px 4px 0 74px; opacity: .7; pointer-events: none; }
+#hint { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); background: #000b; padding: 12px 18px; border-radius: 14px; font: 600 16px system-ui; text-align: center; max-width: 80vw; opacity: 0; transition: opacity .4s; pointer-events: none; }
+#noGL { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; font-size: 18px; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<video id="src" playsinline muted loop></video>
+<div id="top">
+  <label class="btn">📁 Своё видео<input id="file" type="file" accept="video/*" hidden></label>
+  <button id="bCam">📷 Камера</button>
+  <button id="bPlay">⏸</button>
+  <button id="bStory" title="Плавно перейти в Неон, как в сюжете">🎞 Сюжет</button>
+  <button id="bRec">⏺ Запись</button>
+  <span class="grow"></span>
+  <button id="bQ" title="Качество картинки">100%</button>
+  <button id="bFit" title="Вписать / на весь экран">⤢</button>
+  <button id="bFull">⛶</button>
+  <span id="fps"></span>
+</div>
+<div id="panel">
+  <div class="row" style="justify-content:center"><button id="bPrev">◀</button><div id="name" style="flex:1"></div><button id="bNext">▶</button></div>
+  <div class="row"><span>Фильтр</span><input id="pos" type="range" min="0" max="1" step="0.01" value="0"></div>
+  <div id="ticks"></div>
+  <div class="row"><span>Сила</span><input id="amt" type="range" min="0" max="1" step="0.01" value="1"></div>
+</div>
+<div id="hint"></div>
+<div id="noGL">Этот браузер не умеет WebGL2, фильтры не заработают. Откройте в Chrome.</div>
+
+<script src="shader.js"></script>
+<script src="filtry.js"></script>
+<script src="kamera.js"></script>
+<script src="zapis.js"></script>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const video = $('#src'), canvas = $('#gl');
+const F = new Filtry(canvas, { fit: 'contain' });
+if (!F.ok) $('#noGL').style.display = 'flex';
+const E = Filtry.EFFECTS;
+const posEl = $('#pos'); posEl.max = E.length - 1;
+$('#ticks').innerHTML = E.map(e => '<i>' + e.e + '</i>').join('');
+
+let hintT = 0;
+function hint(t, ms = 1800) { const h = $('#hint'); h.innerHTML = t; h.style.opacity = 1; clearTimeout(hintT); hintT = setTimeout(() => h.style.opacity = 0, ms); }
+function showName() {
+  const i0 = Math.floor(F.pos), f = F.pos - i0, e = E[Math.round(F.pos)];
+  const mix = f > 0.02 && f < 0.98 ? ' → ' + E[i0 + 1].e : '';
+  $('#name').innerHTML = e.e + ' ' + e.name + mix + '<small>' + e.grp + ' · ' + (Math.round(F.pos) + 1) + '/' + E.length + (e.cost === 3 ? ' · тяжёлый' : '') + '</small>';
+}
+
+// ---- плавный переход к нужному фильтру (как смена стиля по сюжету) ----
+let anim = null;
+function goTo(target, sec = 1.2) { anim = { from: F.pos, to: Math.max(0, Math.min(E.length - 1, target)), t: 0, dur: sec }; }
+posEl.oninput = () => { anim = null; F.setPos(+posEl.value); showName(); };
+posEl.onchange = () => { goTo(Math.round(F.pos), 0.25); };   // отпустили - доезжаем до ближайшего фильтра
+$('#amt').oninput = e => { F.amount = +e.target.value; };
+$('#bPrev').onclick = () => goTo(Math.round(F.pos) - 1, 0.8);
+$('#bNext').onclick = () => goTo(Math.round(F.pos) + 1, 0.8);
+$('#bStory').onclick = () => {
+  const neon = E.findIndex(e => e.id === 13), tgt = Math.round(F.pos) === neon ? 0 : neon;
+  goTo(tgt, 2.5); hint(tgt ? 'Мир становится неоновым…' : 'Мир возвращается…', 2000);
+};
+addEventListener('keydown', e => { if (e.key === 'ArrowRight') $('#bNext').onclick(); if (e.key === 'ArrowLeft') $('#bPrev').onclick(); });
+
+// палец по картинке двигает центр эффекта (пузырь, воронка, симметрия...)
+canvas.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') F.touch = [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; });
+canvas.addEventListener('pointerdown', e => { F.touch = [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; });
+
+// ---- источники ----
+playVideoUrl(video, 'primer.mp4');
+F.setSource(video);
+video.addEventListener('seeked', () => F.resetHistory()); // склейка/перемотка: забываем прошлые кадры
+$('#file').onchange = e => { const f = e.target.files[0]; if (!f) return; playVideoFile(video, f); F.setSource(video); $('#bCam').classList.remove('on'); hint('Видео: ' + f.name); };
+let camFacing = null;
+$('#bCam').onclick = async () => {
+  camFacing = camFacing === 'environment' ? 'user' : 'environment';
+  const ok = await startCamera(video, camFacing);
+  if (!ok) { hint('Камера не включилась'); camFacing = null; return; }
+  F.setSource(video, camFacing === 'user'); $('#bCam').classList.add('on');
+  hint(camFacing === 'user' ? 'Передняя камера (нажми ещё раз - задняя)' : 'Задняя камера');
+};
+$('#bPlay').onclick = () => { if (video.paused) { video.play(); $('#bPlay').textContent = '⏸'; } else { video.pause(); $('#bPlay').textContent = '▶'; } };
+const Q = [1, 0.7, 0.5]; let qi = 0;
+$('#bQ').onclick = () => { qi = (qi + 1) % Q.length; F.quality = Q[qi]; $('#bQ').textContent = Math.round(Q[qi] * 100) + '%'; hint('Разрешение ' + Math.round(Q[qi] * 100) + '%: меньше = быстрее на слабом телефоне'); };
+$('#bFit').onclick = () => { F.fit = F.fit === 'contain' ? 'cover' : 'contain'; hint(F.fit === 'cover' ? 'На весь экран (края обрезаны)' : 'Вписать целиком'); };
+$('#bFull').onclick = () => { const d = document; d.fullscreenElement ? d.exitFullscreen() : d.documentElement.requestFullscreen && d.documentElement.requestFullscreen().catch(() => {}); };
+let rec = null;
+$('#bRec').onclick = async () => {
+  if (rec) { const r = rec; rec = null; $('#bRec').classList.remove('on'); $('#bRec').textContent = '⏺ Запись'; const b = await r.stop(); saveBlob(b, 'kino_filtr.' + (b.type.includes('mp4') ? 'mp4' : 'webm')); hint('Видео сохранено в «Загрузки»'); return; }
+  rec = startRecording(canvas); if (!rec) { hint('Этот браузер не умеет записывать'); return; }
+  $('#bRec').classList.add('on'); $('#bRec').textContent = '⏹ Стоп';
+};
+
+// ---- главный цикл + счётчик кадров ----
+let fc = 0, ft = 0, lastTs = 0;
+function loop(ts) {
+  requestAnimationFrame(loop);
+  const dt = lastTs ? (ts - lastTs) / 1000 : 0; lastTs = ts;
+  if (anim) {
+    anim.t += dt; const k = Math.min(1, anim.t / anim.dur), s = k * k * (3 - 2 * k);
+    F.setPos(anim.from + (anim.to - anim.from) * s); posEl.value = F.pos; showName();
+    if (k >= 1) anim = null;
+  }
+  F.render(ts);
+  fc++; ft += dt; if (ft >= 1) { $('#fps').textContent = Math.round(fc / ft) + ' к/с'; fc = 0; ft = 0; }
+}
+showName(); requestAnimationFrame(loop);
+// со звуком/без касания мобильный браузер может не запустить видео - запустим по первому касанию
+addEventListener('pointerdown', () => { if (video.paused && $('#bPlay').textContent === '⏸') video.play().catch(() => {}); }, { once: true });
+</script>
+</body>
+</html>
