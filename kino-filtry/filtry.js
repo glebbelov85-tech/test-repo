@@ -75,6 +75,18 @@ class Filtry {
     return true;
   }
   // два стиля одновременно: постоянная смесь (mix 0..1 - доля второго). Без второго: setStyle(a)
+  // применить состояние в формате сцены (то же, что пишется в отрезок, событие или вариант выбора):
+  //   look, filter, filter2 + mix (смесь двух стилей), trans, atmos + atmosAmount, light + lightAmount, grade + gradeAmount, fx { amount, wind, bloom ... }
+  apply(e, fade = 1.5) {
+    if (!e) return;
+    if (e.look != null) this.setLook(e.look, fade);
+    if (e.filter != null && e.filter2 != null && e.filter2 !== 'none' && e.filter !== 'none') this.setBlend(e.filter, e.filter2, e.mix != null ? e.mix : 0.5);
+    else if (e.filter != null) this.setStyle(e.filter, fade, e.trans);
+    if (e.atmos != null) this.setAtmos(e.atmos, fade, e.atmosAmount != null ? e.atmosAmount : 0.6);
+    if (e.light != null) this.setLight(e.light, fade, e.lightAmount != null ? e.lightAmount : 1);
+    if (e.grade != null) this.setGrade(e.grade, fade, e.gradeAmount != null ? e.gradeAmount : 1);
+    if (e.fx) this.set(e.fx, fade);
+  }
   setBlend(a, b, mix = 0.5) {
     const ia = Filtry.styleId(a), ib = Filtry.styleId(b); if (ia == null || ib == null) return false;
     this._sAnim = null; this.sA = ia; this.sB = ib; this.mix = Math.max(0.001, Math.min(1, mix)); this.trans = 0; this._dirty = true; return true;

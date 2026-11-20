@@ -41,50 +41,8 @@ video.src { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 
 #time, #fps { font: 12px ui-monospace, monospace; color: var(--mute); font-variant-numeric: tabular-nums; white-space: nowrap; }
 #bPlay { width: 38px; padding: 6px 0; }
 
-/* ---------- инспектор ---------- */
-#side { display: grid; grid-template-rows: auto auto minmax(0, 1fr); background: var(--panel); border-left: 1px solid var(--line); min-height: 0; min-width: 0; }
-#layers { padding: 10px 12px 8px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
-.lhead { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
-.lhead #lookName { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lhead #lookName span { font-weight: 400; color: var(--mute); }
-.layer { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 4px 8px; align-items: center; background: var(--well); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
-.layer.act { border-color: var(--line2); }
-.layer .lname { color: var(--mute); background: none; border: 0; padding: 0; text-align: left; font-weight: 700; }
-.layer .lname:hover { color: var(--ink); background: none; }
-.layer.act .lname { color: var(--ink); }
-.vals { display: flex; gap: 4px; flex-wrap: nowrap; overflow: hidden; height: 24px; min-height: 24px; align-items: center; min-width: 0; }
-.vals em { font-style: normal; color: var(--mute); }
-.val { display: inline-flex; align-items: center; gap: 2px; background: var(--acc-soft); border: 1px solid rgba(255, 154, 61, .45); color: var(--ink); border-radius: 6px; padding: 2px 2px 2px 7px; max-width: 100%; min-width: 0; flex: 0 1 auto; }
-.val span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.val button { border: 0; background: none; padding: 0 5px; color: var(--mute); font-size: 15px; line-height: 1; }
-.val button:hover { color: var(--bad); background: none; }
-.ctl { grid-column: 1 / -1; display: grid; grid-template-columns: 86px minmax(0, 1fr) 30px; gap: 8px; align-items: center; transition: opacity .15s; }
-.layer:not(.act) .ctl:not(.always), .ctl.dis { opacity: .3; pointer-events: none; }
-.ctl label { color: var(--mute); font-size: 12px; }
-.ctl output { text-align: right; font: 11px ui-monospace, monospace; color: var(--mute); font-variant-numeric: tabular-nums; }
-#tabs { display: grid; grid-template-columns: repeat(6, auto); border-bottom: 1px solid var(--line); }
-#tabs button { border: 0; border-radius: 0; background: none; padding: 9px 2px; color: var(--mute); border-bottom: 2px solid transparent; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
-#tabs button:hover { color: var(--ink); }
-#tabs button.on { color: var(--acc); border-bottom-color: var(--acc); background: none; font-weight: 700; }
-#lib { overflow-y: auto; min-height: 0; padding: 10px 12px 14px; }
-.pane { display: none; } .pane.on { display: block; }
-.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.tiles h2 { grid-column: 1 / -1; margin-top: 8px; }
-.tiles h2:first-child { margin-top: 0; }
-.tile { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 6px; text-align: left; padding: 7px 8px; min-height: 36px; white-space: normal; }
-.tile .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tile small { grid-column: 2 / -1; color: var(--mute); font-size: 11px; line-height: 1.25; white-space: normal; }
-.tile.on small { color: var(--acc-ink); opacity: .8; }
-.tile i { font-style: normal; width: 7px; height: 7px; border-radius: 50%; }
-.tile .n2 { font: 700 10px var(--display); background: var(--acc-ink); color: var(--acc); border-radius: 4px; padding: 1px 5px; }
-.c1 { background: var(--good); } .c2 { background: var(--warn); } .c3 { background: var(--bad); }
-.note { color: var(--mute); font-size: 12px; margin: 0 0 10px; }
-.seg { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
-.seg button { border-radius: 0; } .seg button:first-child { border-radius: 8px 0 0 8px; } .seg button:last-child { border-radius: 0 8px 8px 0; border-left: 0; }
-.knobs { display: grid; gap: 4px; }
-.knobs .ctl { display: grid; grid-template-columns: 120px minmax(0, 1fr) 30px; }
-.legend { display: flex; gap: 12px; color: var(--mute); font-size: 11px; margin-top: 10px; flex-wrap: wrap; }
-.legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+/* ---------- пульт (pult.js) ---------- */
+#side { border-left: 1px solid var(--line); min-height: 0; min-width: 0; }
 
 .modal { position: fixed; inset: 0; display: none; background: rgba(0, 0, 0, .82); z-index: 6; padding: 16px; overflow: auto; }
 .modal.show { display: block; }
@@ -103,11 +61,10 @@ video.src { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 
   body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(190px, 40%) minmax(0, 1fr); }
   #side { border-left: 0; border-top: 1px solid var(--line); }
   #bar h1, #fps { display: none; }
-  .layer:not(.act) .ctl:not(.always), .ctl.dis { display: none; }
-  #side { overflow-y: auto; grid-template-rows: auto auto auto; }
+  #side { overflow-y: auto; } #side .kpult { height: auto; }
 }
 /* телефон боком */
-@media (max-height: 520px) and (min-width: 620px) { body { grid-template-columns: minmax(0, 1fr) 46%; grid-template-rows: minmax(0, 1fr); } #side { border-top: 0; border-left: 1px solid var(--line); grid-template-rows: auto minmax(0, 1fr); overflow-y: auto; } #layers { display: none; } #bar h1 { display: none; } }
+@media (max-height: 520px) and (min-width: 620px) { body { grid-template-columns: minmax(0, 1fr) 46%; grid-template-rows: minmax(0, 1fr); } #side { border-top: 0; border-left: 1px solid var(--line); } #side .kpult { grid-template-rows: auto minmax(0, 1fr); } #side .kp-layers { display: none; } #bar h1 { display: none; } }
 </style>
 </head>
 <body>
@@ -135,51 +92,7 @@ video.src { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 
   </div>
 </section>
 
-<aside id="side">
-  <div id="layers">
-    <div class="lhead"><h2>Слои</h2><div id="lookName"></div><button id="bReset" title="Выключить все слои">Сбросить всё</button></div>
-    <div class="layer" id="L-style">
-      <button class="lname" data-go="style">Стиль</button><div class="vals" id="v-style"></div>
-      <div class="ctl"><label for="amt">Сила</label><input id="amt" type="range" min="0" max="1" step="0.01" value="1"><output id="amtO">100</output></div>
-      <div class="ctl" id="blendRow"><label for="blend">Смесь 1 ↔ 2</label><input id="blend" type="range" min="0.05" max="0.95" step="0.01" value="0.5"><output id="blendO">50</output></div>
-    </div>
-    <div class="layer" id="L-atmos">
-      <button class="lname" data-go="atmos">Атмосфера</button><div class="vals" id="v-atmos"></div>
-      <div class="ctl"><label for="aAmt">Густота</label><input id="aAmt" type="range" min="0" max="1" step="0.01" value="0.6"><output id="aAmtO">60</output></div>
-      <div class="ctl"><label for="wind">Ветер</label><input id="wind" type="range" min="-1" max="1" step="0.01" value="0"><output id="windO">0</output></div>
-    </div>
-    <div class="layer" id="L-light">
-      <button class="lname" data-go="light">Свет</button><div class="vals" id="v-light"></div>
-      <div class="ctl"><label for="lAmt">Сила</label><input id="lAmt" type="range" min="0" max="1" step="0.01" value="1"><output id="lAmtO">100</output></div>
-    </div>
-    <div class="layer" id="L-grade">
-      <button class="lname" data-go="grade">Цвет</button><div class="vals" id="v-grade"></div>
-      <div class="ctl"><label for="gAmt">Сила</label><input id="gAmt" type="range" min="0" max="1" step="0.01" value="1"><output id="gAmtO">100</output></div>
-    </div>
-  </div>
-  <div id="tabs">
-    <button data-t="looks" class="on">Образы</button><button data-t="style">Стиль</button><button data-t="atmos">Атмосфера</button><button data-t="light">Свет</button><button data-t="grade">Цвет</button><button data-t="film">Плёнка</button>
-  </div>
-  <div id="lib">
-    <div class="pane on" id="p-looks"><p class="note">Образ заполняет все слои сразу. После этого любой слой можно поменять или убрать. Повторное нажатие выключает образ.</p><div class="tiles" id="looks"></div></div>
-    <div class="pane" id="p-style">
-      <div class="seg" role="group" aria-label="Какой стиль выбираю"><button id="slot1" class="on">Выбираю стиль 1</button><button id="slot2">Выбираю стиль 2</button></div>
-      <p class="note">Два стиля смешиваются в одной картинке, доля задаётся ползунком «Смесь» в слоях. Повторное нажатие выключает стиль.</p>
-      <div class="tiles" id="styles"></div>
-    </div>
-    <div class="pane" id="p-atmos"><p class="note">Слои атмосферы складываются, одновременно до трёх. Повторное нажатие убирает слой.</p><div class="tiles" id="atmos"></div></div>
-    <div class="pane" id="p-light"><p class="note">Один свет на кадр. Нажмите на кадр, чтобы поставить солнце в эту точку. Повторное нажатие выключает свет.</p><div class="tiles" id="lights"></div></div>
-    <div class="pane" id="p-grade"><p class="note">Одна цветокоррекция на кадр. Повторное нажатие выключает её.</p><div class="tiles" id="grades"></div></div>
-    <div class="pane" id="p-film">
-      <h2>Оптика и плёнка</h2><div class="knobs" id="knobs" style="margin:8px 0 14px"></div>
-      <h2>Смена облика</h2>
-      <div class="knobs" style="margin-top:8px">
-        <div class="ctl"><label for="fade">Длительность, с</label><input id="fade" type="range" min="0" max="6" step="0.1" value="1.5"><output id="fadeO">1.5</output></div>
-        <div class="ctl"><label for="trans">Вид перехода</label><select id="trans" style="grid-column:2 / -1"></select></div>
-      </div>
-    </div>
-  </div>
-</aside>
+<aside id="side"></aside>
 
 <div class="modal" id="galBox"><div class="card">
   <div class="closeRow"><div><h3>До и после</h3><p>Слева исходный кадр, справа образ. Нажмите на картинку, чтобы включить этот образ на видео.</p></div><button id="galClose">Закрыть</button></div>
@@ -188,6 +101,7 @@ video.src { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 
 
 <script src="shader.js"></script>
 <script src="filtry.js"></script>
+<script src="pult.js"></script>
 <script>
 "use strict";
 const $ = s => document.querySelector(s), v = $('#v');
@@ -215,85 +129,12 @@ $('#seek').onchange = () => { seeking = false; };
 setInterval(() => { if (!v.duration) return; if (!seeking) $('#seek').value = v.currentTime / v.duration * 1000; $('#time').textContent = mmss(v.currentTime) + ' / ' + mmss(v.duration); if (F.fps) $('#fps').textContent = Math.round(F.fps) + ' к/с'; }, 250);
 if (F.ok) { F.setSource(v); play(CLIPS[0][0]); }
 
-// ---------- состояние: что включено в каждом слое ----------
-const S = { look: '', st1: null, st2: null, atm: [], light: null, grade: null, slot: 1 };
-let fade = 1.5, splitOn = false;
-const val = id => +$('#' + id).value;
-function slide(id, x) { $('#' + id).value = x; const o = $('#' + id + 'O'); if (o) o.textContent = id === 'fade' ? (+x).toFixed(1) : Math.round(x * 100); }
-
-function tile(box, key, e, name, o = {}) {
-  const b = document.createElement('button'); b.className = 'tile'; b.dataset.k = key;
-  b.innerHTML = (o.cost ? '<i class="c' + o.cost + '"></i>' : '<span>' + e + '</span>') + '<span class="nm">' + (o.cost ? e + ' ' : '') + name + '</span><span class="tag"></span>' + (o.sub ? '<small>' + o.sub + '</small>' : '');
-  b.title = name + (o.sub ? ': ' + o.sub : ''); b.onclick = () => o.fn(key); box.appendChild(b);
-}
-const head = (box, t) => { const h = document.createElement('h2'); h.textContent = t; box.appendChild(h); };
-for (const k in Filtry.LOOKS) tile($('#looks'), k, Filtry.LOOKS[k].e, Filtry.LOOKS[k].name, { sub: Filtry.LOOKS[k].mood, fn: pickLook });
-let g = ''; for (const e of Filtry.EFFECTS) { if (!e.id) continue; if (e.grp !== g) { g = e.grp; head($('#styles'), g); } tile($('#styles'), e.key, e.e, e.name, { fn: pickStyle }); }
-for (const k in Filtry.ATMOS) tile($('#atmos'), k, Filtry.ATMOS[k].e, Filtry.ATMOS[k].name, { fn: pickAtmos });
-for (const k in Filtry.LIGHTS) tile($('#lights'), k, Filtry.LIGHTS[k].e, Filtry.LIGHTS[k].name, { fn: pickLight });
-for (const k in Filtry.GRADES) tile($('#grades'), k, Filtry.GRADES[k].e, Filtry.GRADES[k].name, { fn: pickGrade });
-Filtry.TRANS.forEach(t => { const o = document.createElement('option'); o.value = t.key; o.textContent = t.name; $('#trans').appendChild(o); }); $('#trans').value = 'pyatna';
-for (const [k, n] of KNOBS) { const d = document.createElement('div'); d.className = 'ctl'; d.innerHTML = '<label for="k_' + k + '">' + n + '</label><input id="k_' + k + '" type="range" min="0" max="1" step="0.01" value="0"><output id="k_' + k + 'O">0</output>'; $('#knobs').appendChild(d); d.querySelector('input').oninput = e => { F.set({ [k]: +e.target.value }, 0); slide('k_' + k, e.target.value); edited(); }; }
-
-// ---------- действия. Каждая плитка - переключатель: нажал ещё раз, слой выключился ----------
-function edited() { if (S.look) { S.look = S.look.replace(/\*$/, '') + '*'; } sync(); }
-function applyStyle(instant) {
-  if (!S.st1 && S.st2) { S.st1 = S.st2; S.st2 = null; }
-  if (S.st1 && S.st2) F.setBlend(S.st1, S.st2, val('blend')); else F.setStyle(S.st1 || 'none', instant ? 0 : fade, $('#trans').value);
-  F.set({ amount: val('amt') }, 0);
-}
-function pickStyle(k) {
-  const had2 = !!S.st2;
-  if (S.st1 === k) S.st1 = null; else if (S.st2 === k) S.st2 = null;
-  else if (S.slot === 2 && S.st1) S.st2 = k; else S.st1 = k;
-  applyStyle(had2); edited();
-}
-function pickAtmos(k) { S.atm = S.atm.includes(k) ? S.atm.filter(x => x !== k) : S.atm.concat(k).slice(-3); F.setAtmos(S.atm.length ? S.atm : 'none', fade, val('aAmt')); edited(); }
-function pickLight(k) { S.light = S.light === k ? null : k; F.setLight(S.light || 'none', fade, val('lAmt')); if (!S.light) { slide('k_rays', 0); slide('k_flare', 0); } else { const L = Filtry.LIGHTS[k]; slide('k_rays', (L.rays || 0) * val('lAmt')); slide('k_flare', (L.flare || 0) * val('lAmt')); } edited(); }
-function pickGrade(k) { S.grade = S.grade === k ? null : k; F.setGrade(S.grade || 'none', fade, val('gAmt')); edited(); }
-function pickLook(k) {
-  if (S.look.replace(/\*$/, '') === k) k = 'chisto';                       // повторное нажатие выключает образ
-  const L = Filtry.LOOKS[k]; F.setLook(k, fade);
-  S.look = k === 'chisto' ? '' : k; S.st1 = L.style || null; S.st2 = null; S.atm = (L.atmos || []).map(a => a[0]); S.light = L.light || null; S.grade = L.grade || null;
-  slide('aAmt', L.atmos && L.atmos[0] ? L.atmos[0][1] : 0.6); slide('amt', L.amount != null ? L.amount : 1); slide('wind', L.wind || 0);
-  slide('lAmt', L.lightAmt != null ? L.lightAmt : 1); slide('gAmt', L.gradeAmt != null ? L.gradeAmt : 1);
-  const LI = Filtry.LIGHTS[L.light] || {};
-  for (const [kn] of KNOBS) slide('k_' + kn, L[kn] != null ? L[kn] : (kn === 'rays' || kn === 'flare' ? (LI[kn] || 0) * (L.lightAmt != null ? L.lightAmt : 1) : 0));
-  sync();
-}
-$('#bReset').onclick = () => pickLook('chisto');
-$('#slot1').onclick = () => { S.slot = 1; sync(); }; $('#slot2').onclick = () => { S.slot = 2; sync(); };
-
-// ---------- показать состояние: слои сверху и подсветка плиток ----------
-function chips(box, items, empty) {
-  box.innerHTML = '';
-  if (!items.length) { box.innerHTML = '<em>' + empty + '</em>'; return; }
-  for (const [label, off] of items) { const c = document.createElement('span'); c.className = 'val'; c.innerHTML = '<span>' + label + '</span>'; const x = document.createElement('button'); x.textContent = '×'; x.title = 'Убрать: ' + label; x.onclick = off; c.appendChild(x); box.appendChild(c); }
-}
-function sync() {
-  const E = k => Filtry.EFFECTS.find(e => e.key === k), st = [S.st1, S.st2].filter(Boolean);
-  chips($('#v-style'), st.map((k, i) => [(st.length > 1 ? (i + 1) + '. ' : '') + E(k).name, () => pickStyle(k)]), 'нет');
-  chips($('#v-atmos'), S.atm.map(k => [Filtry.ATMOS[k].name, () => pickAtmos(k)]), 'нет');
-  chips($('#v-light'), S.light ? [[Filtry.LIGHTS[S.light].name, () => pickLight(S.light)]] : [], 'как снято');
-  chips($('#v-grade'), S.grade ? [[Filtry.GRADES[S.grade].name, () => pickGrade(S.grade)]] : [], 'как снято');
-  $('#L-style').classList.toggle('act', st.length > 0); $('#L-atmos').classList.toggle('act', S.atm.length > 0); $('#L-light').classList.toggle('act', !!S.light); $('#L-grade').classList.toggle('act', !!S.grade);
-  $('#blendRow').classList.toggle('dis', st.length < 2);
-  const base = S.look.replace(/\*$/, ''), L = Filtry.LOOKS[base], any = st.length || S.atm.length || S.light || S.grade;
-  $('#lookName').innerHTML = L ? L.name + (S.look.endsWith('*') ? ' <span>(изменён)</span>' : '') : '<span>' + (any ? 'своя смесь' : 'чистое видео') + '</span>';
-  const mark = (box, keys) => box.querySelectorAll('.tile').forEach(b => { const i = keys.indexOf(b.dataset.k); b.classList.toggle('on', i >= 0); const t = b.querySelector('.tag'); t.className = 'tag' + (i >= 0 && box.id === 'styles' && st.length > 1 ? ' n2' : ''); t.textContent = i >= 0 && box.id === 'styles' && st.length > 1 ? i + 1 : ''; });
-  mark($('#looks'), [base]); mark($('#styles'), st); mark($('#atmos'), S.atm); mark($('#lights'), [S.light]); mark($('#grades'), [S.grade]);
-  $('#slot1').classList.toggle('on', S.slot === 1); $('#slot2').classList.toggle('on', S.slot === 2);
-}
-$('#amt').oninput = e => { F.set({ amount: +e.target.value }, 0); slide('amt', e.target.value); edited(); };
-$('#blend').oninput = e => { slide('blend', e.target.value); if (S.st1 && S.st2) F.setBlend(S.st1, S.st2, +e.target.value); };
-$('#aAmt').oninput = e => { slide('aAmt', e.target.value); if (S.atm.length) F.setAtmos(S.atm, 0.3, +e.target.value); edited(); };
-$('#wind').oninput = e => { F.set({ wind: +e.target.value }, 0); slide('wind', e.target.value); edited(); };
-$('#lAmt').oninput = e => { slide('lAmt', e.target.value); if (S.light) F.setLight(S.light, 0.2, +e.target.value); edited(); };
-$('#gAmt').oninput = e => { slide('gAmt', e.target.value); if (S.grade) F.setGrade(S.grade, 0.2, +e.target.value); edited(); };
-$('#fade').oninput = e => { fade = +e.target.value; slide('fade', fade); };
-function tab(t) { document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.t === t)); document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + t)); $('#lib').scrollTop = 0; }
-document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => tab(b.dataset.t));
-document.querySelectorAll('.lname').forEach(b => b.onclick = () => tab(b.dataset.go));
+// ---------- пульт со слоями: отдельный блок pult.js, тот же, что идёт в редактор ----------
+const P = new KinoPult($('#side'), { filtry: F });
+const narrow = matchMedia('(max-width: 900px)'); P.el.classList.toggle('compact', narrow.matches); narrow.onchange = () => P.el.classList.toggle('compact', narrow.matches);
+window.pickLook = k => P.pickLook(k); window.pickStyle = k => P.pickStyle(k); window.pickAtmos = k => P.pickAtmos(k);
+window.pickLight = k => P.pickLight(k); window.pickGrade = k => P.pickGrade(k);
+let splitOn = false;
 
 // ---------- кадр: нажатие ставит солнце и центр эффектов; линия «до/после» двигается ----------
 function pt(e) {     // точка в координатах кадра видео (0..1, ноль снизу)
@@ -301,7 +142,7 @@ function pt(e) {     // точка в координатах кадра виде
   const w = vw * s, h = vh * s, x = (e.clientX - R.left - (R.width - w) / 2) / w, y = 1 - (e.clientY - R.top - (R.height - h) / 2) / h;
   return [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))];
 }
-function touch(e) { const p = pt(e); if (splitOn) { F.split = Math.max(0.02, Math.min(0.98, p[0])); return; } F.touch = p; F.set({ sunX: p[0], sunY: p[1] }, 0); }
+function touch(e) { const p = pt(e); if (splitOn) { F.split = Math.max(0.02, Math.min(0.98, p[0])); return; } P.sunAt(p[0], p[1]); }
 $('#ekran').addEventListener('pointerdown', e => { $('#msg').style.display = 'none'; touch(e); });
 $('#ekran').addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') touch(e); });
 $('#bCmp').onclick = () => { splitOn = !splitOn; F.split = splitOn ? 0.5 : 0; $('#bCmp').classList.toggle('on', splitOn); if (splitOn) say('Двигайте линию по кадру: слева исходное видео', 2500); };
@@ -312,10 +153,9 @@ F.onTier = () => qLabel();
 $('#bQ').onclick = () => { if (F.auto) { F.auto = false; F.setTier(0); } else if (F.tier < Filtry.TIERS.length - 1) F.setTier(F.tier + 1); else { F.auto = true; F.setTier(1); } qLabel(); };
 requestAnimationFrame(function loop(ts) { F.render(ts); requestAnimationFrame(loop); });
 if (F.ok) { setTimeout(() => { try { F.calibrate(); } catch (e) {} qLabel(); F.warmup(); }, 400); qLabel(); }
-sync();
 
 // ---------- галерея ----------
-for (const k of GALLERY) { const L = Filtry.LOOKS[k], f = document.createElement('figure'); f.innerHTML = '<img loading="lazy" src="gallery/' + k + '.jpg" alt="До и после: ' + L.name + '"><figcaption>' + L.name + '<span>' + L.mood + '</span></figcaption>'; f.onclick = () => { $('#galBox').classList.remove('show'); S.look = ''; pickLook(k); }; $('#gal').appendChild(f); }
+for (const k of GALLERY) { const L = Filtry.LOOKS[k], f = document.createElement('figure'); f.innerHTML = '<img loading="lazy" src="gallery/' + k + '.jpg" alt="До и после: ' + L.name + '"><figcaption>' + L.name + '<span>' + L.mood + '</span></figcaption>'; f.onclick = () => { $('#galBox').classList.remove('show'); if (P.S.look !== k) P.pickLook(k); }; $('#gal').appendChild(f); }
 $('#bGal').onclick = () => $('#galBox').classList.add('show');
 $('#galClose').onclick = () => $('#galBox').classList.remove('show');
 addEventListener('keydown', e => { if (e.key === 'Escape') $('#galBox').classList.remove('show'); if (e.key === ' ' && !/INPUT|SELECT|BUTTON/.test(e.target.tagName)) { e.preventDefault(); togglePlay(); } });
