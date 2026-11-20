@@ -56,7 +56,7 @@ class Filtry {
   setSource(video, mirror = false) { this.src = video; this.mirror = mirror; this.resetHistory(); }
   // забыть прошлые кадры (вызывать на склейке отрезков, иначе «время»-эффекты смешают два отрезка)
   resetHistory() { this.histCount = 0; }
-  // позиция ползунка: 13 = Неон, 13.5 = половина Неона + половина следующего
+  // позиция фильтра: 13 = Неон, 13.5 = половина Неона + половина следующего
   setPos(v) { this.pos = Math.max(0, Math.min(Filtry.EFFECTS.length - 1, v)); }
   setEffectId(id) { const i = Filtry.EFFECTS.findIndex(e => e.id === id); if (i >= 0) this.setPos(i); }
   current() { return Filtry.EFFECTS[Math.round(this.pos)]; }
@@ -126,7 +126,7 @@ class Filtry {
   }
 }
 
-// Порядок = порядок на ползунке. id = номер ветки в шейдере (shader.js, функция fx).
+// Порядок = порядок переключения стрелками. id = номер ветки в шейдере (shader.js, функция fx).
 // cost: 1 - лёгкий, 2 - средний, 3 - тяжёлый для слабого телефона.
 // time: true - эффект использует прошлые кадры (на склейке отрезков звать resetHistory()).
 Filtry.EFFECTS = [

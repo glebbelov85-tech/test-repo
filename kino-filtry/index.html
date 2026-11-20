@@ -20,7 +20,7 @@ button.on { background: #ffd34d; color: #000; }
 .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
 .row span { min-width: 64px; font: 600 13px system-ui; opacity: .85; }
 input[type=range] { flex: 1; height: 34px; accent-color: #ff5ad0; }
-#ticks { display: flex; font-size: 11px; justify-content: space-between; margin: -4px 4px 0 74px; opacity: .7; pointer-events: none; }
+#bPrev, #bNext { font-size: 24px; padding: 10px 22px; }
 #hint { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); background: #000b; padding: 12px 18px; border-radius: 14px; font: 600 16px system-ui; text-align: center; max-width: 80vw; opacity: 0; transition: opacity .4s; pointer-events: none; }
 #noGL { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; font-size: 18px; }
 </style>
@@ -42,8 +42,6 @@ input[type=range] { flex: 1; height: 34px; accent-color: #ff5ad0; }
 </div>
 <div id="panel">
   <div class="row" style="justify-content:center"><button id="bPrev">◀</button><div id="name" style="flex:1"></div><button id="bNext">▶</button></div>
-  <div class="row"><span>Фильтр</span><input id="pos" type="range" min="0" max="1" step="0.01" value="0"></div>
-  <div id="ticks"></div>
   <div class="row"><span>Сила</span><input id="amt" type="range" min="0" max="1" step="0.01" value="1"></div>
 </div>
 <div id="hint"></div>
@@ -60,8 +58,6 @@ const video = $('#src'), canvas = $('#gl');
 const F = new Filtry(canvas, { fit: 'contain' });
 if (!F.ok) $('#noGL').style.display = 'flex';
 const E = Filtry.EFFECTS;
-const posEl = $('#pos'); posEl.max = E.length - 1;
-$('#ticks').innerHTML = E.map(e => '<i>' + e.e + '</i>').join('');
 
 let hintT = 0;
 function hint(t, ms = 1800) { const h = $('#hint'); h.innerHTML = t; h.style.opacity = 1; clearTimeout(hintT); hintT = setTimeout(() => h.style.opacity = 0, ms); }
@@ -74,8 +70,6 @@ function showName() {
 // ---- плавный переход к нужному фильтру (как смена стиля по сюжету) ----
 let anim = null;
 function goTo(target, sec = 1.2) { anim = { from: F.pos, to: Math.max(0, Math.min(E.length - 1, target)), t: 0, dur: sec }; }
-posEl.oninput = () => { anim = null; F.setPos(+posEl.value); showName(); };
-posEl.onchange = () => { goTo(Math.round(F.pos), 0.25); };   // отпустили - доезжаем до ближайшего фильтра
 $('#amt').oninput = e => { F.amount = +e.target.value; };
 $('#bPrev').onclick = () => goTo(Math.round(F.pos) - 1, 0.8);
 $('#bNext').onclick = () => goTo(Math.round(F.pos) + 1, 0.8);
@@ -121,7 +115,7 @@ function loop(ts) {
   const dt = lastTs ? (ts - lastTs) / 1000 : 0; lastTs = ts;
   if (anim) {
     anim.t += dt; const k = Math.min(1, anim.t / anim.dur), s = k * k * (3 - 2 * k);
-    F.setPos(anim.from + (anim.to - anim.from) * s); posEl.value = F.pos; showName();
+    F.setPos(anim.from + (anim.to - anim.from) * s); showName();
     if (k >= 1) anim = null;
   }
   F.render(ts);
