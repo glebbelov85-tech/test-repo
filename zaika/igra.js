@@ -1,6 +1,6 @@
 'use strict';
-// «Домик Зайки» 2.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '2.1';
+// «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
+const VERSION = '3.0';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -209,14 +209,18 @@ function arc(obj, to, ms, h = 1.5, ease = 'inout') {
   return twf(ms, e => { obj.position.lerpVectors(a, to, e); obj.position.y += Math.sin(e * Math.PI) * h; }, ease);
 }
 function popIn(obj, s = 1, delay = 0, ms = 480) { obj.scale.setScalar(0.001); return tws(obj, s, ms, 'back', delay); }
-function hop(obj, h = 0.7, ms = 420) { const y = obj.position.y; return twf(ms, e => { obj.position.y = y + Math.sin(e * Math.PI) * h; }); }
-function wobble(obj, amp = 0.3, ms = 520) { const z = obj.rotation.z; return twf(ms, (e, k) => { obj.rotation.z = z + Math.sin(k * Math.PI * 5) * amp * (1 - k); }); }
-function squash(obj, ms = 380) { const s = obj.scale.clone(); return twf(ms, (e, k) => { const q = Math.sin(k * Math.PI * 2) * 0.12 * (1 - k); obj.scale.set(s.x * (1 + q), s.y * (1 - q), s.z * (1 + q)); }).then(() => obj.scale.copy(s)); }
-function nudge(obj) { const s = obj.scale.x; return twf(1300, (e, k) => { obj.scale.setScalar(s * (1 + Math.abs(Math.sin(k * Math.PI * 3)) * 0.16)); }).then(() => obj.scale.setScalar(s)); }
+// Все «подпрыгивания» прибавляют сдвиг поверх текущего положения: сколько раз ни нажми, объект вернётся на место.
+function hop(obj, h = 0.7, ms = 420) { let p = 0; return twf(ms, e => { const v = Math.sin(e * Math.PI) * h; obj.position.y += v - p; p = v; }); }
+function wobble(obj, amp = 0.3, ms = 520) { let p = 0; return twf(ms, (e, k) => { const v = Math.sin(k * Math.PI * 5) * amp * (1 - k); obj.rotation.z += v - p; p = v; }); }
+function squash(obj, ms = 380) { let p = 0; return twf(ms, (e, k) => { const q = Math.sin(k * Math.PI * 2) * 0.12 * (1 - k), a = (1 + q) / (1 + p), b = (1 - q) / (1 - p); obj.scale.set(obj.scale.x * a, obj.scale.y * b, obj.scale.z * a); p = q; }); }
+function nudge(obj) { let p = 0; return twf(1300, (e, k) => { const q = Math.abs(Math.sin(k * Math.PI * 3)) * 0.16; obj.scale.multiplyScalar((1 + q) / (1 + p)); p = q; }); }
 function headNo(a) { const h = a.userData.head; if (!h) return; return twf(650, (e, k) => { h.rotation.y = Math.sin(k * Math.PI * 4) * 0.45 * (1 - k); }); }
 function happy(a, spin = true) {
-  const y = a.position.y, r = a.rotation.y; SFX.boing();
-  return twf(900, (e, k) => { a.position.y = y + Math.abs(Math.sin(k * Math.PI * 2)) * 0.9 * (k < 0.5 ? 1 : 0.6); if (spin) a.rotation.y = r + EASE.inout(Math.min(1, k * 2)) * Math.PI * 2; }).then(() => { a.rotation.y = r; a.position.y = y; });
+  let py = 0, pr = 0; SFX.boing();
+  return twf(900, (e, k) => {
+    const y = Math.abs(Math.sin(k * Math.PI * 2)) * 0.9 * (k < 0.5 ? 1 : 0.6), r = spin ? EASE.inout(Math.min(1, k * 2)) * Math.PI * 2 : 0;
+    a.position.y += y - py; a.rotation.y += r - pr; py = y; pr = r;
+  }).then(() => { a.rotation.y -= pr; });
 }
 
 // ---------- персонажи: моргание, дыхание, речь ----------
@@ -292,10 +296,10 @@ function grad(top, bottom, mid) {
 function lights(g, o = {}) {
   g.add(new T.HemisphereLight(C(o.sky || '#ffffff'), C(o.gnd || '#ffe2c2'), o.hi === undefined ? 0.56 : o.hi));
   const d = new T.DirectionalLight(C(o.sun || '#fff1dc'), o.di === undefined ? 0.52 : o.di);
-  d.position.set(o.lx === undefined ? 7 : o.lx, o.ly || 17, 15); d.target.position.set(0, 4, 0); g.add(d.target);
+  d.position.set(o.lx === undefined ? 7 : o.lx, (o.ly || 17) + (o.ty || 4) - 4, 15); d.target.position.set(o.tx || 0, o.ty || 4, 0); g.add(d.target);
   d.castShadow = !S.low;
   const sz = MOBILE ? 1024 : 2048; d.shadow.mapSize.set(sz, sz);
-  const c = d.shadow.camera; c.left = -19; c.right = 19; c.top = 19; c.bottom = -19; c.near = 1; c.far = 70;
+  const c = d.shadow.camera, q = o.sh || 19; c.left = -q; c.right = q; c.top = q; c.bottom = -q; c.near = 1; c.far = 70;
   d.shadow.bias = -0.0006; d.shadow.normalBias = 0.04; d.shadow.radius = 4;
   g.add(d); sunLight = d; return d;
 }
@@ -354,6 +358,12 @@ function meadow(g, o = {}) {
     chirp -= dt; if (chirp < 0) { chirp = rr(3, 8); if (AC) SFX.chirp(); }
   });
 }
+// травяной уступ: задний ряд стоит выше, и всех видно
+function terrace(y, z, x0 = -30, x1 = 30) {
+  const w = x1 - x0, cx = (x0 + x1) / 2;
+  const t = rbox(M('#8fd870', 1), w, y, 9, 0.5, cx, y / 2 - 0.05, z - 4.5); t.receiveShadow = true; world.add(t);
+  const e = mesh(new T.BoxGeometry(w, 0.5, 0.3), M('#74c45c', 1), cx, y - 0.35, z + 0.02); e.castShadow = false; world.add(e);
+}
 function interior(g, o) {
   scene.background = new T.Color(C(o.wall));
   const wt = cnv(256, 256, (x, w, h) => {
@@ -409,8 +419,8 @@ canvas.addEventListener('pointerdown', e => {
     dragPlane.setFromNormalAndCoplanarPoint(n, p.position);
     ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam);
     ray.ray.intersectPlane(dragPlane, dragPt);
-    dragging = { p, pk, id: e.pointerId, off: p.position.clone().sub(dragPt), home: p.position.clone(), sx: e.clientX, sy: e.clientY, moved: false, s: p.scale.x };
-    p.userData.held = true; p.scale.setScalar(dragging.s * 1.12);
+    dragging = { p, pk, id: e.pointerId, off: p.position.clone().sub(dragPt), home: p.position.clone(), sx: e.clientX, sy: e.clientY, moved: false };
+    p.userData.held = true; p.scale.multiplyScalar(1.12);
     try { canvas.setPointerCapture(e.pointerId); } catch (er) {}
     pk.drag.onGrab && pk.drag.onGrab();
   } else pk.onTap && pk.onTap(p);
@@ -423,7 +433,7 @@ canvas.addEventListener('pointermove', e => {
 });
 function endDrag(e) {
   const d = dragging; if (!d || (e && e.pointerId !== d.id)) return;
-  dragging = null; d.p.userData.held = false; d.p.scale.setScalar(d.s);
+  dragging = null; d.p.userData.held = false; d.p.scale.multiplyScalar(1 / 1.12);
   if (!d.moved) { d.p.position.copy(d.home); d.pk.drag.onTap && d.pk.drag.onTap(); return; }
   const ok = d.pk.drag.onDrop(d.home);
   if (!ok) arc(d.p, d.home, 380, 0.6);
@@ -571,7 +581,7 @@ ROOMS.kraski = {
   },
   round(g) {
     g.balls.forEach(b => { unpick(b); world.remove(b); }); g.balls = [];
-    const pal = g.lvl < 2 ? ['krasny', 'zhelty', 'siniy', 'zeleny'] : Object.keys(COLORS);
+    const pal = Object.keys(COLORS); // все шесть цветов с самого начала
     const n = [2, 3, 4][g.lvl];
     let target; do target = pick(pal); while (target === g.prev); g.prev = target;
     const cols = shuffle([target, ...shuffle(pal.filter(c => c !== target)).slice(0, n - 1)]);
@@ -684,68 +694,111 @@ ROOMS.figury = {
 };
 
 // ===== 3. Считалка =====
+// столик с лунками: сколько лунок, столько угощений
+function mkStol(N, sp, slotHex) {
+  const tb = grp(), wood = M('#d9a05b', 0.7), w = sp * N + 0.7;
+  const top = grp(0, 1.25, 0); top.rotation.x = 0.62;
+  const board = rbox(wood, w, 0.26, 1.7, 0.12); board.receiveShadow = true; top.add(board);
+  const slots = [];
+  for (let i = 0; i < N; i++) { const s = cyl(M(slotHex, 0.9), 0.42, 0.42, 0.05, (i - (N - 1) / 2) * sp, 0.14, 0, 24); s.castShadow = false; top.add(s); slots.push(s); }
+  tb.add(top);
+  for (const s of [-1, 1]) tb.add(cyl(M('#b9783a', 0.8), 0.14, 0.16, 1.2, s * (w / 2 - 0.35), 0.6, -0.3, 10));
+  tb.userData.slots = slots; return tb;
+}
 ROOMS.schet = {
   intro: 'schet_intro',
-  voice: ['schet_intro', 'nyam', 'sorvi', 1, 2, 3, 4, 5].flatMap(x => typeof x === 'number' ? ['hochet_' + x, 'chislo_' + x] : [x]),
+  voice: ['schet_intro', 'nyam', 'sorvi', 'zhochet_1', 'zhochet_2', 'zhochet_3', 1, 2, 3, 4, 5].flatMap(x => typeof x === 'number' ? ['hochet_' + x, 'chislo_' + x] : [x]),
   setup(g) {
     setFrame(landscape ? { cy: 3.85, halfW: 8.3, halfH: 5.1 } : { cy: 6.1, halfW: 4.8, halfH: 7.7 });
     lights(world); meadow(world, { sunX: 12 });
+    const two = g.two = g.lvl >= 2; // третий уровень: ёжику яблоки, Зайке морковки, и число у каждого своё
     const tree = g.tree = mkDerevo();
     const ez = g.ezh = actor(mkEzhik());
-    if (landscape) { tree.position.set(-4.6, 0, -1.2); tree.scale.setScalar(1.0); ez.position.set(5.7, 0, 0.6); ez.scale.setScalar(1.45); ez.rotation.y = -0.85; g.tab = [1.35, 1.6]; }
-    else { tree.position.set(-0.3, 0, -1.6); tree.scale.setScalar(1.38); ez.position.set(2.75, 0, 0.8); ez.scale.setScalar(1.2); ez.rotation.y = -0.85; g.tab = [-1.9, 1.8]; }
+    g.asc = landscape ? 1.25 : 1.1; g.csc = 1; g.tsc = 1; g.cspots = [];
+    ez.rotation.y = -0.85;
+    if (!two) {
+      if (landscape) { tree.position.set(-4.6, 0, -1.2); tree.scale.setScalar(1.0); ez.position.set(5.7, 0, 0.6); ez.scale.setScalar(1.45); g.tab = [1.35, 0, 1.6]; }
+      else { tree.position.set(-0.3, 0, -1.6); tree.scale.setScalar(1.38); ez.position.set(2.75, 0, 0.8); ez.scale.setScalar(1.2); g.tab = [-1.9, 0, 1.8]; }
+    } else {
+      const z = g.zaika = actor(mkZaika());
+      let bed;
+      if (landscape) {
+        terrace(4.0, -1.2, -1.3, 30);
+        tree.position.set(-5.4, 0, -1.4); tree.scale.setScalar(0.95);
+        ez.position.set(6.2, 0, 0.9); ez.scale.setScalar(1.25); g.tab = [2.3, 0, 1.7];
+        z.position.set(6.3, 4.0, -2.9); z.scale.setScalar(0.98); z.rotation.y = -0.35; g.tab2 = [2.3, 4.0, -2.7];
+        bed = [-4.7, 0, 2.1, 5, 1.1]; g.asc = 1.15;
+      } else {
+        terrace(3.9, -1.0);
+        tree.position.set(-2.2, 3.9, -3.2); tree.scale.setScalar(1.0);
+        ez.position.set(3.35, 0, 1.0); ez.scale.setScalar(0.8); g.tab = [0.95, 0, 1.9];
+        z.position.set(-3.95, 0, 0.8); z.scale.setScalar(0.8); z.rotation.y = 0.35; g.tab2 = [-1.95, 0, 1.9];
+        bed = [2.45, 3.9, -2.2, 4, 1.0]; g.tsc = 0.78; g.asc = 1.0;
+      }
+      world.add(z);
+      // грядка с морковками
+      const [bx, by, bz, bn, bs] = bed; g.csc = bs;
+      const soil = rbox(M('#8d5a34', 1), bn * 0.85 * bs + 0.5, 0.5, 1.3 * bs, 0.2, bx, by + 0.12, bz); soil.receiveShadow = true; world.add(soil);
+      for (let i = 0; i < bn; i++) g.cspots.push(V(bx + (i - (bn - 1) / 2) * 0.85 * bs, by + 0.37 + 0.2 * bs, bz + 0.1));
+    }
     world.add(tree, ez); speaker = null;
     hitBox(ez, 2.2, 2, 2.6, 0, 0.9, 0); ez.userData.cy = 1.2;
     pickable(ez, () => { hop(ez, 0.5); SFX.boing(); g.repeat && g.repeat(); });
     const k = tree.scale.x;
-    g.spots = [[-1.9, 5.5, 1.75], [-0.7, 7.0, 2.2], [0.9, 7.6, 1.6], [2.0, 5.9, 1.7], [0.3, 5.5, 2.45], [-0.9, 4.4, 2.2], [1.2, 4.3, 2.15]].map(([x, y, z]) => V(tree.position.x + x * k, y * k, tree.position.z + z * k));
-    g.apples = []; g.prevN = null; g.table = null;
-    g.tick = t => { g.apples.forEach(a => { if (a.userData.hang) a.rotation.z = Math.sin(t * 1.7 + a.userData.ph) * 0.18; }); tree.userData.crown.rotation.z = Math.sin(t * 0.8) * 0.012; };
+    g.spots = [[-1.9, 5.5, 1.75], [-0.7, 7.0, 2.2], [0.9, 7.6, 1.6], [2.0, 5.9, 1.7], [0.3, 5.5, 2.45], [-0.9, 4.4, 2.2], [1.2, 4.3, 2.15]].map(([x, y, z]) => V(tree.position.x + x * k, tree.position.y + y * k, tree.position.z + z * k));
+    g.items = []; g.prevN = null; g.prevM = null; g.tables = [];
+    g.tick = t => { g.items.forEach(a => { if (a.userData.hang) a.rotation.z = Math.sin(t * 1.7 + a.userData.ph) * 0.18; }); tree.userData.crown.rotation.z = Math.sin(t * 0.8) * 0.012; };
   },
   round(g) {
-    const pool = [[1, 2, 3], [2, 3, 4], [3, 4, 5]][g.lvl];
-    let N; do N = pick(pool); while (N === g.prevN); g.prevN = N;
-    // столик с лунками: сколько лунок, столько яблок
-    if (g.table) world.remove(g.table);
-    const tb = g.table = grp(g.tab[0], 0, g.tab[1]), wood = M('#d9a05b', 0.7), sp = landscape ? 0.95 : 0.86, tw_ = sp * N + 0.7;
-    const top = grp(0, 1.25, 0); top.rotation.x = 0.62;
-    const board = rbox(wood, tw_, 0.26, 1.7, 0.12); board.receiveShadow = true; top.add(board);
-    const slots = [];
-    for (let i = 0; i < N; i++) { const s = cyl(M('#8a5a2e', 0.9), 0.42, 0.42, 0.05, (i - (N - 1) / 2) * sp, 0.14, 0, 24); s.castShadow = false; top.add(s); slots.push(s); }
-    tb.add(top);
-    for (const s of [-1, 1]) tb.add(cyl(M('#b9783a', 0.8), 0.14, 0.16, 1.2, s * (tw_ / 2 - 0.35), 0.6, -0.3, 10));
-    world.add(tb); popIn(tb, 1);
-    // яблоки на дереве
-    g.apples.forEach(a => { unpick(a); world.remove(a); }); g.apples = [];
-    const asc = landscape ? 1.25 : 1.1;
-    let count = 0, flying = false;
-    g.spots.forEach((p, i) => {
-      const a = mkYabloko(); a.position.copy(p); a.userData.hang = true; a.userData.ph = Math.random() * 6;
-      hitBox(a, 1.15, 1.15, 1.15); world.add(a); g.apples.push(a); popIn(a, asc, i * 70, 380);
-      pickable(a, async () => {
-        if (a.userData.used || count >= N || flying) return;
-        a.userData.used = true; a.userData.hang = false; flying = true; unpick(a); count++;
-        const c = count; SFX.plop();
-        tb.updateMatrixWorld(true);
-        const dst = slots[c - 1].getWorldPosition(new T.Vector3()).add(V(0, 0.42 * asc * 0.8, 0.25));
-        twf(520, e => { a.rotation.z = -e * Math.PI * 2; });
-        arc(a, dst, 520, 1.6).then(() => { flying = false; a.rotation.z = 0; squash(a); SFX.thunk(); });
-        if (c < N) { Voice.say('chislo_' + c, null); return; }
-        Idle.off(); g.apples.forEach(unpick);
-        await Voice.say('chislo_' + c, null);
-        if (!g.alive()) return;
-        // ёжик ест
-        const used = g.apples.filter(x => x.userData.used);
-        const mouthP = g.ezh.getWorldPosition(new T.Vector3()).add(V(-1.6, 1.1, 1.2).multiplyScalar(g.ezh.scale.x / 1.5));
-        for (const x of used) { arc(x, mouthP, 330, 0.9); tws(x, 0.3, 330, 'in'); await wait(200); SFX.munch(); squash(g.ezh, 260); }
-        await wait(250); used.forEach(x => world.remove(x));
-        happy(g.ezh, false);
-        g.solved(mouthP, 'nyam', g.ezh);
-      });
-    });
-    g.repeat = () => Voice.say('hochet_' + N, g.ezh);
-    g.say('hochet_' + N, null);
-    Idle.set(() => { Voice.say(count ? 'hochet_' + N : ['hochet_' + N, 'sorvi'], null); const a = g.apples.find(x => !x.userData.used); a && nudge(a); });
+    const two = g.two;
+    let N, Mz = 0;
+    if (two) { do { N = 1 + rnd(3); Mz = 1 + rnd(3); } while (N === Mz || (N === g.prevN && Mz === g.prevM)); g.prevM = Mz; }
+    else { const pool = [[1, 2, 3], [2, 3, 4, 5]][g.lvl]; do N = pick(pool); while (N === g.prevN); }
+    g.prevN = N;
+    g.tables.forEach(t => world.remove(t));
+    const sp = landscape ? 0.95 : 0.86;
+    const mk = (n, pos, hex) => { const t = mkStol(n, sp, hex); t.position.set(pos[0], pos[1], pos[2]); world.add(t); popIn(t, g.tsc); return t; };
+    const tabs = { a: mk(N, g.tab, '#8a5a2e'), m: two ? mk(Mz, g.tab2, '#b0632a') : null };
+    g.tables = [tabs.a, tabs.m].filter(Boolean);
+    g.items.forEach(a => { unpick(a); world.remove(a); }); g.items = [];
+    const need = { a: N, m: Mz }, cnt = { a: 0, m: 0 }, eater = { a: g.ezh, m: g.zaika };
+    const ask = two ? ['hochet_' + N, 'zhochet_' + Mz] : ['hochet_' + N];
+    let flying = false, over = false;
+    const give = async it => {
+      const U = it.userData, k = U.k;
+      if (U.used || flying || over) return;
+      if (cnt[k] >= need[k]) { SFX.soft(); wobble(it, 0.25); wobble(eater[k], 0.08); return; } // этому зверю уже хватит
+      U.used = true; U.hang = false; flying = true; unpick(it); const c = ++cnt[k]; SFX.plop();
+      const tb = tabs[k]; tb.updateMatrixWorld(true);
+      const dst = tb.userData.slots[c - 1].getWorldPosition(new T.Vector3()).add(V(0, 0.34 * it.scale.x, 0.25));
+      twf(520, e => { it.rotation.z = -e * Math.PI * 2; });
+      arc(it, dst, 520, 1.6).then(() => { flying = false; it.rotation.z = 0; squash(it); SFX.thunk(); });
+      if (cnt.a < need.a || cnt.m < need.m) { Voice.say(['chislo_' + c, two && c === need[k] ? (k === 'a' ? 'zhochet_' + Mz : 'hochet_' + N) : null], null); return; }
+      over = true; Idle.off(); g.items.forEach(unpick);
+      await Voice.say('chislo_' + c, null);
+      if (!g.alive()) return;
+      // звери едят
+      let first = null;
+      for (const kk of two ? ['a', 'm'] : ['a']) {
+        const an = eater[kk], s = an.scale.x, wp = an.getWorldPosition(new T.Vector3());
+        const mp = kk === 'a' ? wp.add(V(-1.6, 1.1, 1.2).multiplyScalar(s / 1.5)) : wp.add(V(0, 1.75 * s, 0.7 * s));
+        first = first || mp;
+        for (const x of g.items.filter(x => x.userData.used && x.userData.k === kk)) { arc(x, mp, 330, 0.9); tws(x, 0.3, 330, 'in'); await wait(200); SFX.munch(); squash(an, 260); }
+      }
+      await wait(250); g.items.filter(x => x.userData.used).forEach(x => world.remove(x));
+      happy(g.ezh, false);
+      g.solved(first, 'nyam', g.ezh);
+    };
+    const add = (k, p, i) => {
+      const it = k === 'a' ? mkYabloko() : mkMorkovka(), U = it.userData; it.position.copy(p); U.k = k; U.hang = k === 'a'; U.ph = Math.random() * 6;
+      hitBox(it, 1.15, k === 'a' ? 1.15 : 1.7, 1.15, 0, k === 'a' ? 0 : 0.25, 0); world.add(it); g.items.push(it); popIn(it, k === 'a' ? g.asc : g.csc, i * 70, 380);
+      pickable(it, () => give(it));
+    };
+    g.spots.forEach((p, i) => add('a', p, i));
+    g.cspots.forEach((p, i) => add('m', p, i));
+    g.repeat = () => Voice.say(ask, null);
+    g.say(ask, null);
+    Idle.set(() => { Voice.say(cnt.a + cnt.m ? ask : ask.concat('sorvi'), null); const k = cnt.a < need.a ? 'a' : 'm', a = g.items.find(x => !x.userData.used && x.userData.k === k); a && nudge(a); });
   },
 };
 
@@ -817,11 +870,12 @@ ROOMS.mishki = {
       if (U.s === sz) {
         busy = true; unpick(bear); g.beds.forEach(x => { unpick(x); unhalo(x); });
         const s = U.sc, c = Math.cos(0.12), sn = Math.sin(0.12);
-        const lx = 0.72 * s, dst = V(b.position.x + lx * c, 0.8 * s + 0.6 * bs, b.position.z - lx * sn + 0.05);
+        const lx = 0.72 * s, dst = V(b.position.x + lx * c, 0.8 * s + 0.56 * bs, b.position.z - lx * sn + 0.05);
         tw(bear.rotation, { z: Math.PI / 2, y: 0.12 }, 500, 'inout');
         await arc(bear, dst, 560, 1.4);
         SFX.thunk(); squash(b, 300);
         bear.userData.sleep = true; bear.userData.noBreath = false; bear.userData.tick = null;
+        (bear.userData.limbs || []).forEach(l => { l.visible = false; });
         const bl = U.blanket; bl.visible = true; tws(bl, 1, 450, 'back');
         U.bear = bear; g.bear = null;
         SFX.twinkle();
@@ -857,15 +911,14 @@ ROOMS.zveri = {
     lights(world); meadow(world);
     g.set = shuffle(ZVERI).slice(0, n);
     // уступы-холмики, чтобы всех было видно
-    const terr = (lvl, y, z) => { const t = rbox(M('#8fd870', 1), 60, y, 9, 0.5, 0, y / 2 - 0.05, z - 4.5); t.receiveShadow = true; world.add(t); const e = mesh(new T.BoxGeometry(60, 0.5, 0.3), M('#74c45c', 1), 0, y - 0.35, z + 0.02); e.castShadow = false; world.add(e); };
     let P, sc;
     if (landscape) {
       if (n === 3) { P = [[-5.2, 0, 0.6], [0, 0, 0.6], [5.2, 0, 0.6]]; sc = 1.6; }
       else if (n === 4) { P = [[-6.1, 0, 0.6], [-2.05, 0, 0.6], [2.05, 0, 0.6], [6.1, 0, 0.6]]; sc = 1.3; }
-      else { terr(1, 4.0, -1.2); P = [[-5.2, 0, 1.2], [0, 0, 1.2], [5.2, 0, 1.2], [-5.2, 4.0, -2.9], [0, 4.0, -2.9], [5.2, 4.0, -2.9]]; sc = 1.22; }
+      else { terrace(4.0, -1.2); P = [[-5.2, 0, 1.2], [0, 0, 1.2], [5.2, 0, 1.2], [-5.2, 4.0, -2.9], [0, 4.0, -2.9], [5.2, 4.0, -2.9]]; sc = 1.22; }
     } else {
-      terr(1, 3.9, -1.2); sc = 1.3;
-      if (n > 4) terr(2, 7.8, -5.2);
+      terrace(3.9, -1.2); sc = 1.3;
+      if (n > 4) terrace(7.8, -5.2);
       P = [[-2.3, 0, 1.2], [2.3, 0, 1.2], [-2.3, 3.9, -2.9], [2.3, 3.9, -2.9], [-2.3, 7.8, -6.9], [2.3, 7.8, -6.9]];
       if (n === 3) P[2] = [0, 3.9, -2.9];
     }
@@ -911,9 +964,12 @@ ROOMS.zveri = {
 };
 
 // ---------- домик-меню ----------
-const CELL_COL = { kraski: '#ffe1ea', figury: '#fff0c7', schet: '#dff6d4', mishki: '#dfe5ff', zveri: '#dff5ff', zaika: '#ffe8d2' };
+const ROOM_KEYS = ['kraski', 'figury', 'schet', 'mishki', 'zveri', 'pryatki', 'piramidka', 'vedra', 'eda', 'mnogo', 'para', 'muzyka'];
+const CELL_COL = { kraski: '#ffe1ea', figury: '#fff0c7', schet: '#dff6d4', mishki: '#dfe5ff', zveri: '#dff5ff', pryatki: '#e3f7d6', piramidka: '#ffe9d2', vedra: '#e0f4ff', eda: '#fff3c9', mnogo: '#ffe3ef', para: '#e9e2ff', muzyka: '#d9f5ee' };
+const ICONS = {}; // значки новых комнат добавляет komnaty2.js
 function cellIcon(key) {
   const g = grp();
+  if (ICONS[key]) { ICONS[key](g); return g; }
   if (key === 'kraski') {
     const bs = ['krasny', 'zhelty', 'siniy'].map((c, i) => { const b = mkShar(COLORS[c]); b.scale.setScalar(0.5); b.position.set((i - 1) * 1.0, 2.3 + (i % 2) * 0.35, 0); g.add(b); return b; });
     g.userData.tick = t => bs.forEach((b, i) => { b.position.y = 2.3 + (i % 2) * 0.35 + Math.sin(t * 1.5 + i * 2) * 0.12; b.rotation.z = Math.sin(t + i) * 0.08; });
@@ -931,15 +987,16 @@ function goHome() {
   const my = clearWorld();
   current = { name: 'home', rebuild: () => goHome() };
   const cw = 4.3, ch = 3.6, cd = 2.6, fl = 0.55;
-  const grid = landscape ? [['kraski', 'zaika', 'figury'], ['schet', 'mishki', 'zveri']] : [['kraski', 'figury'], ['schet', 'mishki'], ['zveri', 'zaika']];
-  const rows = grid.length, cols = grid[0].length, Wd = cw * cols, Ht = (ch + fl) * rows, roofH = landscape ? 2.7 : 2.5;
-  setFrame(landscape ? { cy: (Ht + roofH) / 2 + 0.1, halfW: Wd / 2 + 1.5, halfH: (Ht + roofH) / 2 + 0.75, pitch: 6 } : { cy: (Ht + roofH) / 2 + 0.2, halfW: Wd / 2 + 0.45, halfH: (Ht + roofH) / 2 + 0.9, pitch: 5 });
-  lights(world, { lx: 4, ly: 11 }); meadow(world);
-  const house = grp(0, 0, -0.5); world.add(house);
+  const cols = landscape ? 4 : 3, rows = ROOM_KEYS.length / cols;
+  const y0 = landscape ? 0 : 3.5; // в портретном положении дом стоит на высоком крыльце, Зайка перед ним
+  const Wd = cw * cols, Ht = (ch + fl) * rows, roofH = landscape ? 3.0 : 2.5, topY = y0 + Ht + fl + roofH;
+  setFrame(landscape ? { cx: -1.55, cy: topY / 2 + 0.1, halfW: Wd / 2 + 2.95, halfH: topY / 2 + 0.7, pitch: 5 } : { cy: topY / 2 + 0.2, halfW: Wd / 2 + 0.55, halfH: topY / 2 + 0.9, pitch: 4 });
+  lights(world, { lx: 4, ly: 11, ty: topY / 2, sh: 23 }); meadow(world);
+  const house = grp(0, y0, -0.5); world.add(house);
   const wallM = M('#fff6e2', 0.9), trimM = M('#ffffff', 0.7);
   const back = rbox(wallM, Wd + 0.5, Ht + 0.2, 0.3, 0.1, 0, Ht / 2, -cd); back.receiveShadow = true; house.add(back);
   for (let c = 0; c <= cols; c++) { const m = rbox(trimM, 0.28, Ht, cd, 0.1, -Wd / 2 + c * cw, Ht / 2, -cd / 2); m.receiveShadow = true; house.add(m); }
-  for (let r = 0; r <= rows; r++) { const m = rbox(r === 0 ? M('#d9b48a', 0.8) : trimM, Wd + 0.5, fl, cd + 0.25, 0.12, 0, r * (ch + fl) + fl / 2, -cd / 2 + 0.1); m.receiveShadow = true; house.add(m); }
+  for (let r = 0; r <= rows; r++) { const m = rbox(trimM, Wd + 0.5, fl, cd + 0.25, 0.12, 0, r * (ch + fl) + fl / 2, -cd / 2 + 0.1); m.receiveShadow = true; house.add(m); }
   // крыша
   const rs = new T.Shape(); rs.moveTo(-Wd / 2 - 0.9, 0); rs.lineTo(Wd / 2 + 0.9, 0); rs.lineTo(0.6, roofH); rs.quadraticCurveTo(0, roofH + 0.35, -0.6, roofH); rs.lineTo(-Wd / 2 - 0.9, 0);
   const roofTop = rows * (ch + fl) + fl;
@@ -950,24 +1007,31 @@ function goHome() {
   const smoke = [];
   for (let i = 0; i < 4; i++) { const s = ball(M('#ffffff', 1, { transparent: true, opacity: 0.8 }), 0.3, 0, 0, 0, true); s.castShadow = false; house.add(s); smoke.push(s); }
   const sx = Wd * 0.3, sy = roofTop + roofH * 0.55 + 1.1;
+  // Зайка живёт снаружи: сбоку от дома или перед крыльцом
+  const zaika = actor(mkZaika()); zaika.userData.wave = true; world.add(zaika);
+  if (landscape) { zaika.position.set(-Wd / 2 - 2.75, 0, 1.2); zaika.scale.setScalar(1.5); zaika.rotation.y = 0.3; }
+  else {
+    const base = rbox(M('#e6cfa8', 0.9), Wd + 0.7, y0 + 0.2, cd + 0.5, 0.2, 0, y0 / 2 - 0.1, -cd / 2 - 0.4); base.receiveShadow = true; world.add(base);
+    const fz = -0.1;
+    world.add(rbox(M('#c0563f', 0.6), 1.7, 2.6, 0.2, 0.5, 3.3, 1.3, fz)); world.add(ball(M('#ffd54f', 0.3), 0.11, 3.85, 1.3, fz + 0.15));
+    const wn = cyl(M('#ffffff', 0.7), 0.75, 0.75, 0.16, -3.9, 2.0, fz, 28); wn.rotation.x = Math.PI / 2; world.add(wn);
+    const wg = cyl(M('#7fd0ff', 0.2), 0.58, 0.58, 0.2, -3.9, 2.0, fz, 28); wg.rotation.x = Math.PI / 2; wg.castShadow = false; world.add(wg);
+    zaika.position.set(-0.3, 0, 1.3); zaika.scale.setScalar(0.84);
+  }
+  hitBox(zaika, 2.2, 4.0, 1.8, 0, 1.9, 0); zaika.userData.cy = 1.9 * zaika.scale.x;
+  pickable(zaika, () => { hop(zaika, 0.5); SFX.boing(); Voice.say('hihi'); });
   // комнаты
   const icons = [];
-  let zaika = null;
-  grid.forEach((row, r) => row.forEach((key, c) => {
-    const x = -Wd / 2 + cw * (c + 0.5), y0 = (rows - 1 - r) * (ch + fl) + fl;
-    const wp = mesh(new T.PlaneGeometry(cw - 0.28, ch), M(CELL_COL[key], 1), x, y0 + ch / 2, -cd + 0.17); wp.castShadow = false; wp.receiveShadow = true; house.add(wp);
-    const cell = grp(x, y0, -cd / 2 + 0.25); house.add(cell);
-    if (key === 'zaika') {
-      zaika = actor(mkZaika()); zaika.scale.setScalar(0.98); zaika.userData.wave = true; cell.add(zaika);
-      hitBox(cell, cw - 0.3, ch, cd, 0, ch / 2, 0); cell.userData.cy = ch / 2;
-      pickable(cell, () => { hop(zaika, 0.5); SFX.boing(); Voice.say('hihi'); });
-      return;
-    }
+  ROOM_KEYS.forEach((key, i) => {
+    const r = Math.floor(i / cols), c = i % cols;
+    const x = -Wd / 2 + cw * (c + 0.5), yc = (rows - 1 - r) * (ch + fl) + fl;
+    const wp = mesh(new T.PlaneGeometry(cw - 0.28, ch), M(CELL_COL[key], 1), x, yc + ch / 2, -cd + 0.17); wp.castShadow = false; wp.receiveShadow = true; house.add(wp);
+    const cell = grp(x, yc, -cd / 2 + 0.25); house.add(cell);
     const ic = cellIcon(key); cell.add(ic); icons.push(ic);
-    ic.scale.setScalar(0.001); tws(ic, 1, 500, 'back', 200 + (r * cols + c) * 110);
-    // звёздочки на полу комнаты
-    const n = Math.min(5, S.stars[key] || 0);
-    for (let i = 0; i < 5; i++) { const s = mkZvezda(i < n, 0.17); s.position.set((i - 2) * 0.5, -fl / 2, cd / 2 + 0.02); s.castShadow = false; cell.add(s); if (i < n) s.userData.tw = i; icons.push(s); }
+    ic.scale.setScalar(0.001); tws(ic, 1, 500, 'back', 200 + i * 70);
+    // звёздочки на полу комнаты: комната пройдена — горят все пять
+    const n = S.stars[key] ? 5 : 0;
+    for (let k = 0; k < 5; k++) { const s = mkZvezda(k < n, 0.17); s.position.set((k - 2) * 0.5, -fl / 2, cd / 2 + 0.02); s.castShadow = false; cell.add(s); if (k < n) s.userData.tw = k; icons.push(s); }
     hitBox(cell, cw - 0.3, ch, cd, 0, ch / 2, 0); cell.userData.cy = ch / 2;
     pickable(cell, () => {
       if (busyWipe) return;
@@ -977,7 +1041,7 @@ function goHome() {
       twf(520, () => applyFrame());
       go(() => runRoom(key));
     });
-  }));
+  });
   speaker = zaika;
   ENVT.push(t => {
     icons.forEach(ic => { if (ic.userData.tick) ic.userData.tick(t); if (ic.userData.tw !== undefined) ic.rotation.y = Math.sin(t * 2 + ic.userData.tw) * 0.5; });
@@ -1034,4 +1098,4 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) Voice
 fit();
 startScreen();
 requestAnimationFrame(frame);
-window.__Z = { step(n) { for (let i = 0; i < n; i++) update(0.033); }, S, Voice, runRoom, goHome, ROOMS, go, get current() { return current; }, get PICK() { return PICK; }, scr, cam, scene };
+window.__Z = { ICONS, step(n) { for (let i = 0; i < n; i++) update(0.033); }, S, Voice, runRoom, goHome, ROOMS, go, get current() { return current; }, get PICK() { return PICK; }, scr, cam, scene };

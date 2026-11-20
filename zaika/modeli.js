@@ -112,7 +112,8 @@ function mkMishka() {
   const fur = M('#b97f4c', 0.9), lt = M('#ebcaa0', 0.9);
   const body = ball(fur, [0.72, 0.74, 0.62], 0, 0.86, 0); g.add(body);
   g.add(ball(lt, [0.46, 0.5, 0.3], 0, 0.84, 0.38));
-  for (const s of [-1, 1]) { g.add(ball(fur, [0.27, 0.22, 0.38], s * 0.4, 0.2, 0.42)); g.add(ball(lt, [0.16, 0.14, 0.05], s * 0.4, 0.2, 0.79)); }
+  const legs = [];
+  for (const s of [-1, 1]) { const a = ball(fur, [0.27, 0.22, 0.38], s * 0.4, 0.2, 0.42), b = ball(lt, [0.16, 0.14, 0.05], s * 0.4, 0.2, 0.79); g.add(a, b); legs.push(a, b); }
   const arms = [];
   for (const s of [-1, 1]) { const a = grp(s * 0.62, 1.3, 0.1); a.add(ball(fur, [0.2, 0.38, 0.2], 0, -0.26, 0)); a.rotation.z = s * 0.45; g.add(a); arms.push(a); }
   const head = grp(0, 2.0, 0); g.add(head);
@@ -122,7 +123,7 @@ function mkMishka() {
   head.add(ball(MAT.eye, [0.11, 0.08, 0.07], 0, -0.06, 0.78));
   const mouth = ball(MAT.dark, [0.06, 0.03, 0.03], 0, -0.27, 0.76); head.add(mouth);
   face(g, head, { ex: 0.29, ey: 0.12, ez: 0.62, er: 0.095, cheeks: [0.5, -0.14, 0.5, 0.14] });
-  Object.assign(U, { body, head, arms, mouth, bodyS: body.scale.clone(), mouthS: mouth.scale.clone(), kind: 'mishka', h: 2.9 });
+  Object.assign(U, { body, head, arms, limbs: arms.concat(legs), mouth, bodyS: body.scale.clone(), mouthS: mouth.scale.clone(), kind: 'mishka', h: 2.9 });
   U.tick = t => { arms[0].rotation.z = -0.45 + Math.sin(t * 1.8 + U.ph) * 0.07; arms[1].rotation.z = 0.45 - Math.sin(t * 1.8 + U.ph) * 0.07; head.rotation.z = Math.sin(t * 1.1 + U.ph) * 0.05; };
   U.ph = Math.random() * 6;
   return g;
@@ -161,11 +162,15 @@ function mkEzhik() {
 }
 
 // ====== ЗВЕРИ ФЕРМЫ ====== (смотрят вдоль +z)
-function legs4(g, mat, hoof, x, z1, z2, h, r) {
+// Лапа растёт из тела: сверху круглое бедро (спрятано в туловище), книзу сужается, внизу лапка или копытце.
+function legs4(g, mat, foot, x, z1, z2, top, r, paw) {
   const L = [];
   for (const s of [-1, 1]) for (const z of [z1, z2]) {
-    const l = grp(s * x, h, z); l.add(cyl(mat, r, r * 0.9, h, 0, -h / 2, 0, 12));
-    if (hoof) l.add(cyl(hoof, r * 1.05, r * 1.1, h * 0.28, 0, -h + h * 0.14, 0, 12));
+    const l = grp(s * x, 0, z);
+    l.add(cyl(mat, r * 1.3, r, top, 0, top / 2, 0, 14));
+    l.add(ball(mat, [r * 1.7, r * 2.1, r * 1.9], 0, top, 0));
+    if (paw) l.add(ball(foot || mat, [r * 1.3, r * 0.78, r * 1.65], 0, r * 0.62, r * 0.4));
+    else if (foot) l.add(cyl(foot, r * 1.1, r * 1.16, r * 1.3, 0, r * 0.65, 0, 14));
     g.add(l); L.push(l);
   }
   return L;
@@ -176,7 +181,7 @@ function mkZver(kind) {
     const w = M('#fffaf2', 0.85), sp = M('#3a2c26', 0.85), pk = M('#f8b3c2', 0.7);
     body = ball(w, [0.8, 0.72, 1.05], 0, 1.3, -0.1); g.add(body);
     [[0.5, 1.7, -0.3, 0.42], [-0.55, 1.45, 0.3, 0.36], [0.1, 1.9, -0.75, 0.38], [-0.4, 1.2, -0.8, 0.3]].forEach(([x, y, z, r]) => g.add(ball(sp, [r, r, r], x * 0.93, y * 0.985, z * 0.93)));
-    legs4(g, w, sp, 0.42, -0.65, 0.5, 0.75, 0.17);
+    legs4(g, w, sp, 0.42, -0.65, 0.5, 1.15, 0.17);
     g.add(ball(pk, [0.3, 0.2, 0.3], 0, 0.72, -0.45));
     const tail = grp(0, 1.6, -1.1); tail.add(cyl(w, 0.04, 0.04, 0.8, 0, -0.4, 0, 6)); tail.add(ball(sp, [0.1, 0.16, 0.1], 0, -0.85, 0)); tail.rotation.x = 0.4; g.add(tail);
     head = grp(0, 1.95, 0.85); g.add(head);
@@ -195,7 +200,7 @@ function mkZver(kind) {
     const f = M('#d9a066', 0.9), dk = M('#8a5632', 0.9), cr = M('#f8e6cc', 0.9);
     body = ball(f, [0.6, 0.58, 0.88], 0, 1.0, -0.1); g.add(body);
     g.add(ball(cr, [0.4, 0.4, 0.5], 0, 0.85, 0.25));
-    legs4(g, f, cr, 0.34, -0.6, 0.45, 0.55, 0.15);
+    legs4(g, f, cr, 0.34, -0.58, 0.42, 0.88, 0.15, true);
     const tail = grp(0, 1.35, -0.9); const tm = ball(f, [0.1, 0.4, 0.1], 0, 0.3, 0); tail.add(tm); tail.rotation.x = -0.5; g.add(tail);
     const col = mesh(new T.TorusGeometry(0.4, 0.07, 8, 24), M('#e53935', 0.5), 0, 1.38, 0.5); col.rotation.x = Math.PI / 2 - 0.5; g.add(col);
     head = grp(0, 1.85, 0.62); g.add(head);
@@ -213,7 +218,7 @@ function mkZver(kind) {
     const f = M('#ffb14a', 0.9), st = M('#e9842a', 0.9), w = M('#fff6e6', 0.9);
     body = ball(f, [0.52, 0.56, 0.8], 0, 0.9, -0.1); g.add(body);
     g.add(ball(w, [0.34, 0.38, 0.4], 0, 0.8, 0.3));
-    legs4(g, f, w, 0.3, -0.55, 0.42, 0.45, 0.13);
+    legs4(g, f, w, 0.29, -0.55, 0.38, 0.8, 0.135, true);
     const tail = grp(0, 1.1, -0.85);
     const tc = new T.CatmullRomCurve3([new T.Vector3(0, 0, 0), new T.Vector3(0, 0.5, -0.25), new T.Vector3(0.1, 1.0, -0.15), new T.Vector3(0.3, 1.25, 0.05)]);
     tail.add(mesh(new T.TubeGeometry(tc, 14, 0.09, 8), f)); tail.add(ball(st, 0.11, 0.3, 1.25, 0.05)); g.add(tail);
@@ -249,7 +254,7 @@ function mkZver(kind) {
   } else if (kind === 'svinka') {
     const p = M('#ffb7c8', 0.85), d = M('#f78faa', 0.8);
     body = ball(p, [0.72, 0.66, 0.95], 0, 1.0, -0.1); g.add(body);
-    legs4(g, p, d, 0.38, -0.6, 0.45, 0.5, 0.16);
+    legs4(g, p, d, 0.38, -0.6, 0.45, 0.88, 0.16);
     const tail = mesh(new T.TorusGeometry(0.14, 0.04, 6, 14, Math.PI * 1.6), d, 0, 1.25, -1.05); tail.rotation.y = Math.PI / 2; g.add(tail);
     head = grp(0, 1.55, 0.72); g.add(head);
     head.add(ball(p, [0.66, 0.6, 0.56]));
@@ -267,7 +272,7 @@ function mkZver(kind) {
       const u = Math.random() * 1.7 - 0.7, a = Math.random() * Math.PI * 2, s = Math.sqrt(Math.max(0, 1 - Math.min(1, u * u)));
       body.add(ball(w, 0.28 + Math.random() * 0.1, s * Math.cos(a) * 0.62, u * 0.52, s * Math.sin(a) * 0.82, true));
     }
-    legs4(g, dk, null, 0.34, -0.55, 0.4, 0.6, 0.11);
+    legs4(g, dk, null, 0.34, -0.55, 0.4, 1.0, 0.12, true);
     head = grp(0, 1.7, 0.78); g.add(head);
     head.add(ball(dk, [0.42, 0.5, 0.44]));
     for (const [x, y, z, r] of [[0, 0.42, 0.05, 0.3], [-0.24, 0.36, 0.0, 0.22], [0.24, 0.36, 0.0, 0.22], [0, 0.3, -0.25, 0.3]]) head.add(ball(w, r, x, y, z, true));
@@ -379,10 +384,10 @@ function mkKrovatka() {
   g.add(rbox(wh, 2.76, 0.34, 1.5, 0.14, 0, 0.62, 0));
   const pl = rbox(wh, 0.8, 0.26, 1.15, 0.12, -0.9, 0.86, 0); g.add(pl);
   for (const s of [-1, 1]) g.add(ball(M('#ffd54f', 0.4), 0.13, -1.5, 1.78, s * 0.7));
-  const bl = grp(0.55, 1.2, 0);
-  bl.add(rbox(M('#6fb8ff', 0.9), 1.8, 0.95, 1.72, 0.2));
+  const bl = grp(0.52, 1.34, 0);
+  bl.add(rbox(M('#6fb8ff', 0.9), 1.85, 1.34, 1.72, 0.3));
   for (let i = 0; i < 7; i++) { const d = ball(M('#ffffff', 0.9), [0.09, 0.09, 0.03], -0.6 + (i % 4) * 0.4 + (i > 3 ? 0.2 : 0), i > 3 ? -0.2 : 0.18, 0.86, true); d.castShadow = false; bl.add(d); }
-  const fold = rbox(M('#ffffff', 0.9), 0.3, 0.99, 1.74, 0.14, -0.8, 0, 0); bl.add(fold);
+  const fold = rbox(M('#ffffff', 0.9), 0.34, 1.38, 1.74, 0.16, -0.82, 0, 0); bl.add(fold);
   bl.scale.set(0.001, 0.001, 0.001); bl.visible = false; g.add(bl);
   g.traverse(o => { if (o.isMesh) o.receiveShadow = true; });
   g.userData.blanket = bl; g.userData.kind = 'krovatka';
@@ -409,5 +414,65 @@ function mkVedro() {
   br.add(cyl(M('#a1784f', 0.7), 0.05, 0.05, 1.1, 0, 0.55, 0, 8));
   const tip = ball(M('#ffffff', 0.4, {}), [0.11, 0.2, 0.11], 0, 1.2, 0); br.add(tip); g.add(br);
   g.userData.paint = [paint.material, tip.material];
+  return g;
+}
+
+// ====== НОВОЕ В 3.0 ======
+function mkMorkovka() {
+  const g = grp(), or = M('#ff8a1c', 0.5), gr = M('#43a047', 0.8);
+  const b = cone(or, 0.27, 1.05, 0, -0.1, 0, 14); b.rotation.x = Math.PI; g.add(b);
+  g.add(ball(or, [0.27, 0.1, 0.27], 0, 0.42, 0));
+  for (let i = 0; i < 3; i++) { const l = ball(gr, [0.09, 0.32, 0.09], (i - 1) * 0.15, 0.74, 0, true); l.rotation.z = -(i - 1) * 0.45; g.add(l); }
+  g.userData.kind = 'morkovka'; return g;
+}
+function mkMed() {
+  const g = grp(), cl = M('#d98a3a', 0.5), hn = M('#ffc21a', 0.25);
+  g.add(ball(cl, [0.52, 0.46, 0.52])); g.add(cyl(cl, 0.36, 0.4, 0.22, 0, 0.42, 0, 20));
+  const rim = mesh(new T.TorusGeometry(0.36, 0.07, 8, 24), cl, 0, 0.53, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
+  g.add(cyl(hn, 0.33, 0.33, 0.07, 0, 0.55, 0, 20));
+  g.add(ball(hn, [0.1, 0.17, 0.06], -0.2, 0.36, 0.34, true)); g.add(ball(hn, [0.08, 0.24, 0.06], 0.13, 0.3, 0.4, true));
+  const lb = ball(M('#fff3d6', 0.8), [0.26, 0.17, 0.05], 0, -0.06, 0.5, true); lb.castShadow = false; g.add(lb);
+  g.userData.kind = 'med'; return g;
+}
+function mkKost() {
+  const g = grp(), w = M('#fff8ea', 0.6);
+  const c = cyl(w, 0.13, 0.13, 0.85, 0, 0, 0, 12); c.rotation.z = Math.PI / 2; g.add(c);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) g.add(ball(w, 0.2, sx * 0.46, sy * 0.14, 0));
+  g.rotation.z = 0.35; g.userData.kind = 'kost'; return g;
+}
+function mkMiska() {
+  const g = grp();
+  g.add(cyl(M('#4fa3f7', 0.4), 0.6, 0.42, 0.38, 0, 0, 0, 24));
+  g.add(cyl(M('#ffffff', 0.3), 0.54, 0.54, 0.05, 0, 0.18, 0, 24));
+  const rim = mesh(new T.TorusGeometry(0.6, 0.05, 8, 28), M('#4fa3f7', 0.4), 0, 0.19, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
+  g.rotation.x = 0.5; g.userData.kind = 'miska'; return g;
+}
+function mkKust() {
+  const g = grp(), a = M('#4fae4d', 0.95), b = M('#66c45c', 0.95), c = M('#3f9a42', 0.95);
+  [[0, 1.4, 0, 1.4, b], [-0.95, 0.9, 0.1, 0.9, a], [0.95, 0.9, 0.1, 0.9, a], [-0.5, 1.9, 0.3, 0.8, a], [0.55, 1.95, 0.25, 0.82, c], [0, 0.8, 0.7, 0.9, c], [-0.65, 0.55, 0.65, 0.65, b], [0.7, 0.55, 0.65, 0.65, b]].forEach(([x, y, z, r, m]) => g.add(ball(m, r, x, y, z)));
+  [[-0.8, 1.5, 0.95], [0.3, 2.3, 0.95], [0.95, 1.2, 0.9], [-0.2, 1.0, 1.55], [0.6, 0.5, 1.25], [-0.9, 0.5, 1.2]].forEach(([x, y, z]) => { const m = ball(M('#ff5d7a', 0.4), 0.11, x, y, z, true); m.castShadow = false; g.add(m); });
+  g.userData.kind = 'kust'; return g;
+}
+function mkKoltso(r, hex) { const g = grp(); g.add(mesh(new T.TorusGeometry(r, 0.3, 14, 36), M(hex, 0.3))); g.userData.kind = 'koltso'; return g; }
+function mkMyach(hex) {
+  const g = grp();
+  g.add(ball(M(hex, 0.3), 0.6));
+  const st = mesh(new T.TorusGeometry(0.585, 0.045, 6, 32), M('#ffffff', 0.4)); st.rotation.x = Math.PI / 2 - 0.4; st.rotation.y = 0.3; st.castShadow = false; g.add(st);
+  const hl = ball(new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }), [0.1, 0.17, 0.04], -0.24, 0.26, 0.48, true); hl.rotation.z = 0.5; hl.castShadow = false; g.add(hl);
+  g.userData.kind = 'myach'; return g;
+}
+function mkVedro2(hex) {
+  const g = grp();
+  g.add(mesh(new T.CylinderGeometry(0.92, 0.66, 1.3, 28, 1, true), M(hex, 0.4, { side: T.DoubleSide }), 0, 0.65, 0));
+  g.add(cyl(M(hex, 0.4), 0.66, 0.66, 0.08, 0, 0.04, 0, 28));
+  const rim = mesh(new T.TorusGeometry(0.92, 0.075, 8, 32), M(hex, 0.3), 0, 1.3, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
+  g.add(mesh(new T.TorusGeometry(0.95, 0.04, 6, 24, Math.PI), M('#ffffff', 0.5), 0, 1.3, 0));
+  g.traverse(o => { if (o.isMesh) o.receiveShadow = true; });
+  g.userData.kind = 'vedro'; return g;
+}
+function mkTarelka() {
+  const g = grp();
+  const p = cyl(M('#ffffff', 0.4), 1.75, 1.5, 0.18, 0, 0, 0, 36); p.receiveShadow = true; g.add(p);
+  const rim = mesh(new T.TorusGeometry(1.75, 0.09, 8, 40), M('#ff8fb1', 0.4), 0, 0.09, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
   return g;
 }
