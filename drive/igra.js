@@ -9,20 +9,21 @@
     // Свой звук мотора: положи файл в drive/zvuk/ с одним из этих имён. Нужна ровная запись
     // работы двигателя на одних оборотах (лучше холостых), 2–6 секунд. Игра зациклит её и будет
     // менять высоту по оборотам. Пока файла нет, мотор синтезируется.
-    motorFiles: ['zvuk/motor.mp3', 'zvuk/motor.ogg', 'zvuk/motor.wav', 'zvuk/motor.m4a'],
-    motorBaseRpm: 800,          // на каких оборотах записан файл
+    motorFiles: ['zvuk/motor.wav', 'zvuk/motor.mp3', 'zvuk/motor.ogg', 'zvuk/motor.m4a'],
+    startFile: 'zvuk/zapusk.wav',   // звук запуска (стартер и схватывание), играет при «Поехали»
+    motorBaseRpm: 900,          // на каких оборотах записан файл (холостые твоей машины)
     // Свой фон за окном: круговая панорама 2:1 в drive/fon/nebo.jpg
     panorama: 'fon/nebo.jpg',
   };
 
-  const P = { m: 1500, r: 0.31, fin: 4.1, gears: [2.8, 1.53, 1.0, 0.7], rev: 2.4, idle: 780, red: 6000, L: 2.7, dmax: 35 * D2R, lock: 450 * D2R };
-  const MU = { asphalt: 0.8, street: 0.55, snow: 0.38 }, CRR = { asphalt: 0.014, street: 0.026, snow: 0.085 };
+  const P = { m: 1500, r: 0.31, fin: 4.1, gears: [2.8, 1.53, 1.0, 0.7], rev: 2.4, idle: 900, red: 6000, L: 2.7, dmax: 35 * D2R, lock: 450 * D2R };
+  const MU = { asphalt: 0.8, street: 0.68, snow: 0.38 }, CRR = { asphalt: 0.014, street: 0.018, snow: 0.085 };
 
   const S = {
-    x: 1.7, z: 96, psi: 0, v: 0, rpm: P.idle, gear: 0, sel: 'D', gas: 0, brake: 0, steer: 0, wheelRate: 0,
+    x: 12.2, z: 100, psi: -Math.PI / 2, v: 0, rpm: P.idle, gear: 0, sel: 'D', gas: 0, brake: 0, steer: 0, wheelRate: 0,
     shiftT: 0, shiftLock: 0, slip: 0, aLong: 0, aLat: 0, pitch: 0, roll: 0, pitchV: 0, rollV: 0,
     signal: null, blink: 0, blinkOn: false, sigArm: 0, horn: false, hornPress: 0, act: null, stalk: 0,
-    lookYaw: 0, lookPitch: -0.2, glance: 0, rosX: 0, rosXv: 0, rosZ: 0, rosZv: 0, odo: 0, running: false, t: 0,
+    engine: 0, lookYaw: 0, lookPitch: -0.2, glance: 0, rosX: 0, rosXv: 0, rosZ: 0, rosZv: 0, odo: 0, running: false, t: 0,
   };
   const IN = { gas: 0, brake: 0, steer: 0, analogSteer: null, analogGas: null, analogBrake: null, horn: false, keys: {} };
 
@@ -132,10 +133,15 @@
           const r = await fetch(url); if (!r.ok) continue;
           const buf = await c.decodeAudioData(await r.arrayBuffer());
           const s = c.createBufferSource(); s.buffer = buf; s.loop = true;
-          A.sampleGain = c.createGain(); A.sampleGain.gain.value = 0; s.connect(A.sampleGain); A.sampleGain.connect(A.master); s.start();
-          A.sample = s; return;
+          A.sampleGain = c.createGain(); A.sampleGain.gain.value = 0;
+          A.sampleF = c.createBiquadFilter(); A.sampleF.type = 'lowpass'; A.sampleF.frequency.value = 1800; A.sampleF.Q.value = 0.5;
+          A.sampleBoost = c.createBiquadFilter(); A.sampleBoost.type = 'peaking'; A.sampleBoost.frequency.value = 220; A.sampleBoost.Q.value = 0.9; A.sampleBoost.gain.value = 0;
+          s.connect(A.sampleBoost); A.sampleBoost.connect(A.sampleF); A.sampleF.connect(A.sampleGain); A.sampleGain.connect(A.master); s.start();
+          A.sample = s; break;
         } catch (e) { /* try the next name */ }
       }
+      try { const r = await fetch(CONFIG.startFile); if (r.ok) A.startBuf = await c.decodeAudioData(await r.arrayBuffer()); } catch (e) { /* no start sound */ }
+      A.ready = true;
     })();
   }
   function click(freq, vol, dur) {
@@ -148,11 +154,17 @@
     for (const o of A.osc) o.os.frequency.setTargetAtTime(f * o.k * (1 + 0.004 * Math.sin(S.t * 31 + o.k)), t, 0.03);
     const load = S.gas, lvl = S.running ? 0.11 + 0.2 * load + 0.05 * (S.rpm / P.red) : 0;
     A.engLP.frequency.setTargetAtTime(260 + S.rpm * 0.22 + load * 1300, t, 0.05);
+    const on = S.running && S.engine >= 1;
     if (A.sample) {
-      A.sample.playbackRate.setTargetAtTime(Math.max(0.4, Math.min(5, S.rpm / CONFIG.motorBaseRpm)), t, 0.04);
-      A.sampleGain.gain.setTargetAtTime(S.running ? 0.45 + 0.5 * load : 0, t, 0.06); A.eng.gain.setTargetAtTime(0, t, 0.05);
-    } else A.eng.gain.setTargetAtTime(lvl, t, 0.06);
-    A.intake.gain.setTargetAtTime(S.running ? load * 0.1 * (0.4 + S.rpm / P.red) : 0, t, 0.06); A.intakeF.frequency.setTargetAtTime(250 + S.rpm * 0.12, t, 0.1);
+      // запись звучит на холостых как есть; выше по оборотам её высота растёт мягче, а сверху подмешивается синтез
+      const r = S.rpm / CONFIG.motorBaseRpm, hiMix = Math.min(1, Math.max(0, (S.rpm - 1700) / 2400));
+      A.sample.playbackRate.setTargetAtTime(Math.max(0.6, Math.min(2.7, 1 + (r - 1) * 0.62)), t, 0.04);
+      A.sampleGain.gain.setTargetAtTime(on ? (0.55 + 0.45 * load) * (1 - 0.45 * hiMix) : 0, t, 0.06);
+      A.sampleF.frequency.setTargetAtTime(1300 + load * 2600 + S.rpm * 0.3, t, 0.06);
+      A.sampleBoost.gain.setTargetAtTime(load * 7, t, 0.08);
+      A.eng.gain.setTargetAtTime(on ? lvl * (0.25 + 0.75 * hiMix) * 0.8 : 0, t, 0.06);
+    } else A.eng.gain.setTargetAtTime(on ? lvl : 0, t, 0.06);
+    A.intake.gain.setTargetAtTime(on ? load * 0.1 * (0.4 + S.rpm / P.red) : 0, t, 0.06); A.intakeF.frequency.setTargetAtTime(250 + S.rpm * 0.12, t, 0.1);
     const sp = Math.abs(S.v);
     A.road.gain.setTargetAtTime(Math.min(0.5, sp * 0.012 + S.slip * 0.15), t, 0.1); A.roadF.frequency.setTargetAtTime(260 + sp * 22, t, 0.2);
     A.horn.gain.setTargetAtTime(S.horn && S.hornPress > 0.55 ? 0.16 : 0, t, 0.012);
@@ -194,7 +206,8 @@
     // --- forces ---
     const mult = 1 + 0.9 * Math.max(0, Math.min(1, 1 - rpmW / Math.max(S.rpm, 1)));
     let F = (torque(S.rpm) * S.gas * mult * ratio * 0.9) / P.r;
-    if (S.gas < 0.04) F += 1300 * Math.max(0, 1 - vd / 2.2);                 // automatic creep
+    if (S.engine < 1) F = 0;
+    if (S.gas < 0.04 && S.engine >= 1) F += 1300 * Math.max(0, 1 - vd / 2.2);                 // automatic creep
     F -= (1 - S.gas) * (rpmW / P.red) * 1500 * (vd > 0.5 ? 1 : 0);           // engine braking
     F *= 1 - 0.75 * dip;
     const Fmax = mu * P.m * 9.81 * 0.52;
@@ -392,9 +405,14 @@
   function start() {
     initAudio(); if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume();
     menu.hidden = true; S.running = true; document.getElementById('hud').hidden = false;
+    if (S.engine === 0) {   // первый «Поехали»: заводим мотор
+      S.engine = 0.001;
+      const play = () => { if (A.startBuf) { const src = A.ctx.createBufferSource(), g = A.ctx.createGain(); g.gain.value = 0.9; src.buffer = A.startBuf; src.connect(g); g.connect(A.master); src.start(); } };
+      if (A.ready) play(); else { let n = 0; const w = setInterval(() => { if (A.ready || ++n > 20) { clearInterval(w); play(); } }, 100); }
+    }
     document.getElementById('touch').hidden = !isTouch;
-    if (isTouch) { IN.analogSteer = 0; IN.analogGas = 0; IN.analogBrake = 0; tip('Веди пальцем по картинке, чтобы повернуть голову', 5); }
-    else { tip('Нажми на картинку, чтобы вертеть головой мышью. W — газ, S — тормоз', 6); }
+    if (isTouch) { IN.analogSteer = 0; IN.analogGas = 0; IN.analogBrake = 0; tip('Заводим мотор… Веди пальцем по картинке, чтобы повернуть голову', 3); }
+    else if (S.engine === 0) { tip('Заводим мотор…', 2); }
     document.getElementById('go').textContent = 'ПРОДОЛЖИТЬ';
   }
   function pause() { S.running = false; menu.hidden = false; if (document.exitPointerLock) document.exitPointerLock(); IN.keys = {}; keySet(); }
@@ -413,6 +431,11 @@
     let dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (dt <= 0) return;
     S.t += dt;
+    if (S.running && S.engine > 0 && S.engine < 1) {
+      S.engine = Math.min(1, S.engine + dt / 1.25);
+      if (S.engine >= 1 && W.gate.target === 0) { W.gate.target = 1; tip(isTouch ? 'Ворота открываются. Включи задний ход кнопкой D/R и выезжай назад' : 'Ворота открываются. Включи задний ход клавишей R и выезжай назад', 7); }
+    }
+    W.update(dt);
     if (S.running) { gamepad(); const n = Math.max(1, Math.ceil(dt / 0.012)); for (let i = 0; i < n; i++) physics(dt / n); controls(dt); }
     else { S.gas = approach(S.gas, 0, dt, dt * 3); S.rpm += (P.idle - S.rpm) * dt * 2; }
     visuals(dt);

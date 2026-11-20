@@ -121,14 +121,14 @@
       for (let y = 0; y < h; y += 4) { g.fillStyle = 'rgba(40,40,40,0.10)'; g.fillRect(0, y, w, 1); }
     }, { repeat: [6, 6] });
     const M = {
-      dash: new T.MeshStandardMaterial({ color: 0x55585a, roughness: 0.82, metalness: 0, bumpMap: grain, bumpScale: 0.0009, side: T.DoubleSide }),
+      dash: new T.MeshStandardMaterial({ color: 0x5c5753, roughness: 0.82, metalness: 0, bumpMap: grain, bumpScale: 0.0009, side: T.DoubleSide }),
       dashDark: new T.MeshStandardMaterial({ color: 0x35373a, roughness: 0.8, bumpMap: grain, bumpScale: 0.0008 }),
       trim: new T.MeshStandardMaterial({ color: 0x8c8a84, roughness: 0.85, bumpMap: grain, bumpScale: 0.0007, side: T.DoubleSide }),
       door: new T.MeshStandardMaterial({ color: 0xb4b4b4, roughness: 0.86, bumpMap: grain, bumpScale: 0.0007, side: T.DoubleSide }),
       piano: new T.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.16, metalness: 0.1, envMapIntensity: 1.3 }),
       black: new T.MeshStandardMaterial({ color: 0x111213, roughness: 0.6 }),
       rubber: new T.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.9 }),
-      wheel: new T.MeshStandardMaterial({ color: 0x3b3d40, roughness: 0.7, bumpMap: grain, bumpScale: 0.0008 }),
+      wheel: new T.MeshStandardMaterial({ color: 0x34383a, roughness: 0.7, bumpMap: grain, bumpScale: 0.0008 }),
       leather: new T.MeshStandardMaterial({ color: 0x18191b, roughness: 0.55, bumpMap: fineGrain, bumpScale: 0.0006 }),
       chrome: new T.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.18, metalness: 1 }),
       satin: new T.MeshStandardMaterial({ color: 0x8b8e92, roughness: 0.4, metalness: 0.8 }),
@@ -276,6 +276,17 @@
     const vR = vent(0.07, 0.085, cab, 0.69, 0.775, -0.575, 7); vR.rotation.x = -0.1;
     const cap1 = add(new T.CylinderGeometry(0.022, 0.024, 0.012, 24), M.dashDark, -0.47, 0.82, -0.585); cap1.rotation.x = Math.PI / 2 - 0.3;
     const cap2 = add(new T.CylinderGeometry(0.02, 0.022, 0.014, 24), M.black, 0.685, 0.855, -0.565); cap2.rotation.x = Math.PI / 2 - 0.3;
+    // lid of the compartment on top of the dash (passenger side), sunglasses, air freshener by the head unit
+    const lid = add(sbox(0.3, 0.006, 0.2, 0.003, 2), M.dash, -0.42, 0.9, -0.93); lid.rotation.x = -0.03;
+    add(new T.BoxGeometry(0.31, 0.002, 0.21), M.rubber, -0.42, 0.8985, -0.93);
+    const gl = new T.Group(); gl.position.set(0.3, 0.925, -1.12); gl.rotation.y = 0.15; cab.add(gl);
+    const lensM = new T.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.1, metalness: 0.5 });
+    for (const sx of [-0.033, 0.033]) add(sbox(0.055, 0.036, 0.005, 0.002, 2), lensM, sx, 0.012, 0, gl);
+    add(new T.BoxGeometry(0.014, 0.006, 0.005), M.black, 0, 0.022, 0, gl);
+    for (const sx of [-0.063, 0.063]) add(new T.BoxGeometry(0.004, 0.006, 0.12), M.black, sx, 0.02, 0.06, gl);
+    const fresh = new T.Group(); fresh.position.set(0.012, 0.76, -0.47); cab.add(fresh);
+    add(new T.CylinderGeometry(0.011, 0.011, 0.04, 12), new T.MeshPhysicalMaterial({ color: 0xdfe8ea, roughness: 0.05, transparent: true, opacity: 0.55 }), 0, 0, 0, fresh);
+    add(new T.CylinderGeometry(0.007, 0.007, 0.016, 10), new T.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.5 }), 0, 0.028, 0, fresh);
     // glovebox seam
     add(new T.BoxGeometry(0.36, 0.003, 0.004), M.rubber, -0.52, 0.66, -0.575);
     add(new T.BoxGeometry(0.36, 0.003, 0.004), M.rubber, -0.52, 0.47, -0.648);
@@ -285,7 +296,9 @@
     K.wheelMount = mount;
     const spin = new T.Group(); mount.add(spin); K.wheelSpin = spin;
     const R = K.WHEEL_R;
-    const rim = add(new T.TorusGeometry(R, K.TUBE_R, 18, 72), M.leather, 0, 0, 0, spin);
+    const perf = canvasTex(64, 64, (g) => { g.fillStyle = '#9a9a9a'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#3c3c3c'; for (let y = 0; y < 64; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < 64; x += 8) { g.beginPath(); g.arc(x + 2, y + 2, 1.5, 0, 7); g.fill(); } }, { data: true, repeat: [90, 6] });
+    const rimMat = new T.MeshStandardMaterial({ color: 0x18191b, roughness: 0.5, bumpMap: perf, bumpScale: 0.0012, map: perf });
+    const rim = add(new T.TorusGeometry(R, K.TUBE_R, 18, 72), rimMat, 0, 0, 0, spin);
     rim.castShadow = true;
     // stitching along the inner side of the rim
     const stitch = canvasTex(64, 8, (g) => { g.clearRect(0, 0, 64, 8); g.fillStyle = '#6b6b6b'; for (let i = 0; i < 64; i += 8) g.fillRect(i + 1, 3, 5, 2); }, { repeat: [40, 1] });
@@ -305,6 +318,8 @@
     })();
     const emb = add(new T.TorusGeometry(0.02, 0.0022, 8, 40), M.wheel, 0, -0.004, 0.043, padG); emb.scale.set(1.5, 1, 1);
     add(sbox(0.03, 0.006, 0.004, 0.0015, 2), M.wheel, 0, -0.004, 0.044, padG);
+    const srs = canvasTex(256, 32, (g) => { g.clearRect(0, 0, 256, 32); g.fillStyle = '#1c1e20'; g.font = '600 22px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('SRS AIRBAG', 128, 17); });
+    const srsM = add(new T.PlaneGeometry(0.075, 0.0095), new T.MeshStandardMaterial({ map: srs, transparent: true, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2 }), 0.045, -0.045, 0.0335, padG); srsM.rotation.z = 0.0;
     // four spokes
     function spoke(ang, w, th) {
       const a0 = new T.Vector3(Math.sin(ang) * 0.085, Math.cos(ang) * 0.05 - 0.004, -0.03), a1 = new T.Vector3(Math.sin(ang) * (R - 0.004), Math.cos(ang) * (R - 0.004), -0.002);
@@ -368,6 +383,11 @@
       // quarter triangle where the mirror is mounted
       const tri = new T.Shape(); tri.moveTo(0, 0); tri.lineTo(0.16, 0); tri.lineTo(0.16, 0.13); tri.lineTo(0, 0);
       const tg = add(new T.ShapeGeometry(tri), new T.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.7, side: T.DoubleSide }), s * 0.772, 0.965, -1.2); tg.rotation.y = -Math.PI / 2;
+    }
+    for (const s of [1, -1]) {
+      const gh = new T.Group(); gh.position.set(s * 0.7, 1.47, -0.3); cab.add(gh);
+      add(sbox(0.022, 0.03, 0.2, 0.01, 3), M.head, -s * 0.03, -0.02, 0, gh);
+      for (const z of [-0.1, 0.1]) add(sbox(0.045, 0.035, 0.04, 0.012, 3), M.head, -s * 0.012, -0.012, z, gh);
     }
     // roof headliner
     const roofOut = add(new T.BoxGeometry(1.66, 0.05, 3.5), M.body, 0, 1.62, 0.95); roofOut.castShadow = true;
@@ -444,14 +464,14 @@
     // inside mirror + rosary
     const im = new T.Group(); im.position.set(0, 1.43, -0.66); cab.add(im);
     add(new T.CylinderGeometry(0.009, 0.012, 0.09, 10), M.black, 0, 0.045, -0.03, im).rotation.x = -0.5;
-    const ih = add(sbox(0.25, 0.075, 0.03, 0.012, 4), M.black, 0, 0, 0, im); ih.rotation.set(0.06, -0.24, 0);
+    const ih = add(sbox(0.31, 0.075, 0.03, 0.012, 4), M.black, 0, 0, 0, im); ih.rotation.set(0.06, -0.24, 0);
     const imat = new T.MeshBasicMaterial({ color: 0x8f989e });
-    const imm = add(new T.PlaneGeometry(0.23, 0.058), imat, 0, 0, 0.0162, ih);
+    const imm = add(new T.PlaneGeometry(0.295, 0.062), imat, 0, 0, 0.0162, ih);
     K.mirrorMats.C = { mat: imat, obj: imm };
     const ros = new T.Group(); ros.position.set(0, 0.035, -0.02); im.add(ros); K.rosary = ros;
     (function () {
-      const wood = new T.MeshStandardMaterial({ color: 0x4a2a17, roughness: 0.45 });
-      const N = 44, beads = new T.InstancedMesh(new T.SphereGeometry(0.0052, 10, 8), wood, N + 6);
+      const wood = new T.MeshStandardMaterial({ color: 0x7a5234, roughness: 0.45 });
+      const N = 44, beads = new T.InstancedMesh(new T.SphereGeometry(0.0062, 10, 8), wood, N + 6);
       const m4 = new T.Matrix4();
       const Lh = 0.2, hw = 0.016;
       for (let i = 0; i < N; i++) {
@@ -466,7 +486,7 @@
       add(new T.BoxGeometry(0.03, 0.007, 0.005), wood, 0, -Lh - 0.095, 0, ros);
       // small cloth pouch on its own string
       add(new T.CylinderGeometry(0.0008, 0.0008, 0.12, 4), M.black, 0.012, -0.06, 0.006, ros);
-      const pouch = add(new T.SphereGeometry(0.02, 14, 10), new T.MeshStandardMaterial({ color: 0x6f7355, roughness: 1, bumpMap: fineGrain, bumpScale: 0.001 }), 0.012, -0.142, 0.006, ros);
+      const pouch = add(new T.SphereGeometry(0.02, 14, 10), new T.MeshStandardMaterial({ color: 0xb9bfae, roughness: 1, bumpMap: fineGrain, bumpScale: 0.001 }), 0.012, -0.142, 0.006, ros);
       pouch.scale.set(0.8, 1.25, 0.7);
       add(new T.ConeGeometry(0.008, 0.016, 8), pouch.material, 0.012, -0.116, 0.006, ros);
     })();
