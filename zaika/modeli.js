@@ -476,3 +476,19 @@ function mkTarelka() {
   const rim = mesh(new T.TorusGeometry(1.75, 0.09, 8, 40), M('#ff8fb1', 0.4), 0, 0.09, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
   return g;
 }
+
+// ====== МОЛЬБЕРТ ======
+function mkMolbert() {
+  const g = grp(), wd = M('#c98a55', 0.6);
+  for (const sx of [-1, 1]) { const l = cyl(wd, 0.07, 0.08, 3.1, sx * 0.62, 1.5, 0.12, 8); l.rotation.z = sx * 0.2; l.rotation.x = 0.1; g.add(l); }
+  const bk = cyl(wd, 0.07, 0.08, 3.0, 0, 1.45, -0.62, 8); bk.rotation.x = -0.4; g.add(bk);
+  const board = grp(0, 2.05, 0.2); board.rotation.x = -0.12; g.add(board);
+  board.add(rbox(M('#ffffff', 0.8), 1.9, 1.5, 0.1, 0.05));
+  board.add(rbox(wd, 2.1, 0.14, 0.3, 0.05, 0, -0.82, 0.1));
+  // детский рисунок: солнышко, травка, цветок
+  const pm = h => new T.MeshBasicMaterial({ color: C(h) });
+  const dot = (h, x, y, rx, ry) => { const m = ball(pm(h), [rx, ry, 0.02], x, y, 0.06, true); m.castShadow = false; board.add(m); };
+  dot('#ffd21f', -0.55, 0.38, 0.22, 0.22); dot('#35b24a', 0, -0.55, 0.85, 0.12); dot('#f0352b', 0.45, 0.05, 0.2, 0.2); dot('#ffd21f', 0.45, 0.05, 0.08, 0.08); dot('#2a6df4', -0.1, 0.45, 0.3, 0.1);
+  const st = cyl(pm('#35b24a'), 0.03, 0.03, 0.5, 0.45, -0.25, 0.06, 6); st.castShadow = false; board.add(st);
+  g.userData.kind = 'molbert'; return g;
+}

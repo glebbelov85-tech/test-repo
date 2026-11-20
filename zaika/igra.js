@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '3.3';
+const VERSION = '3.4';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -494,7 +494,7 @@ function clearWorld() {
   for (let i = cam.children.length - 1; i >= 0; i--) cam.remove(cam.children[i]);
   if (scene.background && scene.background.isTexture) scene.background.dispose();
   world = new T.Group(); scene.add(world);
-  UI.fin.classList.remove('on'); UI.top.classList.remove('on'); UI.start.classList.remove('on'); LVL.classList.remove('on');
+  UI.fin.classList.remove('on'); UI.top.classList.remove('on'); UI.start.classList.remove('on'); LVL.classList.remove('on'); $('ris').classList.remove('on');
   return session;
 }
 async function go(fn) {
@@ -1061,6 +1061,12 @@ function goHome() {
     const wg = cyl(M('#7fd0ff', 0.2), 0.58, 0.58, 0.2, -3.9, 2.0, fz, 28); wg.rotation.x = Math.PI / 2; wg.castShadow = false; world.add(wg);
     zaika.position.set(-0.3, 0, 1.3); zaika.scale.setScalar(0.84);
   }
+  // мольберт: нажмёшь — откроется рисование
+  const mb = mkMolbert(); world.add(mb);
+  if (landscape) { zaika.position.x += 0.75; mb.position.set(-Wd / 2 - 4.05, 0, 2.6); mb.scale.setScalar(0.95); mb.rotation.y = 0.3; }
+  else { mb.position.set(-2.35, 0, 1.5); mb.scale.setScalar(0.8); mb.rotation.y = 0.2; }
+  hitBox(mb, 2.2, 3.4, 1.4, 0, 1.7, 0); mb.userData.cy = 1.7 * mb.scale.x;
+  pickable(mb, () => { if (busyWipe || !window.openRis) return; SFX.tap(); hop(mb, 0.4, 300); go(openRis); });
   hitBox(zaika, 2.2, 4.0, 1.8, 0, 1.9, 0); zaika.userData.cy = 1.9 * zaika.scale.x;
   pickable(zaika, () => { hop(zaika, 0.5); SFX.boing(); Voice.say('hihi'); });
   // комнаты
@@ -1141,4 +1147,4 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) Voice
 fit();
 startScreen();
 requestAnimationFrame(frame);
-window.__Z = { ICONS, step(n) { for (let i = 0; i < n; i++) update(0.033); }, S, Voice, runRoom, goHome, ROOMS, go, get current() { return current; }, get PICK() { return PICK; }, scr, cam, scene };
+window.__Z = { ICONS, clearWorld, step(n) { for (let i = 0; i < n; i++) update(0.033); }, S, Voice, runRoom, goHome, ROOMS, go, get current() { return current; }, get PICK() { return PICK; }, scr, cam, scene };

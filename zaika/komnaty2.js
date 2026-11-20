@@ -78,9 +78,11 @@ ICONS.pryatki = g => {
 
 // ===== 7. Пирамидка =====
 const RING_COLS = Object.keys(COLORS); // шесть цветов, для каждого есть запись «Это красный»
+// Название колечка: размер и цвет («Самое большое… красное колечко»), пока записей нет — «Это красный»
+const ringSay = (c, i, n) => Voice.have.has('kol_' + c) ? [i === 0 ? 'kol_samoe_b' : i === n - 1 ? 'kol_samoe_m' : 'kol_pomenshe', 'kol_' + c] : ['eto_' + c];
 ROOMS.piramidka = {
   intro: 'piramidka_intro',
-  voice: ['piramidka_intro', 'kol_bolshoe', 'kol_ne', 'piramidka_gotova', ...Object.keys(COLORS).map(c => 'eto_' + c)],
+  voice: ['piramidka_intro', 'kol_bolshoe', 'kol_ne', 'piramidka_gotova', 'kol_samoe_b', 'kol_pomenshe', 'kol_samoe_m', ...Object.keys(COLORS).flatMap(c => ['eto_' + c, 'kol_' + c])],
   setup(g) {
     setFrame(ROOM_FR()); lights(world);
     interior(world, { wall: '#d6f0e2', dot: '#bfe4d0', floorHue: 30, floorL: 65 }); rugAt('#ffcf7a');
@@ -125,13 +127,14 @@ ROOMS.piramidka = {
       await arc(r, top, 420, 0.8);
       await tw(r.position, { y: 0.3 + 0.3 * k + idx * th }, 240, 'in');
       SFX.thunk(); squash(st, 260); tone(392 + idx * 70, 0, 0.25, 'triangle', 0.12);
+      const name = ringSay(r.userData.c, idx, n);
       idx++; busy = false;
-      if (idx < n) { Voice.say('eto_' + r.userData.c); Idle.poke(); return; }
+      if (idx < n) { Voice.say(name); Idle.poke(); return; }
       Idle.off();
       const cap = ball(M('#ff5d8a', 0.3), 0.36 * k, 0, poleH + 0.1, 0); st.add(cap); popIn(cap, 0.36 * k);
       g.rings.forEach(x => { st.attach(x); });
       hop(st, 0.5, 450);
-      g.solved(V(g.px, poleH + 0.5, g.pz + 1), ['eto_' + r.userData.c, 'piramidka_gotova']);
+      g.solved(V(g.px, poleH + 0.5, g.pz + 1), [...name, 'piramidka_gotova']);
     };
     g.repeat = () => Voice.say('kol_bolshoe');
     g.say('kol_bolshoe');
@@ -535,3 +538,75 @@ ICONS.muzyka = g => {
   const bars = x.userData.bars;
   g.userData.tick = t => { const k = Math.floor(t * 1.6) % 4; bars.forEach((b, i) => { b.userData.mat.emissiveIntensity = i === k ? 0.4 : 0; }); };
 };
+
+// ===== Рисование (открывается с мольберта возле дома) =====
+(() => {
+  const el = $('ris'), cv = $('rc'), ov = $('ro'), pal = $('pal'), cx = cv.getContext('2d'), ox = ov.getContext('2d');
+  const INK = ['#f0352b', '#ff8a1c', '#ffd21f', '#35b24a', '#2a6df4', '#ff6fae', '#b25de0', '#8d5a34', '#2b2b2b'];
+  let col = INK[0], eraser = false, pic = 0, dpr = 1, strokes = new Map();
+  const ico = {
+    home: '<svg viewBox="0 0 100 100"><path d="M14 48 L50 16 L86 48" fill="none" stroke="#5d3a24" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 44 V84 H76 V44" fill="#ffcc80" stroke="#5d3a24" stroke-width="7" stroke-linejoin="round"/></svg>',
+    eraser: '<svg viewBox="0 0 100 100"><rect x="22" y="34" width="56" height="34" rx="8" transform="rotate(-25 50 50)" fill="#ffb3c7" stroke="#5d3a24" stroke-width="6"/><path d="M20 84 H80" stroke="#5d3a24" stroke-width="6" stroke-linecap="round"/></svg>',
+    clear: '<svg viewBox="0 0 100 100"><rect x="20" y="16" width="60" height="68" rx="6" fill="#fff" stroke="#5d3a24" stroke-width="6"/><path d="M62 16 L80 34 H62Z" fill="#cfd8dc" stroke="#5d3a24" stroke-width="5" stroke-linejoin="round"/></svg>',
+    next: '<svg viewBox="0 0 100 100"><rect x="14" y="20" width="72" height="60" rx="8" fill="#fff" stroke="#5d3a24" stroke-width="6"/><circle cx="36" cy="42" r="8" fill="#ffd21f"/><path d="M20 74 L44 52 L58 64 L68 56 L82 72" fill="none" stroke="#35b24a" stroke-width="7" stroke-linejoin="round"/></svg>',
+  };
+  // картинки-раскраски: рисуются контуром поверх красок. Координаты от -1 до 1.
+  const PICS = [
+    null,
+    (x) => { x.arc(0, 0, 0.42, 0, 7); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5; x.moveTo(Math.cos(a) * 0.55, Math.sin(a) * 0.55); x.lineTo(Math.cos(a) * 0.9, Math.sin(a) * 0.9); } },
+    (x) => { for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; x.moveTo(Math.cos(a) * 0.42 + 0.24, Math.sin(a) * 0.42 - 0.35); x.arc(Math.cos(a) * 0.42, Math.sin(a) * 0.42 - 0.35, 0.24, 0, 7); } x.moveTo(0.2, -0.35); x.arc(0, -0.35, 0.2, 0, 7); x.moveTo(0, 0.3); x.lineTo(0, 0.95); x.moveTo(0, 0.7); x.quadraticCurveTo(0.45, 0.35, 0.55, 0.7); x.quadraticCurveTo(0.3, 0.85, 0, 0.7); },
+    (x) => { x.rect(-0.6, -0.1, 1.2, 1.0); x.moveTo(-0.8, -0.1); x.lineTo(0, -0.85); x.lineTo(0.8, -0.1); x.closePath(); x.rect(-0.12, 0.35, 0.34, 0.55); x.rect(-0.45, 0.1, 0.28, 0.28); x.moveTo(0.4, -0.5); x.lineTo(0.4, -0.8); x.lineTo(0.56, -0.8); x.lineTo(0.56, -0.34); },
+    (x) => { x.ellipse(-0.1, 0, 0.62, 0.4, 0, 0, 7); x.moveTo(0.5, 0); x.lineTo(0.95, -0.38); x.lineTo(0.95, 0.38); x.closePath(); x.moveTo(-0.38, -0.1); x.arc(-0.44, -0.1, 0.06, 0, 7); x.moveTo(-0.15, -0.38); x.quadraticCurveTo(0.05, -0.75, 0.3, -0.33); x.moveTo(-0.1, -0.1); x.quadraticCurveTo(0.1, 0.05, -0.1, 0.2); },
+    (x) => { x.arc(0, 0.25, 0.55, 0, 7); x.moveTo(-0.14, -0.3); x.ellipse(-0.3, -0.62, 0.16, 0.42, -0.15, 0, 7); x.moveTo(0.46, -0.3); x.ellipse(0.3, -0.62, 0.16, 0.42, 0.15, 0, 7); x.moveTo(-0.14, 0.15); x.arc(-0.2, 0.15, 0.06, 0, 7); x.moveTo(0.26, 0.15); x.arc(0.2, 0.15, 0.06, 0, 7); x.moveTo(0.07, 0.36); x.arc(0, 0.36, 0.07, 0, 7); x.moveTo(-0.2, 0.5); x.quadraticCurveTo(0, 0.66, 0.2, 0.5); },
+    (x) => { x.ellipse(0, -0.25, 0.5, 0.6, 0, 0, 7); x.moveTo(-0.08, 0.35); x.lineTo(0.08, 0.35); x.lineTo(0, 0.44); x.closePath(); x.moveTo(0, 0.44); x.bezierCurveTo(0.25, 0.6, -0.25, 0.75, 0, 0.98); },
+    (x) => { x.moveTo(0, -0.35); x.bezierCurveTo(-0.7, -0.85, -0.95, 0.2, 0, 0.8); x.bezierCurveTo(0.95, 0.2, 0.7, -0.85, 0, -0.35); },
+  ];
+  const area = () => { const r = pal.getBoundingClientRect(); return { w: innerWidth, h: Math.max(100, r.top) }; };
+  function outline() {
+    ox.setTransform(1, 0, 0, 1, 0, 0); ox.clearRect(0, 0, ov.width, ov.height);
+    const f = PICS[pic]; if (!f) return;
+    const a = area(), k = Math.min(a.w, a.h) * 0.42 * dpr;
+    ox.setTransform(k, 0, 0, k, a.w / 2 * dpr, a.h / 2 * dpr);
+    ox.beginPath(); f(ox); ox.lineWidth = 0.035; ox.lineJoin = ox.lineCap = 'round'; ox.strokeStyle = '#4a3426'; ox.stroke();
+  }
+  function fitRis(keep) {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+    let old = null;
+    if (keep && cv.width && (cv.width !== w || cv.height !== h)) { old = document.createElement('canvas'); old.width = cv.width; old.height = cv.height; old.getContext('2d').drawImage(cv, 0, 0); }
+    if (cv.width !== w || cv.height !== h || !keep) { cv.width = ov.width = w; cv.height = ov.height = h; cx.fillStyle = '#fffdf5'; cx.fillRect(0, 0, w, h); }
+    if (old) { const k = Math.min(w / old.width, h / old.height); cx.drawImage(old, (w - old.width * k) / 2, 0, old.width * k, old.height * k); }
+    outline();
+  }
+  const wipe = () => { cx.fillStyle = '#fffdf5'; cx.fillRect(0, 0, cv.width, cv.height); };
+  const width = () => Math.min(innerWidth, innerHeight) * (eraser ? 0.09 : 0.035) * dpr;
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault(); const p = [e.clientX * dpr, e.clientY * dpr]; strokes.set(e.pointerId, p);
+    cx.fillStyle = eraser ? '#fffdf5' : col; cx.beginPath(); cx.arc(p[0], p[1], width() / 2, 0, 7); cx.fill();
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+  });
+  cv.addEventListener('pointermove', e => {
+    const p = strokes.get(e.pointerId); if (!p) return;
+    const q = [e.clientX * dpr, e.clientY * dpr];
+    cx.strokeStyle = eraser ? '#fffdf5' : col; cx.lineWidth = width(); cx.lineCap = cx.lineJoin = 'round';
+    cx.beginPath(); cx.moveTo(p[0], p[1]); cx.lineTo(q[0], q[1]); cx.stroke(); strokes.set(e.pointerId, q);
+  });
+  const up = e => strokes.delete(e.pointerId);
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  // кнопки
+  const btns = [];
+  const add = (html, fn, bg) => { const b = document.createElement('div'); b.className = 'btn'; if (bg) b.style.background = bg; b.innerHTML = html; tapBtn(b, () => fn(b)); pal.appendChild(b); btns.push(b); return b; };
+  const mark = b => { btns.forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+  add(ico.home, () => { SFX.tap(); go(goHome); });
+  INK.forEach((c, i) => { const b = add('', bb => { col = c; eraser = false; mark(bb); tone(440 + i * 60, 0, 0.12, 'triangle', 0.1); }, c); b.classList.add('ink'); if (!i) b.classList.add('sel'); });
+  add(ico.eraser, bb => { eraser = true; mark(bb); SFX.tap(); });
+  add(ico.next, () => { pic = (pic + 1) % PICS.length; wipe(); outline(); SFX.plop(); });
+  add(ico.clear, () => { wipe(); SFX.whoosh(); });
+  window.openRis = () => {
+    clearWorld(); scene.background = new T.Color(C('#fffdf5'));
+    current = { name: 'ris', rebuild: () => fitRis(true) };
+    el.classList.add('on'); if (!pic) pic = 1 + rnd(PICS.length - 1);
+    fitRis(false);
+  };
+  addEventListener('resize', () => { if (current && current.name === 'ris') setTimeout(() => fitRis(true), 60); });
+})();

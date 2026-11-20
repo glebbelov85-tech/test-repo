@@ -25,6 +25,14 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 #lvl .btn { position: relative; width: 11.5vmin; height: 11.5vmin; max-width: 92px; max-height: 92px; padding: 1.3vmin; background: rgba(255,255,255,.7); }
 #lvl .btn svg { opacity: .45; }
 #lvl .btn.sel { background: #fff; outline: .7vmin solid #ffb300; } #lvl .btn.sel svg { opacity: 1; }
+#ris { position: fixed; inset: 0; background: #fffdf5; display: none; z-index: 10; }
+#ris.on { display: block; }
+#ris canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
+#ro { pointer-events: none; }
+#pal { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 1.6vmin; padding: 1.6vmin 1.6vmin calc(2.2vmin + env(safe-area-inset-bottom)); background: rgba(255,236,200,.92); box-shadow: 0 -0.6vmin 2vmin rgba(0,0,0,.12); }
+#pal .btn { position: relative; width: 12.5vmin; height: 12.5vmin; max-width: 96px; max-height: 96px; padding: 1.8vmin; }
+#pal .btn.ink { border: .9vmin solid #fff; }
+#pal .btn.sel { outline: .9vmin solid #5d3a24; transform: translateY(-1vmin); }
 #bHome { left: calc(2.5vmin + env(safe-area-inset-left)); top: calc(2.5vmin + env(safe-area-inset-top)); }
 #bRep { right: calc(2.5vmin + env(safe-area-inset-right)); top: calc(2.5vmin + env(safe-area-inset-top)); }
 #stars { position: absolute; left: 50%; top: calc(3.5vmin + env(safe-area-inset-top)); transform: translateX(-50%); display: flex; gap: 1.2vmin; background: rgba(255,255,255,.35); padding: 1.2vmin 2.4vmin; border-radius: 6vmin; }
@@ -55,15 +63,16 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 </div>
 <div id="start">
   <div class="btn green" id="bPlay"><svg viewBox="0 0 100 100"><path d="M36 24 L78 50 L36 76Z" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round"/></svg></div>
-  <div id="ver">v3.3</div>
+  <div id="ver">v3.4</div>
 </div>
 <div id="lvl"></div>
+<div id="ris"><canvas id="rc"></canvas><canvas id="ro"></canvas><div id="pal"></div></div>
 <div id="wipe"></div>
 <script src="three.min.js"></script>
-<script src="frazy.js?v=3.3"></script>
-<script src="voice/zapisi.js?v=3.3"></script>
-<script src="modeli.js?v=3.3"></script>
-<script src="igra.js?v=3.3"></script>
-<script src="komnaty2.js?v=3.3"></script>
+<script src="frazy.js?v=3.4"></script>
+<script src="voice/zapisi.js?v=3.4"></script>
+<script src="modeli.js?v=3.4"></script>
+<script src="igra.js?v=3.4"></script>
+<script src="komnaty2.js?v=3.4"></script>
 </body>
 </html>
