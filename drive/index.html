@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0d10">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="fonts.css">
+<title>За рулём</title>
+<style>
+:root{--bg:#0b0d10;--panel:rgba(12,15,19,.78);--line:#2b343d;--fg:#eef1f3;--muted:#98a4ae;--acc:#ffb23a;--green:#35d05a;
+  --display:"Russo One","Arial Black",Impact,sans-serif;--body:"Rubik","Segoe UI",Arial,sans-serif;--mono:"PT Mono",ui-monospace,Consolas,monospace;color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--body);-webkit-user-select:none;user-select:none;touch-action:none}
+#game{position:fixed;inset:0}
+#game canvas{display:block;width:100%;height:100%}
+.screen{position:fixed;inset:0;display:flex;z-index:30;overflow:auto;touch-action:pan-y;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(180deg,rgba(8,10,13,.55),rgba(8,10,13,.9))}
+.card{margin:auto;max-width:760px;width:100%;display:grid;gap:16px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(44px,9vw,84px);line-height:.95;margin:0;letter-spacing:.02em}
+h1 small{display:block;font-size:.22em;letter-spacing:.32em;color:var(--acc);margin-top:10px}
+p{margin:0;line-height:1.55;color:#cfd6dc;max-width:62ch}
+.btns{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+button{font-family:var(--display);font-size:18px;letter-spacing:.04em;color:#111;background:var(--acc);border:0;border-radius:8px;padding:14px 24px;cursor:pointer;box-shadow:0 3px 0 #8a5a12;touch-action:manipulation}
+button:active{transform:translateY(2px);box-shadow:0 1px 0 #8a5a12}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font-size:14px;padding:9px 12px;background:#1a2128;color:var(--fg);box-shadow:none;border:2px solid var(--line)}
+.seg button.on{background:var(--acc);color:#111;border-color:var(--acc)}
+.row{display:grid;grid-template-columns:minmax(110px,170px) 1fr;gap:10px;align-items:center}
+.row label{color:var(--muted);font-size:14px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:7px 18px;font-size:14px;color:#cfd6dc;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.keys b{font-family:var(--mono);color:var(--fg);background:#1a2128;border:1px solid var(--line);border-radius:4px;padding:1px 6px;margin-right:6px;font-weight:400}
+.ver{justify-self:start;font-family:var(--mono);font-size:13px;letter-spacing:.1em;color:#111;background:var(--acc);border-radius:4px;padding:3px 10px}
+.note{font-size:13px;color:var(--muted)}
+/* on-screen readout */
+#hud{position:fixed;left:50%;top:max(10px,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:10;pointer-events:none;display:flex;gap:14px;align-items:center;
+  font-family:var(--mono);font-size:clamp(13px,1.7vw,17px);background:rgba(8,10,13,.45);border-radius:999px;padding:6px 16px;text-shadow:0 1px 2px #000}
+#hud .tl{color:#3c4650}#hud .tl.on{color:var(--green)}
+#hud b{font-family:var(--display);font-weight:400;font-size:1.25em}
+#tip{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:10;pointer-events:none;font-size:13px;color:#dfe5ea;background:rgba(8,10,13,.5);border-radius:8px;padding:6px 12px;text-align:center;transition:opacity .6s}
+/* touch controls */
+#touch{position:fixed;inset:0;z-index:12;pointer-events:none}
+#touch>*{pointer-events:auto;position:absolute}
+.tb{width:56px;height:56px;border-radius:50%;background:rgba(10,13,17,.5);border:2px solid rgba(255,255,255,.28);color:#fff;font-family:var(--display);font-size:18px;display:grid;place-items:center;box-shadow:none;padding:0}
+.tb.on{background:rgba(255,178,58,.75);color:#111;border-color:var(--acc)}
+#tTop{right:max(10px,env(safe-area-inset-right,0px));top:max(10px,env(safe-area-inset-top,0px));display:flex;gap:8px}
+#tLeftTop{left:max(10px,env(safe-area-inset-left,0px));top:max(10px,env(safe-area-inset-top,0px));display:flex;gap:8px}
+#steer{left:max(14px,env(safe-area-inset-left,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));width:min(44vw,300px);height:84px;border-radius:42px;background:rgba(10,13,17,.4);border:2px solid rgba(255,255,255,.25)}
+#steer i{position:absolute;top:8px;left:50%;width:64px;height:64px;margin-left:-32px;border-radius:50%;background:rgba(255,255,255,.7)}
+.pedal{bottom:max(18px,env(safe-area-inset-bottom,0px));width:66px;height:min(42vh,190px);border-radius:14px;background:rgba(10,13,17,.4);border:2px solid rgba(255,255,255,.25);overflow:hidden}
+.pedal i{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(53,208,90,.6)}
+.pedal span{position:absolute;left:0;right:0;top:6px;text-align:center;font-family:var(--display);font-size:12px;color:#fff}
+#pGas{right:max(14px,env(safe-area-inset-right,0px))}
+#pBrake{right:calc(max(14px,env(safe-area-inset-right,0px)) + 78px)}#pBrake i{background:rgba(224,60,50,.65)}
+</style></head>
+<body>
+<div id="game"></div>
+
+<div id="hud" hidden>
+  <span class="tl" id="hL">◀</span>
+  <span><b id="hSpd">0</b> км/ч</span>
+  <span id="hGear">D</span>
+  <span class="tl" id="hR">▶</span>
+</div>
+<div id="tip" hidden></div>
+
+<div id="touch" hidden>
+  <div id="tLeftTop">
+    <button class="tb" id="bMenu">≡</button>
+    <button class="tb" id="bGear">D</button>
+  </div>
+  <div id="tTop">
+    <button class="tb" id="bL">◀</button>
+    <button class="tb" id="bHaz">⚠</button>
+    <button class="tb" id="bR">▶</button>
+    <button class="tb" id="bHorn">Би</button>
+  </div>
+  <div id="steer"><i></i></div>
+  <div class="pedal" id="pBrake"><i></i><span>ТОРМОЗ</span></div>
+  <div class="pedal" id="pGas"><i></i><span>ГАЗ</span></div>
+</div>
+
+<div class="screen" id="menu">
+  <div class="card">
+    <span class="ver">v0.1 · тест</span>
+    <h1>ЗА РУЛЁМ<small>ОТ ПЕРВОГО ЛИЦА</small></h1>
+    <p>Правый руль, зима, посёлок. Трогайся плавно: педаль газа нажимается постепенно, машина разгоняется и катится по инерции, коробка-автомат сама переключает передачи.</p>
+    <div class="keys" id="keys">
+      <span><b>W</b><b>S</b> газ и тормоз</span>
+      <span><b>A</b><b>D</b> руль</span>
+      <span><b>мышь</b> повернуть голову</span>
+      <span><b>Q</b><b>E</b> поворотники</span>
+      <span><b>F</b> аварийка</span>
+      <span><b>пробел</b> сигнал</span>
+      <span><b>R</b> передача D / R</span>
+      <span><b>Z</b><b>C</b> глянуть влево, вправо</span>
+      <span><b>X</b> взгляд прямо</span>
+      <span><b>Esc</b> меню</span>
+    </div>
+    <div class="row"><label>Графика</label><div class="seg" id="segQ"><button data-q="2">Высокая</button><button data-q="1">Средняя</button><button data-q="0">Простая</button></div></div>
+    <div class="row"><label>Громкость</label><input type="range" id="vol" min="0" max="100" value="70"></div>
+    <div class="btns"><button id="go">ПОЕХАЛИ</button><span class="note" id="loadNote"></span></div>
+  </div>
+</div>
+
+<script src="three.min.js"></script>
+<script src="kabina.js"></script>
+<script src="ruki.js"></script>
+<script src="mir.js"></script>
+<script src="igra.js"></script>
+</body></html>
