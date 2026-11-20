@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '3.2';
+const VERSION = '3.3';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -18,6 +18,12 @@ const rr = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[rnd(a.length)];
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const V = (x, y, z) => new T.Vector3(x, y, z);
+// «Мешочек»: задания идут по кругу без повторов, пока не выпадут все варианты (никто не остаётся голодным)
+function bag(g, name, items) {
+  const B = g._bag || (g._bag = {}); let b = B[name];
+  if (!b || !b.q.length) { const q = shuffle(items); if (b && q.length > 1 && q[0] === b.last) q.push(q.shift()); b = B[name] = { q, last: b ? b.last : null }; }
+  return (b.last = b.q.shift());
+}
 
 // ---------- звук ----------
 let AC = null;
@@ -116,6 +122,7 @@ const Voice = {
         });
       });
     }
+    if (this.have.size > 50) return new Promise(res => setTimeout(res, 250));
     return this.tts(TEXT[id] || id);
   },
   tts(text) {
@@ -593,7 +600,7 @@ ROOMS.kraski = {
     g.balls.forEach(b => { unpick(b); world.remove(b); }); g.balls = [];
     const pal = Object.keys(COLORS); // все шесть цветов с самого начала
     const n = [3, 4, 6][g.lvl];
-    let target; do target = pick(pal); while (target === g.prev); g.prev = target;
+    const target = bag(g, 't', pal);
     const cols = shuffle([target, ...shuffle(pal.filter(c => c !== target)).slice(0, n - 1)]);
     g.vedro.userData.paint.forEach(m => m.color.copy(C(COLORS[target]))); squash(g.vedro);
     const P = landscape
@@ -652,7 +659,8 @@ ROOMS.figury = {
   round(g) {
     if (g.sorter) world.remove(g.sorter);
     if (g.shape) { unpick(g.shape); world.remove(g.shape); }
-    const order = shuffle(g.set).slice(0, g.cnt), n = order.length, sp = landscape ? 2.72 : 2.55;
+    const target = bag(g, 't', g.set);
+    const order = shuffle([target, ...shuffle(g.set.filter(x => x !== target)).slice(0, g.cnt - 1)]), n = order.length, sp = landscape ? 2.72 : 2.55;
     let w, h, cy, holes;
     if (landscape || n <= 3) { w = sp * n + 0.9; h = 3.4; cy = 2.75; holes = order.map((k, i) => ({ kind: k, x: (i - (n - 1) / 2) * sp, y: 0 })); }
     else { const per = Math.ceil(n / 2); w = sp * per + 0.9; h = 6.2; cy = 4.0; holes = order.map((k, i) => { const r = i < per ? 0 : 1, cnt = r ? n - per : per, j = r ? i - per : i; return { kind: k, x: (j - (cnt - 1) / 2) * sp, y: r ? -1.4 : 1.4 }; }); }
@@ -667,7 +675,6 @@ ROOMS.figury = {
     st.scale.setScalar(1); st.updateMatrixWorld(true);
     const targets = holes.map(o => { const tgt = grp(); tgt.position.copy(st.localToWorld(V(o.x, o.y, 0.05))); tgt.userData.fig = o.kind; hitBox(tgt, 2.4, 2.6, 1.2); world.add(tgt); return tgt; });
     st.scale.setScalar(0.001);
-    let target; do target = pick(order); while (target === g.prev && n > 1); g.prev = target;
     const sh = g.shape = mkFigura(target); const sy = landscape ? 6.5 : 10.3;
     sh.userData.by = sy; sh.userData.cy = 0; sh.position.set(landscape ? 1.2 : 0.6, sy, 1.6); sh.scale.setScalar(0.001);
     hitBox(sh, 2.6, 2.6, 1.5); world.add(sh); tws(sh, 1.15, 500, 'back', 250);
@@ -763,8 +770,8 @@ ROOMS.schet = {
   round(g) {
     const two = g.two;
     let N, Mz = 0;
-    if (two) { do { N = 1 + rnd(3); Mz = 1 + rnd(3); } while (N === Mz || (N === g.prevN && Mz === g.prevM)); g.prevM = Mz; }
-    else { const pool = [[1, 2, 3], [3, 4, 5]][g.lvl]; do N = pick(pool); while (N === g.prevN); }
+    if (two) { [N, Mz] = bag(g, 'p', [[1, 2], [1, 3], [2, 1], [2, 3], [3, 1], [3, 2]]); }
+    else { N = bag(g, 'n', [[1, 2, 3], [2, 3, 4, 5]][g.lvl]); }
     g.prevN = N;
     g.tables.forEach(t => world.remove(t));
     const sp = landscape ? 0.95 : 0.86;
@@ -868,7 +875,7 @@ ROOMS.mishki = {
       world.add(b); g.beds.push(b); popIn(b, s, i * 120);
       pickable(b, () => tryBed(b));
     });
-    let sz; do sz = pick(g.sizes); while (g.prev.length >= 2 && g.prev.slice(-2).every(p => p === sz));
+    const sz = bag(g, 's', g.sizes);
     g.prev.push(sz);
     const bear = g.bear = actor(mkMishka()), bs = BS[sz] * k * 0.8;
     bear.position.set(0, g.shelfY, -2.3); bear.userData.cy = 1.4 * bs;
@@ -952,7 +959,7 @@ ROOMS.zveri = {
   },
   round(g) {
     g.cards.forEach(unhalo);
-    let t; do t = pick(g.set); while (t === g.prev); g.prev = t;
+    const t = bag(g, 't', g.set);
     let busy = false;
     const whoFor = c => id => (id === 'zvuk_' + c.userData.z ? c : null);
     const q = g.lvl >= 2 ? 'zvuk_' + t : 'kto_' + t; // на сложном только голос зверя, без подсказки «кто говорит»

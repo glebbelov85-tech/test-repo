@@ -77,10 +77,10 @@ ICONS.pryatki = g => {
 };
 
 // ===== 7. Пирамидка =====
-const RING_COLS = ['#f0352b', '#ff8a1c', '#ffd21f', '#35b24a', '#2a6df4', VIOLET];
+const RING_COLS = Object.keys(COLORS); // шесть цветов, для каждого есть запись «Это красный»
 ROOMS.piramidka = {
   intro: 'piramidka_intro',
-  voice: ['piramidka_intro', 'kol_bolshoe', 'kol_ne', 'piramidka_gotova'],
+  voice: ['piramidka_intro', 'kol_bolshoe', 'kol_ne', 'piramidka_gotova', ...Object.keys(COLORS).map(c => 'eto_' + c)],
   setup(g) {
     setFrame(ROOM_FR()); lights(world);
     interior(world, { wall: '#d6f0e2', dot: '#bfe4d0', floorHue: 30, floorL: 65 }); rugAt('#ffcf7a');
@@ -103,7 +103,7 @@ ROOMS.piramidka = {
     const slots = shuffle(landscape ? [[-0.6, 6.1], [2.5, 6.1], [5.6, 6.1], [0.6, 2.5], [3.7, 2.5], [6.8, 2.5]] : n === 6 ? [[-2.5, 10.4], [2.5, 10.4], [-2.5, 7.7], [2.5, 7.7], [-2.5, 5.0], [2.5, 5.0]] : [[-2.5, 9.9], [2.5, 9.9], [-2.5, 6.5], [2.5, 6.5], [0, 8.2]]).slice(0, n);
     const order = [];
     for (let i = 0; i < n; i++) {
-      const rad = 1.3 - i * (0.7 / (n - 1)), r = mkKoltso(rad, cols[i]), U = r.userData;
+      const rad = 1.3 - i * (0.7 / (n - 1)), r = mkKoltso(rad, COLORS[cols[i]]), U = r.userData; U.c = cols[i];
       U.r = rad; U.by = slots[i][1]; U.ph = Math.random() * 6; U.cy = 0;
       r.position.set(slots[i][0], U.by, 1.0); hitBox(r, rad * 2 + 0.9, rad * 2 + 0.9, 1.2);
       world.add(r); g.rings.push(r); order.push(r); popIn(r, k, 150 + i * 90);
@@ -126,12 +126,12 @@ ROOMS.piramidka = {
       await tw(r.position, { y: 0.3 + 0.3 * k + idx * th }, 240, 'in');
       SFX.thunk(); squash(st, 260); tone(392 + idx * 70, 0, 0.25, 'triangle', 0.12);
       idx++; busy = false;
-      if (idx < n) { Idle.poke(); return; }
+      if (idx < n) { Voice.say('eto_' + r.userData.c); Idle.poke(); return; }
       Idle.off();
       const cap = ball(M('#ff5d8a', 0.3), 0.36 * k, 0, poleH + 0.1, 0); st.add(cap); popIn(cap, 0.36 * k);
       g.rings.forEach(x => { st.attach(x); });
       hop(st, 0.5, 450);
-      g.solved(V(g.px, poleH + 0.5, g.pz + 1), 'piramidka_gotova');
+      g.solved(V(g.px, poleH + 0.5, g.pz + 1), ['eto_' + r.userData.c, 'piramidka_gotova']);
     };
     g.repeat = () => Voice.say('kol_bolshoe');
     g.say('kol_bolshoe');
@@ -175,7 +175,7 @@ ROOMS.vedra = {
   round(g) {
     const sc = g.sc;
     g.old.forEach(b => tws(b, 0.001, 250, 'in').then(() => world.remove(b))); g.old = [];
-    let c; do c = pick(g.cols); while (c === g.prev); g.prev = c;
+    const c = bag(g, 'c', g.cols);
     const ball = g.ball = mkMyach(COLORS[c]), bs = Math.max(0.95, sc * 0.92);
     ball.position.copy(g.home); ball.userData.cy = 0; hitBox(ball, 1.9, 1.9, 1.6); world.add(ball); popIn(ball, bs, 150);
     let busy = false;
@@ -251,7 +251,7 @@ ROOMS.eda = {
   },
   round(g) {
     g.an.forEach(unhalo);
-    let who; do who = pick(g.set); while (who === g.prev); g.prev = who;
+    const who = bag(g, 'w', g.set);
     const name = EDA[who][0], q = 'kto_lubit_' + name;
     const food = g.food = EDA[who][3](); food.position.copy(g.home); food.userData.cy = 0;
     hitBox(food, 1.5, 1.5, 1.3); world.add(food); popIn(food, 1.55, 150);
@@ -400,7 +400,7 @@ ROOMS.para = {
     const n = g.n;
     g.toys.forEach(x => { unpick(x); world.remove(x); }); g.toys = [];
     const keys = Object.keys(TOY);
-    let target; do target = pick(keys); while (target === g.prev); g.prev = target;
+    const target = bag(g, 't', keys);
     const pool = shuffle(keys.filter(k => k !== target)), fam = k => TOY[k][0];
     let ds = [];
     if (g.lvl < 1) { const used = new Set([fam(target)]); for (const k of pool) { if (ds.length >= n - 1) break; if (!used.has(fam(k))) { used.add(fam(k)); ds.push(k); } } }
@@ -479,8 +479,7 @@ ROOMS.muzyka = {
     const bars = g.xy.userData.bars;
     if (g.lvl === 0) {
       // лёгкий уровень: нажимай на клавишу, которая светится
-      const need = 4, type = rnd(3), st = type === 1 ? need - 1 + rnd(7 - need) : rnd(7 - need), seq = [];
-      for (let i = 0; i < need; i++) seq.push(type === 0 ? st + i : type === 1 ? st - i : Math.min(5, st + (i % 2 ? 2 : 0) + (i > 1 ? 1 : 0)));
+      const need = 4, seq = shuffle([0, 1, 2, 3, 4, 5]).slice(0, need); // четыре разные клавиши
       let idx = 0;
       const light = () => { bars.forEach(unhalo); g.want = seq[idx]; const b = bars[g.want]; halo(b, 0.62, 0.3); b.userData.halo.rotation.x = Math.PI / 2; };
       g.onBar = i => {
@@ -497,8 +496,8 @@ ROOMS.muzyka = {
       return;
     }
     // средний и сложный: Зайка играет мелодию, а ты повтори по памяти
-    const need = g.lvl + 1, seq = [];
-    while (seq.length < need) { const x = rnd(6); if (x !== seq[seq.length - 1]) seq.push(x); }
+    const need = g.lvl + 1; let seq;
+    do seq = shuffle([0, 1, 2, 3, 4, 5]).slice(0, need); while (seq.join() === g.prevSeq); g.prevSeq = seq.join();
     let idx = 0, listen = false, token = 0, help = false;
     g.want = -1; g.onBar = null;
     const play = async () => {
