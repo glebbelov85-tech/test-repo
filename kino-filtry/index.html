@@ -2,128 +2,163 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
-<title>Фильтры для кино: проба</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кинофильтры: проба эффектов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
 <style>
-html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
-#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-#src { display: none; }
-#top { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 8px; align-items: center; padding: calc(env(safe-area-inset-top) + 8px) 10px 8px; background: linear-gradient(#000a, #0000); flex-wrap: wrap; }
-#top .grow { flex: 1; }
-button, label.btn { font: 600 15px system-ui; color: #fff; background: #ffffff22; border: 1px solid #ffffff44; border-radius: 12px; padding: 8px 12px; cursor: pointer; backdrop-filter: blur(6px); }
-button.on { background: #ffd34d; color: #000; }
-#fps { font: 600 13px ui-monospace, monospace; opacity: .85; text-shadow: 0 1px 3px #000; }
-#panel { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 14px calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(#0000, #000c 35%); }
-#name { text-align: center; font: 800 20px system-ui; text-shadow: 0 2px 6px #000; margin-bottom: 4px; }
-#name small { display: block; font: 600 12px system-ui; opacity: .75; }
-.row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
-.row span { min-width: 64px; font: 600 13px system-ui; opacity: .85; }
-input[type=range] { flex: 1; height: 34px; accent-color: #ff5ad0; }
-#bPrev, #bNext { font-size: 24px; padding: 10px 22px; }
-#hint { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); background: #000b; padding: 12px 18px; border-radius: 14px; font: 600 16px system-ui; text-align: center; max-width: 80vw; opacity: 0; transition: opacity .4s; pointer-events: none; }
-#noGL { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; font-size: 18px; }
+/* Одна тема: тёмная монтажная. Слева монитор с видео и линейкой времени, справа инспектор постоянной ширины:
+   сверху «Слои» (что включено), ниже библиотека по вкладкам. Размеры не зависят от выбранной вкладки. */
+:root {
+  --bg: #0c0d11; --panel: #13151c; --well: #0f1117; --line: #262a36; --line2: #353a49; --ink: #eceae4; --mute: #9499a8;
+  --acc: #ff9a3d; --acc-ink: #1a0f02; --acc-soft: rgba(255, 154, 61, .14); --good: #7be39a; --warn: #ffd34d; --bad: #ff6b6b;
+  --display: 'Unbounded', 'Arial Black', sans-serif; --body: 'Golos Text', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --side: 400px; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.35 var(--body); overflow: hidden; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+body { display: grid; grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: minmax(0, 1fr); }
+button { font: 500 13px var(--body); color: var(--ink); background: #1b1e28; border: 1px solid var(--line2); border-radius: 8px; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+button:hover { background: #242836; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+button.on { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); font-weight: 700; }
+select { font: 500 13px var(--body); color: var(--ink); background: #1b1e28; border: 1px solid var(--line2); border-radius: 8px; padding: 6px 8px; min-width: 0; }
+input[type=range] { accent-color: var(--acc); height: 22px; min-width: 0; }
+h2 { font: 700 10px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin: 0; }
+
+/* ---------- монитор ---------- */
+#mon { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
+#bar, #transport { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); min-width: 0; }
+#bar { border-bottom: 1px solid var(--line); }
+#transport { border-top: 1px solid var(--line); }
+#bar h1 { font: 700 13px var(--display); margin: 0 8px 0 0; letter-spacing: .02em; }
+.grow { flex: 1; min-width: 0; }
+#stage { position: relative; background: #000; min-height: 0; }
+#ekran { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+video.src { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+#msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, .78); padding: 10px 16px; border-radius: 10px; display: none; z-index: 5; text-align: center; max-width: 80%; }
+#seek { flex: 1; }
+#time, #fps { font: 12px ui-monospace, monospace; color: var(--mute); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#bPlay { width: 38px; padding: 6px 0; }
+
+/* ---------- пульт (pult.js) ---------- */
+#side { border-left: 1px solid var(--line); min-height: 0; min-width: 0; }
+
+.modal { position: fixed; inset: 0; display: none; background: rgba(0, 0, 0, .82); z-index: 6; padding: 16px; overflow: auto; }
+.modal.show { display: block; }
+.card { background: var(--panel); border: 1px solid var(--line2); border-radius: 14px; padding: 18px 20px; max-width: 1100px; margin: 0 auto; }
+.card h3 { font: 700 17px var(--display); margin: 0 0 6px; }
+.card p { color: var(--mute); margin: 6px 0; max-width: 70ch; }
+.gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 12px; }
+.gal figure { margin: 0; cursor: pointer; }
+.gal img { width: 100%; display: block; border-radius: 8px; border: 1px solid var(--line2); }
+.gal figcaption { margin-top: 5px; font-weight: 700; }
+.gal figcaption span { display: block; font-weight: 400; color: var(--mute); font-size: 12px; }
+.closeRow { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+
+/* узкий экран: монитор сверху постоянной высоты, инспектор снизу */
+@media (max-width: 900px) {
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(190px, 40%) minmax(0, 1fr); }
+  #side { border-left: 0; border-top: 1px solid var(--line); }
+  #bar h1, #fps { display: none; }
+  #side { overflow-y: auto; } #side .kpult { height: auto; }
+}
+/* телефон боком */
+@media (max-height: 520px) and (min-width: 620px) { body { grid-template-columns: minmax(0, 1fr) 46%; grid-template-rows: minmax(0, 1fr); } #side { border-top: 0; border-left: 1px solid var(--line); } #side .kpult { grid-template-rows: auto minmax(0, 1fr); } #side .kp-layers { display: none; } #bar h1 { display: none; } }
 </style>
 </head>
 <body>
-<canvas id="gl"></canvas>
-<video id="src" playsinline muted loop></video>
-<div id="top">
-  <label class="btn">📁 Своё видео<input id="file" type="file" accept="video/*" hidden></label>
-  <button id="bCam">📷 Камера</button>
-  <button id="bPlay">⏸</button>
-  <button id="bStory" title="Плавно перейти в Неон, как в сюжете">🎞 Сюжет</button>
-  <button id="bRec">⏺ Запись</button>
-  <span class="grow"></span>
-  <button id="bQ" title="Качество картинки">100%</button>
-  <button id="bFit" title="Вписать / на весь экран">⤢</button>
-  <button id="bFull">⛶</button>
-  <span id="fps"></span>
-</div>
-<div id="panel">
-  <div class="row" style="justify-content:center"><button id="bPrev">◀</button><div id="name" style="flex:1"></div><button id="bNext">▶</button></div>
-  <div class="row"><span>Сила</span><input id="amt" type="range" min="0" max="1" step="0.01" value="1"></div>
-</div>
-<div id="hint"></div>
-<div id="noGL">Этот браузер не умеет WebGL2, фильтры не заработают. Откройте в Chrome.</div>
+<section id="mon">
+  <div id="bar">
+    <h1>Кинофильтры</h1>
+    <select id="clip" aria-label="Отрезок видео"></select>
+    <button id="bFile" title="Показать на своём ролике с этого устройства">Своё видео</button>
+    <input id="file" type="file" accept="video/*" hidden>
+    <span class="grow"></span>
+    <button id="bGal">Галерея</button>
+    <button id="bQ" title="Качество картинки. Авто снижает само, если устройство не успевает">Авто</button>
+  </div>
+  <div id="stage">
+    <canvas id="ekran"></canvas>
+    <video class="src" id="v" muted playsinline webkit-playsinline loop preload="auto"></video>
+    <div id="msg"></div>
+  </div>
+  <div id="transport">
+    <button id="bPlay" title="Пуск и пауза (пробел)">❚❚</button>
+    <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Время в ролике">
+    <span id="time">0:00 / 0:00</span>
+    <button id="bCmp" title="Слева исходное видео, справа эффект. Линию можно двигать по кадру">До / после</button>
+    <span id="fps"></span>
+  </div>
+</section>
+
+<aside id="side"></aside>
+
+<div class="modal" id="galBox"><div class="card">
+  <div class="closeRow"><div><h3>До и после</h3><p>Слева исходный кадр, справа образ. Нажмите на картинку, чтобы включить этот образ на видео.</p></div><button id="galClose">Закрыть</button></div>
+  <div class="gal" id="gal"></div>
+</div></div>
 
 <script src="shader.js"></script>
 <script src="filtry.js"></script>
-<script src="kamera.js"></script>
-<script src="zapis.js"></script>
+<script src="pult.js"></script>
 <script>
 "use strict";
-const $ = s => document.querySelector(s);
-const video = $('#src'), canvas = $('#gl');
-const F = new Filtry(canvas, { fit: 'contain' });
-if (!F.ok) $('#noGL').style.display = 'flex';
-const E = Filtry.EFFECTS;
+const $ = s => document.querySelector(s), v = $('#v');
+const CLIPS = [['primer.mp4', 'Кабина в движении']];
+const GALLERY = ['zimnee_utro', 'metel', 'zakat', 'zolotoy_chas', 'siyanie', 'liven', 'kiberpank', 'neon_son', 'eho', 'oskolki', 'skazka', 'u_kostra', 'vospominanie', 'pogonya', 'burya', 'nuar'];
+const KNOBS = [['bloom', 'Свечение'], ['rays', 'Лучи света'], ['flare', 'Блик объектива'], ['grain', 'Зерно плёнки'], ['vign', 'Виньетка'], ['ca', 'Цветная кайма'], ['bars', 'Киношные полосы']];
+const F = new Filtry($('#ekran'), { fit: 'contain' });
+const say = (t, ms) => { const m = $('#msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(say.t); if (ms) say.t = setTimeout(() => m.style.display = 'none', ms); };
+if (!F.ok) say('В этом браузере нет WebGL2, фильтры не запустятся. Попробуйте Chrome или Safari поновее.');
 
-let hintT = 0;
-function hint(t, ms = 1800) { const h = $('#hint'); h.innerHTML = t; h.style.opacity = 1; clearTimeout(hintT); hintT = setTimeout(() => h.style.opacity = 0, ms); }
-function showName() {
-  const i0 = Math.floor(F.pos), f = F.pos - i0, e = E[Math.round(F.pos)];
-  const mix = f > 0.02 && f < 0.98 ? ' → ' + E[i0 + 1].e : '';
-  $('#name').innerHTML = e.e + ' ' + e.name + mix + '<small>' + e.grp + ' · ' + (Math.round(F.pos) + 1) + '/' + E.length + (e.cost === 3 ? ' · тяжёлый' : '') + '</small>';
+// ---------- видео и линейка времени ----------
+CLIPS.forEach(([src, name], i) => { const o = document.createElement('option'); o.value = i; o.textContent = name; $('#clip').appendChild(o); });
+function play(src) { v.src = src; v.play().catch(() => say('Нажмите на кадр, чтобы запустить видео', 4000)); F.resetHistory(); }
+$('#clip').onchange = e => play(CLIPS[+e.target.value][0]);
+$('#bFile').onclick = () => $('#file').click();
+$('#file').onchange = e => { const f = e.target.files[0]; if (f) play(URL.createObjectURL(f)); };
+v.addEventListener('error', () => say('Видео не загрузилось. Выберите другой отрезок.', 4000));
+const mmss = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+let seeking = false;
+function togglePlay() { v.paused ? v.play().catch(() => {}) : v.pause(); }
+$('#bPlay').onclick = togglePlay;
+v.addEventListener('play', () => $('#bPlay').textContent = '❚❚'); v.addEventListener('pause', () => $('#bPlay').textContent = '▶');
+$('#seek').oninput = e => { seeking = true; if (v.duration) v.currentTime = e.target.value / 1000 * v.duration; };
+$('#seek').onchange = () => { seeking = false; };
+setInterval(() => { if (!v.duration) return; if (!seeking) $('#seek').value = v.currentTime / v.duration * 1000; $('#time').textContent = mmss(v.currentTime) + ' / ' + mmss(v.duration); if (F.fps) $('#fps').textContent = Math.round(F.fps) + ' к/с'; }, 250);
+if (F.ok) { F.setSource(v); play(CLIPS[0][0]); }
+
+// ---------- пульт со слоями: отдельный блок pult.js, тот же, что идёт в редактор ----------
+const P = new KinoPult($('#side'), { filtry: F });
+const narrow = matchMedia('(max-width: 900px)'); P.el.classList.toggle('compact', narrow.matches); narrow.onchange = () => P.el.classList.toggle('compact', narrow.matches);
+window.pickLook = k => P.pickLook(k); window.pickStyle = k => P.pickStyle(k); window.pickAtmos = k => P.pickAtmos(k);
+window.pickLight = k => P.pickLight(k); window.pickGrade = k => P.pickGrade(k);
+let splitOn = false;
+
+// ---------- кадр: нажатие ставит солнце и центр эффектов; линия «до/после» двигается ----------
+function pt(e) {     // точка в координатах кадра видео (0..1, ноль снизу)
+  const R = $('#ekran').getBoundingClientRect(), vw = v.videoWidth || 16, vh = v.videoHeight || 9, s = Math.min(R.width / vw, R.height / vh);
+  const w = vw * s, h = vh * s, x = (e.clientX - R.left - (R.width - w) / 2) / w, y = 1 - (e.clientY - R.top - (R.height - h) / 2) / h;
+  return [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))];
 }
+function touch(e) { const p = pt(e); if (splitOn) { F.split = Math.max(0.02, Math.min(0.98, p[0])); return; } P.sunAt(p[0], p[1]); }
+$('#ekran').addEventListener('pointerdown', e => { $('#msg').style.display = 'none'; touch(e); });
+$('#ekran').addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') touch(e); });
+$('#bCmp').onclick = () => { splitOn = !splitOn; F.split = splitOn ? 0.5 : 0; $('#bCmp').classList.toggle('on', splitOn); if (splitOn) say('Двигайте линию по кадру: слева исходное видео', 2500); };
 
-// ---- плавный переход к нужному фильтру (как смена стиля по сюжету) ----
-let anim = null;
-function goTo(target, sec = 1.2) { anim = { from: F.pos, to: Math.max(0, Math.min(E.length - 1, target)), t: 0, dur: sec }; }
-$('#amt').oninput = e => { F.amount = +e.target.value; };
-$('#bPrev').onclick = () => goTo(Math.round(F.pos) - 1, 0.8);
-$('#bNext').onclick = () => goTo(Math.round(F.pos) + 1, 0.8);
-$('#bStory').onclick = () => {
-  const neon = E.findIndex(e => e.id === 13), tgt = Math.round(F.pos) === neon ? 0 : neon;
-  goTo(tgt, 2.5); hint(tgt ? 'Мир становится неоновым…' : 'Мир возвращается…', 2000);
-};
-addEventListener('keydown', e => { if (e.key === 'ArrowRight') $('#bNext').onclick(); if (e.key === 'ArrowLeft') $('#bPrev').onclick(); });
+// ---------- качество ----------
+function qLabel() { $('#bQ').textContent = 'Качество: ' + (F.auto ? 'авто, ' : '') + F.tierName().toLowerCase(); }
+F.onTier = () => qLabel();
+$('#bQ').onclick = () => { if (F.auto) { F.auto = false; F.setTier(0); } else if (F.tier < Filtry.TIERS.length - 1) F.setTier(F.tier + 1); else { F.auto = true; F.setTier(1); } qLabel(); };
+requestAnimationFrame(function loop(ts) { F.render(ts); requestAnimationFrame(loop); });
+if (F.ok) { setTimeout(() => { try { F.calibrate(); } catch (e) {} qLabel(); F.warmup(); }, 400); qLabel(); }
 
-// палец по картинке двигает центр эффекта (пузырь, воронка, симметрия...)
-canvas.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') F.touch = [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; });
-canvas.addEventListener('pointerdown', e => { F.touch = [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; });
-
-// ---- источники ----
-playVideoUrl(video, 'primer.mp4');
-F.setSource(video);
-video.addEventListener('seeked', () => F.resetHistory()); // склейка/перемотка: забываем прошлые кадры
-$('#file').onchange = e => { const f = e.target.files[0]; if (!f) return; playVideoFile(video, f); F.setSource(video); $('#bCam').classList.remove('on'); hint('Видео: ' + f.name); };
-let camFacing = null;
-$('#bCam').onclick = async () => {
-  camFacing = camFacing === 'environment' ? 'user' : 'environment';
-  const ok = await startCamera(video, camFacing);
-  if (!ok) { hint('Камера не включилась'); camFacing = null; return; }
-  F.setSource(video, camFacing === 'user'); $('#bCam').classList.add('on');
-  hint(camFacing === 'user' ? 'Передняя камера (нажми ещё раз - задняя)' : 'Задняя камера');
-};
-$('#bPlay').onclick = () => { if (video.paused) { video.play(); $('#bPlay').textContent = '⏸'; } else { video.pause(); $('#bPlay').textContent = '▶'; } };
-const Q = [1, 0.7, 0.5]; let qi = 0;
-$('#bQ').onclick = () => { qi = (qi + 1) % Q.length; F.quality = Q[qi]; $('#bQ').textContent = Math.round(Q[qi] * 100) + '%'; hint('Разрешение ' + Math.round(Q[qi] * 100) + '%: меньше = быстрее на слабом телефоне'); };
-$('#bFit').onclick = () => { F.fit = F.fit === 'contain' ? 'cover' : 'contain'; hint(F.fit === 'cover' ? 'На весь экран (края обрезаны)' : 'Вписать целиком'); };
-$('#bFull').onclick = () => { const d = document; d.fullscreenElement ? d.exitFullscreen() : d.documentElement.requestFullscreen && d.documentElement.requestFullscreen().catch(() => {}); };
-let rec = null;
-$('#bRec').onclick = async () => {
-  if (rec) { const r = rec; rec = null; $('#bRec').classList.remove('on'); $('#bRec').textContent = '⏺ Запись'; const b = await r.stop(); saveBlob(b, 'kino_filtr.' + (b.type.includes('mp4') ? 'mp4' : 'webm')); hint('Видео сохранено в «Загрузки»'); return; }
-  rec = startRecording(canvas); if (!rec) { hint('Этот браузер не умеет записывать'); return; }
-  $('#bRec').classList.add('on'); $('#bRec').textContent = '⏹ Стоп';
-};
-
-// ---- главный цикл + счётчик кадров ----
-let fc = 0, ft = 0, lastTs = 0;
-function loop(ts) {
-  requestAnimationFrame(loop);
-  const dt = lastTs ? (ts - lastTs) / 1000 : 0; lastTs = ts;
-  if (anim) {
-    anim.t += dt; const k = Math.min(1, anim.t / anim.dur), s = k * k * (3 - 2 * k);
-    F.setPos(anim.from + (anim.to - anim.from) * s); showName();
-    if (k >= 1) anim = null;
-  }
-  F.render(ts);
-  fc++; ft += dt; if (ft >= 1) { $('#fps').textContent = Math.round(fc / ft) + ' к/с'; fc = 0; ft = 0; }
-}
-showName(); requestAnimationFrame(loop);
-// со звуком/без касания мобильный браузер может не запустить видео - запустим по первому касанию
-addEventListener('pointerdown', () => { if (video.paused && $('#bPlay').textContent === '⏸') video.play().catch(() => {}); }, { once: true });
+// ---------- галерея ----------
+for (const k of GALLERY) { const L = Filtry.LOOKS[k], f = document.createElement('figure'); f.innerHTML = '<img loading="lazy" src="gallery/' + k + '.jpg" alt="До и после: ' + L.name + '"><figcaption>' + L.name + '<span>' + L.mood + '</span></figcaption>'; f.onclick = () => { $('#galBox').classList.remove('show'); if (P.S.look !== k) P.pickLook(k); }; $('#gal').appendChild(f); }
+$('#bGal').onclick = () => $('#galBox').classList.add('show');
+$('#galClose').onclick = () => $('#galBox').classList.remove('show');
+addEventListener('keydown', e => { if (e.key === 'Escape') $('#galBox').classList.remove('show'); if (e.key === ' ' && !/INPUT|SELECT|BUTTON/.test(e.target.tagName)) { e.preventDefault(); togglePlay(); } });
 </script>
 </body>
 </html>
