@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '4.0';
+const VERSION = '4.1';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -364,6 +364,7 @@ function meadow(g, o = {}) {
     bfs.forEach(b => { const u = b.userData, a = t * 0.5 + u.ph; b.position.set(u.cx + Math.sin(a) * 6, 2.5 + Math.sin(a * 2.3) * 1.2 + (landscape ? 0 : 2), -3 + Math.cos(a * 0.8) * 2); b.rotation.y = Math.cos(a) > 0 ? 0.6 : -0.6; const f = Math.sin(t * 16 + u.ph) * 1.0; u.wg[0].rotation.y = f; u.wg[1].rotation.y = -f; });
     chirp -= dt; if (chirp < 0) { chirp = rr(3, 8); if (AC) SFX.chirp(); }
   });
+  return { sun, clouds };
 }
 // травяной уступ: задний ряд стоит выше, и всех видно
 function terrace(y, z, x0 = -30, x1 = 30) {
@@ -986,6 +987,38 @@ ROOMS.zveri = {
   },
 };
 
+// ---------- наряды Зайки: открываются за звёздочки, меняются нажатием на Зайку в домике ----------
+const OUTFIT_AT = [0, 1, 3, 6, 10]; // сколько звёздочек нужно для каждого наряда
+function outfitsOpen() { const n = Object.values(S.stars).reduce((a, b) => a + b, 0); return OUTFIT_AT.filter(x => n >= x).length; }
+function dressZaika(z) {
+  const head = z.userData.head; if (!head) return;
+  if (z.userData.outfit) head.remove(z.userData.outfit);
+  const k = Math.min(S.outfit || 0, outfitsOpen() - 1), o = grp(); z.userData.outfit = o; head.add(o);
+  const gold = M('#ffc928', 0.3);
+  if (k === 1) { // цветок у ушка
+    for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; o.add(ball(M('#ff6fae', 0.6), [0.13, 0.13, 0.06], 0.46 + Math.cos(a) * 0.15, 0.6 + Math.sin(a) * 0.15, 0.36, true)); }
+    o.add(ball(M('#ffd21f', 0.5), 0.09, 0.46, 0.6, 0.4, true));
+  } else if (k === 2) { // очки
+    for (const s of [-1, 1]) o.add(mesh(new T.TorusGeometry(0.19, 0.035, 8, 24), M('#2a6df4', 0.4), s * 0.3, 0.08, 0.72));
+    const br = cyl(M('#2a6df4', 0.4), 0.03, 0.03, 0.22, 0, 0.1, 0.74, 6); br.rotation.z = Math.PI / 2; o.add(br);
+  } else if (k === 3) { // шляпка
+    const st = M('#ffe08a', 0.8); o.add(cyl(st, 0.95, 0.95, 0.07, 0, 0.6, 0, 28)); o.add(cyl(st, 0.5, 0.56, 0.42, 0, 0.82, 0, 24)); o.add(cyl(M('#ff5d8a', 0.6), 0.57, 0.57, 0.13, 0, 0.7, 0, 24));
+  } else if (k === 4) { // корона
+    o.add(mesh(new T.CylinderGeometry(0.42, 0.38, 0.3, 20, 1, true), M('#ffc928', 0.3, { side: T.DoubleSide }), 0, 0.82, 0));
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; o.add(cone(gold, 0.11, 0.28, Math.cos(a) * 0.4, 1.08, Math.sin(a) * 0.4, 6)); o.add(ball(M(['#f0352b', '#2a6df4', '#35b24a'][i % 3], 0.3), 0.06, Math.cos(a) * 0.42, 0.84, Math.sin(a) * 0.42, true)); }
+  }
+}
+function mkPtichka(hex) {
+  const g = grp(), m = M(hex, 0.7);
+  g.add(ball(m, [0.3, 0.27, 0.36], 0, 0.3, 0)); g.add(ball(m, 0.21, 0, 0.6, 0.2));
+  g.add(ball(M('#ffffff', 0.8), [0.2, 0.18, 0.2], 0, 0.24, 0.16, true));
+  const bk = cone(M('#ff9800', 0.5), 0.07, 0.18, 0, 0.58, 0.44, 8); bk.rotation.x = Math.PI / 2; g.add(bk);
+  for (const s of [-1, 1]) g.add(ball(MAT.eye, 0.04, s * 0.1, 0.66, 0.37, true));
+  const wings = [-1, 1].map(s => { const w = grp(s * 0.26, 0.36, 0); w.add(ball(m, [0.22, 0.05, 0.2], s * 0.18, 0, 0, true)); g.add(w); return w; });
+  const tl = ball(m, [0.1, 0.04, 0.22], 0, 0.3, -0.42, true); tl.rotation.x = -0.5; g.add(tl);
+  g.userData.wings = wings; return g;
+}
+
 // ---------- домик-меню ----------
 const ROOM_KEYS = ['kraski', 'figury', 'schet', 'mishki', 'zveri', 'pryatki', 'piramidka', 'vedra', 'eda', 'mnogo', 'para', 'muzyka'];
 const CELL_COL = { kraski: '#ffe1ea', figury: '#fff0c7', schet: '#dff6d4', mishki: '#dfe5ff', zveri: '#dff5ff', pryatki: '#e3f7d6', piramidka: '#ffe9d2', vedra: '#e0f4ff', eda: '#fff3c9', mnogo: '#ffe3ef', para: '#e9e2ff', muzyka: '#d9f5ee' };
@@ -1043,8 +1076,29 @@ function goHome() {
   const y0 = landscape ? 0 : 3.5; // в портретном положении дом стоит на высоком крыльце, Зайка перед ним
   const Wd = cw * cols, Ht = (ch + fl) * rows, roofH = landscape ? 3.0 : 2.5, topY = y0 + Ht + fl + roofH;
   setFrame(landscape ? { cx: -0.6, cy: topY / 2 + 0.1, halfW: Wd / 2 + 4.3, halfH: topY / 2 + 0.7, pitch: 5 } : { cy: topY / 2 + 0.2, halfW: Wd / 2 + 0.55, halfH: topY / 2 + 0.9, pitch: 4 });
-  lights(world, { lx: 4, ly: 11, ty: topY / 2, sh: 23 }); meadow(world);
+  const sunL = lights(world, { lx: 4, ly: 11, ty: topY / 2, sh: 23 }), env = meadow(world), hemiL = world.children.find(o => o.isHemisphereLight);
   const house = grp(0, y0, -0.5); world.add(house);
+  // солнышко: нажмёшь — наступит ночь с луной и звёздами, ещё раз — снова день
+  {
+    const sun = env.sun, rays = sun.children.slice(1), disc = sun.children[0]; let night = false, busy = false;
+    const stars = grp(); stars.visible = false; world.add(stars);
+    for (let i = 0; i < 46; i++) { const s = ball(new T.MeshBasicMaterial({ color: 0xffffff }), rr(0.09, 0.2), rr(-34, 34), rr(6, 30), -39, true); s.castShadow = false; s.userData.ph = Math.random() * 6; stars.add(s); }
+    if (!landscape) { sun.position.set(-5.2, topY + 3.2, -36); sun.scale.setScalar(0.8); }
+    hitBox(sun, 8, 8, 3); sun.userData.cy = 0;
+    pickable(sun, () => {
+      if (busy || busyWipe) return; busy = true; night = !night; SFX.twinkle();
+      if (scene.background && scene.background.isTexture) scene.background.dispose();
+      scene.background = night ? grad('#101a44', '#5a6fb0', '#2a3a7a') : grad('#6ec6ff', '#eafaff', '#bfe9ff');
+      rays.forEach(r => r.visible = !night); disc.material.color.copy(C(night ? '#fff8dc' : '#ffe066'));
+      stars.visible = night; env.clouds.forEach(c => c.visible = !night);
+      tw(hemiL, { intensity: night ? 0.36 : 0.56 }, 500); tw(sunL, { intensity: night ? 0.2 : 0.52 }, 500);
+      hemiL.color.copy(C(night ? '#9fb4ff' : '#ffffff'));
+      hop(zaika, 0.4); zaika.userData.sleep = night; zaika.userData.wave = !night;
+      if (night) zzz(V(zaika.position.x + 0.8, 3.3 * zaika.scale.x, zaika.position.z + 0.5));
+      wait(600).then(() => busy = false);
+    });
+    ENVT.push(t => { if (stars.visible) stars.children.forEach(s => { const k = 0.75 + Math.sin(t * 2.5 + s.userData.ph) * 0.35; s.scale.setScalar(0.14 * k); }); });
+  }
   const wallM = M('#fff6e2', 0.9), trimM = M('#ffffff', 0.7);
   const back = rbox(wallM, Wd + 0.5, Ht + 0.2, 0.3, 0.1, 0, Ht / 2, -cd); back.receiveShadow = true; house.add(back);
   for (let c = 0; c <= cols; c++) { const m = rbox(trimM, 0.28, Ht, cd, 0.1, -Wd / 2 + c * cw, Ht / 2, -cd / 2); m.receiveShadow = true; house.add(m); }
@@ -1077,7 +1131,27 @@ function goHome() {
   hitBox(mb, 2.2, 3.4, 1.4, 0, 1.7, 0); mb.userData.cy = 1.7 * mb.scale.x;
   pickable(mb, () => { if (busyWipe || !window.openRis) return; SFX.tap(); hop(mb, 0.4, 300); go(openRis); });
   hitBox(zaika, 2.2, 4.0, 1.8, 0, 1.9, 0); zaika.userData.cy = 1.9 * zaika.scale.x;
-  pickable(zaika, () => { hop(zaika, 0.5); SFX.boing(); Voice.say('hihi'); });
+  pickable(zaika, () => {
+    hop(zaika, 0.5); SFX.boing(); Voice.say('hihi');
+    const n = outfitsOpen(); // нажатие меняет наряд, если их открыто больше одного
+    if (n > 1) { S.outfit = ((S.outfit || 0) + 1) % n; save(); dressZaika(zaika); burst(V(zaika.position.x, 3.4 * zaika.scale.x, zaika.position.z + 0.6), 10); }
+  });
+  // птички на крыше: нажмёшь — облетят домик и вернутся
+  (landscape ? [['#4fc3f7', -0.62], ['#ff8a65', -0.36]] : [['#4fc3f7', -0.2], ['#ff8a65', 0.3]]).forEach(([c, fx], i) => {
+    const b = mkPtichka(c), x = fx * Wd / 2, y = rows * (ch + fl) + fl + roofH * Math.min(1, (-Math.abs(x) + Wd / 2 + 0.9) / (Wd / 2 + 0.3)) + 0.08, home = V(x, y, 0.45);
+    b.position.copy(home); b.scale.setScalar(1.25); b.rotation.y = i ? -0.5 : 0.4; house.add(b);
+    hitBox(b, 1.6, 1.6, 1.6, 0, 0.4, 0); b.userData.cy = 0.5;
+    let fly = false;
+    pickable(b, () => {
+      if (fly) return; fly = true; for (let k = 0; k < 3; k++) setTimeout(() => SFX.chirp(), k * 260);
+      const r0 = b.rotation.y, dir = i ? -1 : 1;
+      twf(2800, (e, k) => {
+        const a = k * Math.PI * 2; b.position.set(home.x + Math.sin(a) * 4.5 * dir, home.y + Math.sin(k * Math.PI) * 2.6 + Math.sin(a * 2) * 0.4, home.z + 1.2 - Math.cos(a) * 1.2);
+        b.rotation.y = Math.cos(a) * dir > 0 ? Math.PI / 2 * dir : -Math.PI / 2 * dir; const f = Math.sin(k * 90) * 0.9; b.userData.wings[0].rotation.z = f; b.userData.wings[1].rotation.z = -f;
+      }, 'inout').then(() => { b.position.copy(home); b.rotation.y = r0; b.userData.wings.forEach(w => w.rotation.z = 0); hop(b, 0.3, 300); fly = false; });
+    });
+    ENVT.push(t => { if (!fly) b.rotation.z = Math.sin(t * 3 + i * 2) * 0.08; });
+  });
   // комнаты
   const icons = [];
   ROOM_KEYS.forEach((key, i) => {

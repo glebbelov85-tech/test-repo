@@ -103,6 +103,7 @@ function mkZaika() {
     if (!U.wave) { arms[0].rotation.z = -0.35 + Math.sin(t * 2) * 0.05; arms[1].rotation.z = 0.35 - Math.sin(t * 2) * 0.05; }
     else { arms[1].rotation.z = 2.4 + Math.sin(t * 9) * 0.35; }
   };
+  if (typeof dressZaika === 'function') dressZaika(g); // наряд, который выбрали в домике
   return g;
 }
 
