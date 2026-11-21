@@ -543,7 +543,7 @@ ICONS.muzyka = g => {
 (() => {
   const el = $('ris'), cv = $('rc'), ov = $('ro'), pal = $('pal'), cx = cv.getContext('2d'), ox = ov.getContext('2d');
   const INK = ['#f0352b', '#ff8a1c', '#ffd21f', '#35b24a', '#2a6df4', '#ff6fae', '#b25de0', '#8d5a34', '#2b2b2b'];
-  let col = INK[0], eraser = false, pic = 0, dpr = 1, strokes = new Map();
+  let col = INK[0], tool = 'pen', stamp = 0, pic = 0, dpr = 1, strokes = new Map(); // tool: pen, stamp, fill, erase
   const ico = {
     home: '<svg viewBox="0 0 100 100"><path d="M14 48 L50 16 L86 48" fill="none" stroke="#5d3a24" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 44 V84 H76 V44" fill="#ffcc80" stroke="#5d3a24" stroke-width="7" stroke-linejoin="round"/></svg>',
     eraser: '<svg viewBox="0 0 100 100"><rect x="22" y="34" width="56" height="34" rx="8" transform="rotate(-25 50 50)" fill="#ffb3c7" stroke="#5d3a24" stroke-width="6"/><path d="M20 84 H80" stroke="#5d3a24" stroke-width="6" stroke-linecap="round"/></svg>',
@@ -579,27 +579,69 @@ ICONS.muzyka = g => {
     outline();
   }
   const wipe = () => { cx.fillStyle = '#fffdf5'; cx.fillRect(0, 0, cv.width, cv.height); };
-  const width = () => Math.min(innerWidth, innerHeight) * (eraser ? 0.09 : 0.035) * dpr;
+  const width = () => Math.min(innerWidth, innerHeight) * (tool === 'erase' ? 0.09 : 0.035) * dpr;
+  // штампы: звёздочка, сердечко, цветок, кружок
+  const STAMPS = [
+    (x, s) => { for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5, q = k % 2 ? s * 0.45 : s; x.lineTo(Math.sin(a) * q, -Math.cos(a) * q); } },
+    (x, s) => { x.moveTo(0, s * 0.9); x.bezierCurveTo(-s * 1.5, -s * 0.1, -s * 0.6, -s * 1.2, 0, -s * 0.4); x.bezierCurveTo(s * 0.6, -s * 1.2, s * 1.5, -s * 0.1, 0, s * 0.9); },
+    (x, s) => { for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; x.moveTo(Math.cos(a) * s * 0.55 + s * 0.42, Math.sin(a) * s * 0.55); x.arc(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55, s * 0.42, 0, 7); } },
+    (x, s) => { x.arc(0, 0, s * 0.85, 0, 7); },
+  ];
+  const stampSize = () => Math.min(innerWidth, innerHeight) * 0.07 * dpr;
+  function putStamp(p) {
+    const s = stampSize(); cx.save(); cx.translate(p[0], p[1]); cx.rotate(rr(-0.3, 0.3)); cx.fillStyle = col; cx.beginPath(); STAMPS[stamp](cx, s); cx.fill();
+    if (stamp === 2) { cx.fillStyle = col === '#ffd21f' ? '#ff8a1c' : '#ffd21f'; cx.beginPath(); cx.arc(0, 0, s * 0.3, 0, 7); cx.fill(); }
+    cx.restore(); tone(660 + stamp * 110, 0, 0.1, 'triangle', 0.09);
+  }
+  // заливка: закрашивает область до контура картинки или до другой краски
+  function fill(px, py) {
+    const w = cv.width, h = cv.height; px |= 0; py |= 0; if (px < 0 || py < 0 || px >= w || py >= h) return;
+    const img = cx.getImageData(0, 0, w, h), d = img.data, od = ox.getImageData(0, 0, w, h).data;
+    const i0 = (py * w + px) * 4, r0 = d[i0], g0 = d[i0 + 1], b0 = d[i0 + 2];
+    const n = parseInt(col.slice(1), 16), fr = n >> 16, fg = (n >> 8) & 255, fb = n & 255;
+    if (Math.abs(r0 - fr) + Math.abs(g0 - fg) + Math.abs(b0 - fb) < 12) return;
+    const seen = new Uint8Array(w * h);
+    const can = (x, y) => { const q = y * w + x, i = q * 4; return !seen[q] && od[i + 3] < 110 && Math.abs(d[i] - r0) + Math.abs(d[i + 1] - g0) + Math.abs(d[i + 2] - b0) < 70; };
+    if (!can(px, py)) return;
+    const st = [px, py];
+    while (st.length) {
+      const y = st.pop(), x = st.pop(); if (!can(x, y)) continue;
+      let xl = x, xr = x; while (xl > 0 && can(xl - 1, y)) xl--; while (xr < w - 1 && can(xr + 1, y)) xr++;
+      for (let i = xl; i <= xr; i++) { const q = y * w + i, k = q * 4; seen[q] = 1; d[k] = fr; d[k + 1] = fg; d[k + 2] = fb; d[k + 3] = 255; }
+      for (const ny of [y - 1, y + 1]) { if (ny < 0 || ny >= h) continue; let run = false; for (let i = xl; i <= xr; i++) { if (can(i, ny)) { if (!run) { st.push(i, ny); run = true; } } else run = false; } }
+    }
+    cx.putImageData(img, 0, 0); SFX.plop();
+  }
   cv.addEventListener('pointerdown', e => {
-    e.preventDefault(); const p = [e.clientX * dpr, e.clientY * dpr]; strokes.set(e.pointerId, p);
-    cx.fillStyle = eraser ? '#fffdf5' : col; cx.beginPath(); cx.arc(p[0], p[1], width() / 2, 0, 7); cx.fill();
+    e.preventDefault(); const p = [e.clientX * dpr, e.clientY * dpr];
+    if (tool === 'fill') { fill(p[0], p[1]); return; }
+    strokes.set(e.pointerId, p);
+    if (tool === 'stamp') { putStamp(p); return; }
+    cx.fillStyle = tool === 'erase' ? '#fffdf5' : col; cx.beginPath(); cx.arc(p[0], p[1], width() / 2, 0, 7); cx.fill();
     try { cv.setPointerCapture(e.pointerId); } catch (er) {}
   });
   cv.addEventListener('pointermove', e => {
     const p = strokes.get(e.pointerId); if (!p) return;
     const q = [e.clientX * dpr, e.clientY * dpr];
-    cx.strokeStyle = eraser ? '#fffdf5' : col; cx.lineWidth = width(); cx.lineCap = cx.lineJoin = 'round';
+    if (tool === 'stamp') { if (Math.hypot(q[0] - p[0], q[1] - p[1]) > stampSize() * 2.1) { putStamp(q); strokes.set(e.pointerId, q); } return; }
+    cx.strokeStyle = tool === 'erase' ? '#fffdf5' : col; cx.lineWidth = width(); cx.lineCap = cx.lineJoin = 'round';
     cx.beginPath(); cx.moveTo(p[0], p[1]); cx.lineTo(q[0], q[1]); cx.stroke(); strokes.set(e.pointerId, q);
   });
   const up = e => strokes.delete(e.pointerId);
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   // кнопки
-  const btns = [];
-  const add = (html, fn, bg) => { const b = document.createElement('div'); b.className = 'btn'; if (bg) b.style.background = bg; b.innerHTML = html; tapBtn(b, () => fn(b)); pal.appendChild(b); btns.push(b); return b; };
-  const mark = b => { btns.forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+  const inks = [], tools = {};
+  const add = (html, fn, bg) => { const b = document.createElement('div'); b.className = 'btn'; if (bg) b.style.background = bg; b.innerHTML = html; tapBtn(b, () => fn(b)); pal.appendChild(b); return b; };
+  const mark = b => { inks.forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
+  const setTool = t => { tool = t; Object.keys(tools).forEach(k => tools[k].classList.toggle('tsel', k === t)); };
+  const stampIco = () => `<svg viewBox="-1.3 -1.3 2.6 2.6"><path d="${(() => { const pts = []; const rec = { moveTo: (x, y) => pts.push(`M${x.toFixed(2)} ${y.toFixed(2)}`), lineTo: (x, y) => pts.push(`${pts.length ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`), bezierCurveTo: (a, b, c, d, e, f) => pts.push(`C${a.toFixed(2)} ${b.toFixed(2)} ${c.toFixed(2)} ${d.toFixed(2)} ${e.toFixed(2)} ${f.toFixed(2)}`), arc: (x, y, r) => pts.push(`M${(x + r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(x - r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(x + r).toFixed(2)} ${y.toFixed(2)}`) }; STAMPS[stamp](rec, 1); return pts.join(''); })()}" fill="#ff6fae" stroke="#5d3a24" stroke-width="0.12" stroke-linejoin="round"/></svg>`;
   add(ico.home, () => { SFX.tap(); go(goHome); });
-  INK.forEach((c, i) => { const b = add('', bb => { col = c; eraser = false; mark(bb); tone(440 + i * 60, 0, 0.12, 'triangle', 0.1); }, c); b.classList.add('ink'); if (!i) b.classList.add('sel'); });
-  add(ico.eraser, bb => { eraser = true; mark(bb); SFX.tap(); });
+  INK.forEach((c, i) => { const b = add('', bb => { col = c; if (tool === 'erase') setTool('pen'); mark(bb); tone(440 + i * 60, 0, 0.12, 'triangle', 0.1); }, c); b.classList.add('ink'); inks.push(b); if (!i) b.classList.add('sel'); });
+  tools.pen = add('<svg viewBox="0 0 100 100"><path d="M22 78 L28 56 L66 18 L82 34 L44 72Z" fill="#ffd21f" stroke="#5d3a24" stroke-width="6" stroke-linejoin="round"/><path d="M22 78 L28 56 L44 72Z" fill="#5d3a24"/></svg>', () => { setTool('pen'); SFX.tap(); });
+  tools.stamp = add(stampIco(), bb => { if (tool === 'stamp') stamp = (stamp + 1) % STAMPS.length; bb.innerHTML = stampIco(); setTool('stamp'); SFX.tap(); });
+  tools.fill = add('<svg viewBox="0 0 100 100"><path d="M28 44 L72 44 L64 84 L36 84Z" fill="#4fc3f7" stroke="#5d3a24" stroke-width="6" stroke-linejoin="round"/><path d="M30 44 Q50 6 70 44" fill="none" stroke="#5d3a24" stroke-width="6" stroke-linecap="round"/><path d="M78 56 q9 14 0 20 q-9 -6 0 -20z" fill="#f0352b"/></svg>', () => { setTool('fill'); SFX.tap(); });
+  tools.erase = add(ico.eraser, () => { setTool('erase'); SFX.tap(); });
+  setTool('pen');
   add(ico.next, () => { pic = (pic + 1) % PICS.length; wipe(); outline(); SFX.plop(); });
   add(ico.clear, () => { wipe(); SFX.whoosh(); });
   window.openRis = () => {

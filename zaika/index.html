@@ -33,6 +33,8 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 #pal .btn { position: relative; width: 12.5vmin; height: 12.5vmin; max-width: 96px; max-height: 96px; padding: 1.8vmin; }
 #pal .btn.ink { border: .9vmin solid #fff; }
 #pal .btn.sel { outline: .9vmin solid #5d3a24; transform: translateY(-1vmin); }
+#pal .btn.tsel { outline: .9vmin solid #ff8a1c; transform: translateY(-1vmin); }
+#pal .btn { width: 11.6vmin; height: 11.6vmin; }
 #bHome { left: calc(2.5vmin + env(safe-area-inset-left)); top: calc(2.5vmin + env(safe-area-inset-top)); }
 #bRep { right: calc(2.5vmin + env(safe-area-inset-right)); top: calc(2.5vmin + env(safe-area-inset-top)); }
 #stars { position: absolute; left: 50%; top: calc(3.5vmin + env(safe-area-inset-top)); transform: translateX(-50%); display: flex; gap: 1.2vmin; background: rgba(255,255,255,.35); padding: 1.2vmin 2.4vmin; border-radius: 6vmin; }
@@ -63,17 +65,17 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 </div>
 <div id="start">
   <div class="btn green" id="bPlay"><svg viewBox="0 0 100 100"><path d="M36 24 L78 50 L36 76Z" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round"/></svg></div>
-  <div id="ver">v4.1</div>
+  <div id="ver">v4.2</div>
 </div>
 <div id="lvl"></div>
 <div id="ris"><canvas id="rc"></canvas><canvas id="ro"></canvas><div id="pal"></div></div>
 <div id="wipe"></div>
 <script src="three.min.js"></script>
-<script src="frazy.js?v=4.1"></script>
-<script src="voice/zapisi.js?v=4.1"></script>
-<script src="modeli.js?v=4.1"></script>
-<script src="igra.js?v=4.1"></script>
-<script src="komnaty2.js?v=4.1"></script>
-<script src="dom.js?v=4.1"></script>
+<script src="frazy.js?v=4.2"></script>
+<script src="voice/zapisi.js?v=4.2"></script>
+<script src="modeli.js?v=4.2"></script>
+<script src="igra.js?v=4.2"></script>
+<script src="komnaty2.js?v=4.2"></script>
+<script src="dom.js?v=4.2"></script>
 </body>
 </html>
