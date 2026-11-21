@@ -1,5 +1,5 @@
 'use strict';
-// «Домик изнутри» (версия 4.5): прогулка по дому от первого лица, управление как в «SCP: Побег».
+// «Домик изнутри» (версия 4.6): прогулка по дому от первого лица, управление как в «SCP: Побег».
 // Слева джойстик — ходить. Пальцем по экрану — смотреть. Справа большая лапка — взять, открыть, включить.
 // Прежнее управление (нажал на пол — пошёл) осталось: адрес с ?ctl=tap или S.ctl = 'tap'.
 (() => {
@@ -13,12 +13,16 @@
     igr: { cx: 0, cz: -STEP, ax: 'z', s: -1 },
     zak: { cx: XS1 + TH + HS, cz: HS + TH + 14, y: SH, hs: 14 }, // большая комната за спальней
     zal: { cx: XS1 + TH + HS, cz: -(HS + TH + 18), y: SH, hs: 18 }, // огромный зал с мячами
+    ris: { cx: -STEP, cz: HS + TH + 6, hs: 6 }, // маленькая комната рисования за кухней
   };
-  const RKEYS = ['hall', 'kuh', 'spal', 'igr', 'zak', 'zal'];
+  const RKEYS = ['hall', 'kuh', 'spal', 'igr', 'zak', 'zal', 'ris'], TASKS = RKEYS.filter(k => k !== 'ris'); // в комнате рисования задания нет
+  let RESUME = null; const GALLERY = []; // куда вернуться после рисования и рисунки для стены
+  (S.gal || []).slice(-4).forEach(u => { try { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; c.getContext('2d').drawImage(im, 0, 0); GALLERY.push(c); }; im.src = u; } catch (e) {} });
   // точка у двери: inner = 1 — внутри комнаты, 0 — со стороны гостиной
   const doorPt = (r, inner) => {
     if (r === 'spal') return { x: inner ? XS1 + TH + 1.5 : HS - 1.5, z: 0 };
     if (r === 'zak') return { x: RM.zak.cx, z: inner ? HS + TH + 1.5 : HS - 1.5 };
+    if (r === 'ris') return { x: RM.ris.cx, z: inner ? HS + TH + 1.5 : HS - 1.5 };
     if (r === 'zal') return { x: RM.zal.cx, z: inner ? -(HS + TH + 1.5) : -(HS - 1.5) };
     const R = RM[r], v = R.s * (inner ? HS + TH + 1.5 : HS - 1.5); return R.ax === 'x' ? { x: v, z: 0 } : { x: 0, z: v };
   };
@@ -74,7 +78,7 @@
   }
   rot.addEventListener('pointerup', e => { e.preventDefault(); e.stopPropagation(); goLandscape(); setTimeout(() => { if (innerHeight > innerWidth * 1.05) { rotSkip = true; } checkRot(); }, 900); });
   rot.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
-  const hudStars = n => { $('fpStars').innerHTML = RKEYS.map((_, i) => `<i class="${i < n ? 'on' : ''}">${STAR_SVG(i < n)}</i>`).join(''); };
+  const hudStars = n => { $('fpStars').innerHTML = TASKS.map((_, i) => `<i class="${i < n ? 'on' : ''}">${STAR_SVG(i < n)}</i>`).join(''); };
   ON_CLEAR.push(() => { hud.classList.remove('on'); rot.classList.remove('on'); rotSkip = false; $('fpUse').classList.remove('lit', 'back'); if (lockedByUs) { lockedByUs = false; try { screen.orientation.unlock(); } catch (e) {} } });
   let FP = null; // состояние текущей прогулки
   tapBtn($('fpHome'), () => { SFX.tap(); go(goHome); });
@@ -354,7 +358,7 @@
 
     const P0 = () => (landscape ? -0.05 : -0.2);
     const st = FP = { x: 0, z: 5.4, y: 0, yaw: 0, pitch: P0(), path: [], arrive: null, look: null, t: 0, maxT: 0, turn: 0, turnLeft: 0, turnDir: 0, room: 'hall', bob: 0, held: null, stars: 0, jx: 0, jy: 0, hopY: 0, build: null, repeat: () => repeat(), use: () => useBtn(), drop: () => drop() };
-    const INTER = [], SURF = [], OBST = { hall: [], kuh: [], spal: [], igr: [], zak: [], zal: [] }, TICK = [], G = {};
+    const INTER = [], SURF = [], OBST = { hall: [], kuh: [], spal: [], igr: [], zak: [], zal: [], ris: [] }, TICK = [], G = {};
     const say = ids => Voice.say(ids, null);
     const floorY = (x, z) => (x > XS0 && z !== undefined && Math.abs(z) > DW / 2 + 0.8) ? SH : SH * Math.max(0, Math.min(1, (x - XS0) / SL));
 
@@ -363,6 +367,7 @@
       hall: { wall: wallTex({ wall: '#ffe9c9', pat: '#ffdcae', panel: '#fff6e6', kind: 'stripes' }), floor: floorTex({ hue: 30, l: 62 }) },
       kuh: { wall: wallTex({ wall: '#d9f2d0', pat: '#c4e8b8', panel: '#f4fbef', kind: 'dots' }), floor: floorTex({ kind: 'tiles', a: '#fff7ea', b: '#bfe3d0' }) },
       spal: { wall: wallTex({ wall: '#dde4ff', pat: '#ffffff', panel: '#f1f3ff', kind: 'stars' }), floor: floorTex({ hue: 26, l: 68 }) },
+      ris: { wall: wallTex({ wall: '#fff3d1', pat: '#ffe2a0', panel: '#fffaf0', kind: 'dots' }), floor: floorTex({ hue: 36, l: 72 }) },
       zal: { wall: wallTex({ wall: '#e9e1ff', pat: '#ffffff', panel: '#f7f3ff', kind: 'stars' }), floor: floorTex({ kind: 'carpet', a: '#ffcf9e', rep: 8 }) },
       zak: { wall: wallTex({ wall: '#d4efff', pat: '#ffffff', panel: '#f3fbff', kind: 'dots' }), floor: floorTex({ kind: 'carpet', a: '#a9dc8f', rep: 6 }) },
       igr: { wall: wallTex({ wall: '#ffe1ea', pat: '#ffd0de', panel: '#fff3f6', kind: 'dots' }), floor: floorTex({ kind: 'carpet', a: '#9fd8ef', rep: 3 }) },
@@ -379,7 +384,7 @@
       fl.rotation.x = -Math.PI / 2; fl.position.set(R.cx, Y, R.cz); fl.receiveShadow = true; fl.userData.surf = { room: key, floor: true }; world.add(fl); SURF.push(fl);
       const cl = new T.Mesh(new T.PlaneGeometry(STEP, STEP), ceilM); cl.rotation.x = Math.PI / 2; cl.position.set(R.cx, Y + WH, R.cz); world.add(cl);
       const lamp = mkLamp({ hall: '#ffb74d', kuh: '#81c784', spal: '#9fa8da', igr: '#ff8fb1' }[key]); lamp.position.set(R.cx, Y + WH, R.cz); world.add(lamp);
-      const hasDoor = side => key === 'hall' ? (side === 'w' || side === 'e' || side === 'n') : (key === 'kuh' && side === 'e') || (key === 'spal' && side !== 'e') || (key === 'zak' && side === 'n') || (key === 'zal' && side === 's') || (key === 'igr' && side === 's');
+      const hasDoor = side => key === 'hall' ? (side === 'w' || side === 'e' || side === 'n') : (key === 'kuh' && (side === 'e' || side === 's')) || (key === 'ris' && side === 'n') || (key === 'spal' && side !== 'e') || (key === 'zak' && side === 'n') || (key === 'zal' && side === 's') || (key === 'igr' && side === 's');
       for (const side of ['n', 's', 'w', 'e']) {
         const piece = (a0, a1, y0, y1) => {
           const g = new T.PlaneGeometry(a1 - a0, y1 - y0), uv = g.attributes.uv;
@@ -426,8 +431,8 @@
       for (const [i, k] of [[4, 0], [10, 1]]) { const pc = mkPicture(k, k ? '#ff8fb1' : '#4fc3f7'); pc.position.set(XS0 + i * run, (i + 1) * rise + 3.6, -DW / 2 + 0.08); world.add(pc); }
     }
 
-    for (const [key, sg] of [['zak', 1], ['zal', -1]]) { // проёмы из спальни в большие комнаты
-      const x = RM[key].cx, z = sg * (HS + TH / 2); frame(z, false, SH, x);
+    for (const [key, sg] of [['zak', 1], ['zal', -1], ['ris', 1]]) { // проёмы из спальни в большие комнаты и из кухни в комнату рисования
+      const x = RM[key].cx, z = sg * (HS + TH / 2), SH = RM[key].y || 0; frame(z, false, SH, x);
       const th = mesh(new T.BoxGeometry(DW, 0.06, TH + 0.1), M(WOOD, 0.6), x, SH + 0.02, z); th.castShadow = false; th.receiveShadow = true; th.userData.surf = { room: key, floor: true }; world.add(th); SURF.push(th);
     }
 
@@ -485,7 +490,7 @@
 
     // ---------- где можно ходить ----------
     const REG = RKEYS.map(k => { const IN = (RM[k].hs || HS) - 0.95; return { x0: RM[k].cx - IN, x1: RM[k].cx + IN, z0: RM[k].cz - IN, z1: RM[k].cz + IN }; })
-      .concat([{ x0: RM.zak.cx - 1.5, x1: RM.zak.cx + 1.5, z0: HS - 1.2, z1: HS + TH + 1.2 }, { x0: RM.zal.cx - 1.5, x1: RM.zal.cx + 1.5, z0: -(HS + TH + 1.2), z1: -(HS - 1.2) }, { x0: -(HS + TH + 1.2), x1: -(HS - 1.2), z0: -1.5, z1: 1.5 }, { x0: -1.5, x1: 1.5, z0: -(HS + TH + 1.2), z1: -(HS - 1.2) }, { x0: HS - 1.2, x1: XS1 + TH + 1.2, z0: -1.5, z1: 1.5 }]);
+      .concat([{ x0: RM.ris.cx - 1.5, x1: RM.ris.cx + 1.5, z0: HS - 1.2, z1: HS + TH + 1.2 }, { x0: RM.zak.cx - 1.5, x1: RM.zak.cx + 1.5, z0: HS - 1.2, z1: HS + TH + 1.2 }, { x0: RM.zal.cx - 1.5, x1: RM.zal.cx + 1.5, z0: -(HS + TH + 1.2), z1: -(HS - 1.2) }, { x0: -(HS + TH + 1.2), x1: -(HS - 1.2), z0: -1.5, z1: 1.5 }, { x0: -1.5, x1: 1.5, z0: -(HS + TH + 1.2), z1: -(HS - 1.2) }, { x0: HS - 1.2, x1: XS1 + TH + 1.2, z0: -1.5, z1: 1.5 }]);
     const inside = (x, z) => REG.some(r => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
     const roomOf = (x, z) => { let best = 'hall', bd = 1e9; for (const k of RKEYS) { const R = RM[k], d = Math.max(Math.abs(x - R.cx), Math.abs(z - R.cz)) / (R.hs || HS); if (d < bd) { bd = d; best = k; } } return best; };
     function clampRoom(p, k) { const R = RM[k], m = (R.hs || HS) - PAD; p.x = Math.max(R.cx - m, Math.min(R.cx + m, p.x)); p.z = Math.max(R.cz - m, Math.min(R.cz + m, p.z)); return p; }
@@ -508,7 +513,7 @@
     function walkTo(p, look, cb) {
       const rf = roomOf(st.x, st.z), rt = roomOf(p.x, p.z), pts = [];
       if (rf !== rt) {
-        const chain = r => r === 'hall' ? [] : (r === 'zak' || r === 'zal' ? ['spal', r] : [r]), A = chain(rf), B = chain(rt);
+        const chain = r => r === 'hall' ? [] : (r === 'zak' || r === 'zal' ? ['spal', r] : r === 'ris' ? ['kuh', r] : [r]), A = chain(rf), B = chain(rt);
         let c = 0; while (c < A.length && c < B.length && A[c] === B[c]) c++;
         for (let i = A.length - 1; i >= c; i--) pts.push(doorPt(A[i], 1), doorPt(A[i], 0));
         for (let i = c; i < B.length; i++) pts.push(doorPt(B[i], 0), doorPt(B[i], 1));
@@ -630,7 +635,7 @@
       const bt = BTN[key]; if (bt) { const s = mkZvezda(true, 0.5); s.castShadow = false; s.position.y = 2.5; bt.add(s); popIn(s, 0.5); TICK.push(t => { s.rotation.y = t * 2; }); }
       const sg = SIGN[key]; if (sg) { const s = mkZvezda(true, 0.42); s.castShadow = false; s.position.set(0.62, 0.62, 0.25); sg.add(s); popIn(s, 0.42); TICK.push(t => { s.rotation.y = Math.sin(t * 2) * 0.6; }); }
       await say(praise());
-      if (!alive() || st.stars < RKEYS.length) return;
+      if (!alive() || st.stars < TASKS.length) return;
       S.stars.dom = (S.stars.dom || 0) + 1; save();
       SFX.fanfare();
       const D = 0.9, hh = D * Math.tan(cam.fov / 2 * Math.PI / 180), hw = hh * cam.aspect;
@@ -729,11 +734,11 @@
       fun(fr, 'kuh', [2.6, 5.0, 2.2, 0, 2.5, 0.2], () => { frOpen = !frOpen; SFX.whoosh(); fr.userData.doors.forEach((d, i) => tw(d.rotation, { y: frOpen ? -1.9 : 0 }, 420, 'inout', i * 90)); if (frOpen) { SFX.twinkle(); } else wait(430).then(() => SFX.thunk()); }, { stand: () => ({ x: cx + 5.4, z: -2.6 }) });
       obst('kuh', cx - 1.0, -7.2, 7.0, 0.9, 0.6);
       const sh = grp(cx - 1.4, 4.6, -7.75); sh.add(rbox(M(WOOD, 0.6), 5.4, 0.16, 0.7, 0.05)); [[-2.0, '#f0352b'], [-1.2, '#ffd21f'], [1.3, '#2a6df4'], [2.1, '#35b24a']].forEach(([x, c]) => { sh.add(cyl(M(c, 0.4), 0.26, 0.26, 0.6, x, 0.4, 0, 14)); sh.add(cyl(M('#ffffff', 0.5), 0.28, 0.28, 0.1, x, 0.74, 0, 14)); }); const hj = mkMed(); hj.scale.setScalar(0.75); hj.position.set(0.1, 0.42, 0); sh.add(hj); world.add(sh);
-      const w1 = mkWindow('#ffd54f'); w1.position.set(cx, 4.3, HS - 0.02); w1.rotation.y = Math.PI; world.add(w1);
+      const w1 = mkWindow('#ffd54f'); w1.position.set(cx - 5.2, 4.3, HS - 0.02); w1.rotation.y = Math.PI; world.add(w1);
       const w2 = mkWindow('#ffd54f'); w2.position.set(cx - HS + 0.02, 5.0, 1.2); w2.rotation.y = Math.PI / 2; w2.scale.set(1.2, 0.62, 1); world.add(w2);
       const rug = mkRug(3.6, '#ffd98a', '#fff7e0'); rug.position.set(cx + 1.0, 0, 1.0); world.add(rug);
-      const tb = grp(cx + 0.5, 0, 6.6); tb.add(rbox(M(WOOD, 0.55), 3.2, 0.2, 1.5, 0.07, 0, 1.6, 0)); for (const sx of [-1, 1]) for (const sz of [-1, 1]) tb.add(cyl(M(WOOD, 0.6), 0.11, 0.09, 1.5, sx * 1.35, 0.75, sz * 0.55, 8)); const pl = mkPlant(); pl.scale.setScalar(0.55); pl.position.set(0.9, 1.7, 0); tb.add(pl); const tp = mkTarelka(); tp.scale.setScalar(0.42); tp.position.set(-0.6, 1.76, 0); tb.add(tp); world.add(tb); obst('kuh', cx + 0.5, 6.6, 1.6, 0.75, 0.6);
-      { const ap = mkYabloko(); ap.scale.setScalar(1.3); ap.position.set(cx - 0.1, 2.16, 6.6); world.add(ap); const it = toy(ap, 'kuh', 0.85, 0.3, 0.2); ap.userData.fp.stand = () => ({ x: cx - 0.1, z: 4.4 }); }
+      const tb = grp(cx + 5.3, 0, 6.6); tb.add(rbox(M(WOOD, 0.55), 3.2, 0.2, 1.5, 0.07, 0, 1.6, 0)); for (const sx of [-1, 1]) for (const sz of [-1, 1]) tb.add(cyl(M(WOOD, 0.6), 0.11, 0.09, 1.5, sx * 1.35, 0.75, sz * 0.55, 8)); const pl = mkPlant(); pl.scale.setScalar(0.55); pl.position.set(0.9, 1.7, 0); tb.add(pl); const tp = mkTarelka(); tp.scale.setScalar(0.42); tp.position.set(-0.6, 1.76, 0); tb.add(tp); world.add(tb); obst('kuh', cx + 5.3, 6.6, 1.6, 0.75, 0.6);
+      { const ap = mkYabloko(); ap.scale.setScalar(1.3); ap.position.set(cx + 4.7, 2.16, 6.6); world.add(ap); const it = toy(ap, 'kuh', 0.85, 0.3, 0.2); ap.userData.fp.stand = () => ({ x: cx + 4.7, z: 4.4 }); }
       TICK.push(t => { if (stove.userData.pot.children[1].position.y < 0.7) stove.userData.pot.children[1].position.y = 0.63 + Math.max(0, Math.sin(t * 7)) * 0.03; });
 
       const FOODS = { mishka: ['med', mkMed, 1.35, 0.35], ezhik: ['yabloko', mkYabloko, 1.5, 0.3], koshka: ['moloko', mkMiska, 1.1, 0.3], sobaka: ['kost', mkKost, 1.25, 0.35] };
@@ -778,7 +783,7 @@
         };
         setQ('kuh', [q], () => { if (st.held !== it && food.parent === world) nudge(food); });
       };
-      startBtn('kuh', cx + 5.2, 3.4);
+      startBtn('kuh', cx + 2.6, 4.4);
     }
 
     // =========== СПАЛЬНЯ (второй этаж): мишки и кроватки ===========
@@ -1146,6 +1151,39 @@
       startBtn('zal', cx + 3.4, cz + H - 3.2);
     }
 
+    // =========== КОМНАТА РИСОВАНИЯ (первый этаж, маленькая): сел за мольберт — и рисуешь ===========
+    {
+      const R = RM.ris, cx = R.cx, cz = R.cz, H = R.hs;
+      const rug = mkRug(3.4, '#ffe08a', '#fff8e1'); rug.position.set(cx, 0, cz + 0.6); world.add(rug);
+      for (const [x, z, c, r] of [[-2.2, -0.6, '#ff6fae', 0.5], [2.4, 1.6, '#4fc3f7', 0.42], [1.2, -1.4, '#81c784', 0.3], [-1.6, 2.4, '#ba68c8', 0.34]]) { const m = cyl(M(c, 0.7), r, r, 0.03, cx + x, 0.045, cz + z, 20); m.castShadow = false; world.add(m); }
+      const w1 = mkWindow('#ff8fb1'); w1.position.set(cx - H + 0.02, 4.3, cz); w1.rotation.y = Math.PI / 2; world.add(w1);
+      // мольберт и стульчик
+      const mb = mkMolbert(); mb.scale.setScalar(1.55); mb.position.set(cx, 0, cz + 3.4); mb.rotation.y = Math.PI; world.add(mb); obst('ris', cx, cz + 3.6, 1.3, 0.9, 0.4);
+      const stl = grp(cx, 0, cz + 1.3); stl.add(ball(M('#ff8fb1', 0.8), [0.75, 0.2, 0.75], 0, 1.25, 0)); stl.add(cyl(M('#ffffff', 0.6), 0.6, 0.6, 0.14, 0, 1.1, 0, 24)); for (let i = 0; i < 3; i++) { const a = i * 2.094, l = cyl(M(WOOD, 0.6), 0.08, 0.1, 1.1, Math.cos(a) * 0.4, 0.55, Math.sin(a) * 0.4, 8); stl.add(l); } world.add(stl); obst('ris', cx, cz + 1.3, 0.5, 0.5, 0.3);
+      const sit = () => {
+        if (busyWipe || st.sit || !window.openRis) return; st.sit = true; st.path = []; SFX.plop(); squash(stl, 300);
+        RESUME = { done: TASKS.filter(k => G[k].done) }; st.look = { yaw: Math.PI, pitch: -0.05 }; tw(st, { hopY: -0.8 }, 420, 'inout');
+        wait(520).then(() => { if (alive()) go(() => openRis(() => { try { const c = window.risSnap && window.risSnap(); if (c) { GALLERY.push(c); if (GALLERY.length > 4) GALLERY.shift(); S.gal = GALLERY.map(g => g.toDataURL('image/jpeg', 0.72)); save(); } } catch (e) {} openDom(); })); });
+      };
+      fun(mb, 'ris', [2.2, 3.4, 1.6, 0, 1.7, 0], sit, { fh: 3.3, stand: () => ({ x: cx, z: cz - 0.6 }) });
+      fun(stl, 'ris', [1.6, 1.6, 1.6], sit, { fh: 1.2, noFocus: true, stand: () => ({ x: cx, z: cz - 0.6 }) });
+      // полка с красками и стаканчик с кистями
+      const sh = grp(cx + H - 0.6, 0, cz - 0.5); sh.rotation.y = -Math.PI / 2;
+      for (const y of [1.3, 2.7]) sh.add(rbox(M(WOOD, 0.6), 4.4, 0.18, 0.9, 0.06, 0, y, 0)); for (const s of [-1, 1]) sh.add(rbox(M(WOOD, 0.6), 0.18, 3.0, 0.9, 0.06, s * 2.2, 1.5, 0));
+      Object.values(COLORS).forEach((c, i) => { const j = grp(-1.6 + (i % 4) * 1.05, i < 4 ? 1.39 : 2.79, 0); j.add(cyl(M('#ffffff', 0.4), 0.3, 0.26, 0.55, 0, 0.28, 0, 16)); j.add(cyl(M(c, 0.5), 0.31, 0.31, 0.12, 0, 0.58, 0, 16)); j.add(cyl(M(c, 0.5), 0.305, 0.27, 0.22, 0, 0.2, 0, 16)); sh.add(j); });
+      { const cup = grp(0.9, 2.79, 0); cup.add(cyl(M('#4fc3f7', 0.5), 0.26, 0.22, 0.6, 0, 0.3, 0, 16)); [['#f0352b', -0.2], ['#ffd21f', 0.05], ['#35b24a', 0.25]].forEach(([c, a]) => { const b = grp(0, 0.3, 0); b.rotation.z = a; b.add(cyl(M(WOOD, 0.6), 0.035, 0.035, 0.9, 0, 0.45, 0, 6)); b.add(ball(M(c, 0.5), [0.07, 0.13, 0.07], 0, 0.95, 0)); cup.add(b); }); sh.add(cup); }
+      world.add(sh); obst('ris', cx + H - 0.6, cz - 0.5, 0.6, 2.3, 0.4);
+      fun(sh, 'ris', [4.4, 3.4, 1.2, 0, 1.7, 0], () => { wobble(sh, 0.03); [0, 2, 4].forEach((n, i) => tone(NOTY[n], i * 0.09, 0.16, 'triangle', 0.1)); burst(V(cx + H - 1.2, 3.4, cz - 0.5), 10, Object.values(COLORS)); }, { fh: 3.6 });
+      // галерея: рисунки на стене за мольбертом
+      const fc = ['#ff8fb1', '#4fc3f7', '#ffd54f', '#81c784'];
+      for (let i = 0; i < 4; i++) {
+        const src = GALLERY[GALLERY.length - 1 - i], f = grp(cx - 4.05 + i * 2.7, 5.0, cz + H - 0.1); f.rotation.y = Math.PI; f.rotation.z = [0.04, -0.03, 0.03, -0.04][i];
+        const fr = rbox(M(fc[i], 0.6), 2.4, 1.9, 0.14, 0.12); fr.castShadow = false; f.add(fr);
+        let map; if (src) { map = new T.CanvasTexture(src); map.encoding = T.sRGBEncoding; } else map = picTex(i % 3);
+        const p = new T.Mesh(new T.PlaneGeometry(2.1, 1.6), new T.MeshBasicMaterial({ map })); p.position.z = 0.08; f.add(p); world.add(f);
+      }
+    }
+
     // ---------- каждый кадр ----------
     const tmpV = new T.Vector3();
     function camFn(dt) {
@@ -1208,7 +1246,11 @@
     }
     current = { name: 'dom', fp: true, rebuild: () => setFov(), camFn, again: openDom, st, G, INTER, use, tap, BTN };
     camFn(0);
-    wait(700).then(() => { if (alive()) say('dom_intro'); });
+    if (RESUME) { // вернулись из рисования: звёзды на месте, стоим у мольберта
+      const r = RESUME; RESUME = null;
+      r.done.forEach(k => { const gk = G[k], b = BTN[k]; if (!gk || !b) return; gk.done = gk.started = true; gk.q = null; st.stars++; const U = b.userData; U.tri.visible = false; U.mat.color.copy(C('#ffb300')); U.mat.emissive.copy(C('#ffb300')); const s = mkZvezda(true, 0.5); s.castShadow = false; s.position.y = 2.5; b.add(s); TICK.push(t => { s.rotation.y = t * 2; }); });
+      hudStars(st.stars); st.x = RM.ris.cx; st.z = RM.ris.cz - 1.6; st.yaw = Math.PI; st.pitch = 0.12; st.room = 'ris'; camFn(0);
+    } else wait(700).then(() => { if (alive()) say('dom_intro'); });
   }
   addEventListener('resize', () => { if (current && current.fp) current.rebuild(); checkRot(); });
   window.openDom = openDom;

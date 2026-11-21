@@ -635,7 +635,7 @@ ICONS.muzyka = g => {
   const mark = b => { inks.forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
   const setTool = t => { tool = t; Object.keys(tools).forEach(k => tools[k].classList.toggle('tsel', k === t)); };
   const stampIco = () => `<svg viewBox="-1.3 -1.3 2.6 2.6"><path d="${(() => { const pts = []; const rec = { moveTo: (x, y) => pts.push(`M${x.toFixed(2)} ${y.toFixed(2)}`), lineTo: (x, y) => pts.push(`${pts.length ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`), bezierCurveTo: (a, b, c, d, e, f) => pts.push(`C${a.toFixed(2)} ${b.toFixed(2)} ${c.toFixed(2)} ${d.toFixed(2)} ${e.toFixed(2)} ${f.toFixed(2)}`), arc: (x, y, r) => pts.push(`M${(x + r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(x - r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(x + r).toFixed(2)} ${y.toFixed(2)}`) }; STAMPS[stamp](rec, 1); return pts.join(''); })()}" fill="#ff6fae" stroke="#5d3a24" stroke-width="0.12" stroke-linejoin="round"/></svg>`;
-  add(ico.home, () => { SFX.tap(); go(goHome); });
+  add(ico.home, () => { SFX.tap(); go((current && current.back) || goHome); });
   INK.forEach((c, i) => { const b = add('', bb => { col = c; if (tool === 'erase') setTool('pen'); mark(bb); tone(440 + i * 60, 0, 0.12, 'triangle', 0.1); }, c); b.classList.add('ink'); inks.push(b); if (!i) b.classList.add('sel'); });
   tools.pen = add('<svg viewBox="0 0 100 100"><path d="M22 78 L28 56 L66 18 L82 34 L44 72Z" fill="#ffd21f" stroke="#5d3a24" stroke-width="6" stroke-linejoin="round"/><path d="M22 78 L28 56 L44 72Z" fill="#5d3a24"/></svg>', () => { setTool('pen'); SFX.tap(); });
   tools.stamp = add(stampIco(), bb => { if (tool === 'stamp') stamp = (stamp + 1) % STAMPS.length; bb.innerHTML = stampIco(); setTool('stamp'); SFX.tap(); });
@@ -644,9 +644,19 @@ ICONS.muzyka = g => {
   setTool('pen');
   add(ico.next, () => { pic = (pic + 1) % PICS.length; wipe(); outline(); SFX.plop(); });
   add(ico.clear, () => { wipe(); SFX.whoosh(); });
-  window.openRis = () => {
+  // маленькая копия рисунка для стены в домике (null, если лист пустой)
+  window.risSnap = () => {
+    const a = area(), W = 320, H = 240, c = document.createElement('canvas'), x = c.getContext('2d'); c.width = W; c.height = H;
+    const sw = a.w * dpr, sh = a.h * dpr, k = Math.max(W / sw, H / sh), dw = sw * k, dh = sh * k;
+    x.fillStyle = '#fffdf5'; x.fillRect(0, 0, W, H);
+    const t = document.createElement('canvas'); t.width = 32; t.height = 24; const tx = t.getContext('2d'); tx.drawImage(cv, 0, 0, sw, sh, 0, 0, 32, 24);
+    const d = tx.getImageData(0, 0, 32, 24).data; let ink = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 20 && (d[i] < 240 || d[i + 1] < 240 || d[i + 2] < 235)) ink++;
+    if (ink < 3) return null;
+    x.drawImage(cv, 0, 0, sw, sh, (W - dw) / 2, (H - dh) / 2, dw, dh); x.drawImage(ov, 0, 0, sw, sh, (W - dw) / 2, (H - dh) / 2, dw, dh); return c;
+  };
+  window.openRis = back => {
     clearWorld(); scene.background = new T.Color(C('#fffdf5'));
-    current = { name: 'ris', rebuild: () => fitRis(true) };
+    current = { name: 'ris', rebuild: () => fitRis(true), back: typeof back === 'function' ? back : null };
     el.classList.add('on'); if (!pic) pic = 1 + rnd(PICS.length - 1);
     fitRis(false);
   };

@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '4.5';
+const VERSION = '4.6';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -469,7 +469,7 @@ const UI = { top: $('top'), stars: $('stars'), fin: $('fin'), start: $('start'),
 const STAR_SVG = on => `<svg viewBox="0 0 100 100"><path d="M50 6 L62 37 L95 39 L69 60 L78 93 L50 74 L22 93 L31 60 L5 39 L38 37Z" fill="${on ? '#ffd23f' : 'rgba(255,255,255,.6)'}" stroke="${on ? '#f59e0b' : 'rgba(0,0,0,.16)'}" stroke-width="6" stroke-linejoin="round"/></svg>`;
 function uiStars(n) { UI.stars.innerHTML = [...Array(ROUNDS)].map((_, i) => `<i class="${i < n ? 'on' : ''}">${STAR_SVG(i < n)}</i>`).join(''); }
 function tapBtn(el, fn) { el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fn(); }); }
-tapBtn($('bHome'), () => { SFX.tap(); go(goHome); });
+tapBtn($('bHome'), () => { SFX.tap(); go((current && current.back) || goHome); });
 tapBtn($('bRep'), () => { SFX.tap(); current && current.repeat && current.repeat(); });
 tapBtn($('bAgain'), () => { SFX.tap(); if (current && current.again) return go(current.again); const k = current && current.key; if (k) go(() => runRoom(k)); });
 tapBtn($('bHome2'), () => { SFX.tap(); go(goHome); });
