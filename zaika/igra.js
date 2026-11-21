@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '3.6';
+const VERSION = '4.0';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -418,6 +418,7 @@ let dragging = null;
 const dragPlane = new T.Plane(), dragPt = new T.Vector3();
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault(); Idle.poke();
+  if (current && current.fp) return; // в доме касания разбирает dom.js
   if (performance.now() < inputLock || dragging) return;
   const p = findPick(e); if (!p) return;
   const pk = p.userData.pick;
@@ -469,7 +470,7 @@ function uiStars(n) { UI.stars.innerHTML = [...Array(ROUNDS)].map((_, i) => `<i 
 function tapBtn(el, fn) { el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fn(); }); }
 tapBtn($('bHome'), () => { SFX.tap(); go(goHome); });
 tapBtn($('bRep'), () => { SFX.tap(); current && current.repeat && current.repeat(); });
-tapBtn($('bAgain'), () => { SFX.tap(); const k = current && current.key; if (k) go(() => runRoom(k)); });
+tapBtn($('bAgain'), () => { SFX.tap(); if (current && current.again) return go(current.again); const k = current && current.key; if (k) go(() => runRoom(k)); });
 tapBtn($('bHome2'), () => { SFX.tap(); go(goHome); });
 const LVL = $('lvl');
 const STAR_P = 'M50 6 L62 37 L95 39 L69 60 L78 93 L50 74 L22 93 L31 60 L5 39 L38 37Z';
@@ -483,8 +484,11 @@ function updLvl() { [...LVL.children].forEach((b, i) => b.classList.toggle('sel'
 
 // ---------- смена сцен ----------
 let session = 0, current = null, busyWipe = false;
+const ON_CLEAR = []; // что ещё убрать при смене сцены (добавляют другие файлы)
 function clearWorld() {
   session++; Idle.off(); Voice.stop();
+  ON_CLEAR.forEach(f => f());
+  if (cam.fov !== 30) { cam.fov = 30; cam.near = 1; cam.far = 400; cam.updateProjectionMatrix(); }
   TW = []; ACT = []; PART = []; PICK = []; HALO = []; ENVT = []; dragging = null; speaker = null;
   if (world) {
     scene.remove(world);
@@ -1015,8 +1019,13 @@ function homeDoor(x, y, z, k, standalone) {
   const dh = grp(0, 1.3, 0.3); hitBox(dh, 2.3, 3.0, 1.0); dh.userData.cy = 0; r.add(dh);
   let busy = false;
   pickable(dh, async () => {
-    if (busy) return; busy = true; SFX.whoosh();
+    if (busy || busyWipe) return; busy = true; SFX.whoosh();
+    // держишь палец на двери — Зайка заходит в дом; короткое нажатие — выглядывает ёжик
+    let held = true; const up = () => { held = false; };
+    addEventListener('pointerup', up, { once: true }); addEventListener('pointercancel', up, { once: true });
+    const my = session;
     await tw(door.rotation, { y: -2.0 }, 380, 'out');
+    if (window.openDom) { await wait(240); if (my !== session) return; if (held) { removeEventListener('pointerup', up); removeEventListener('pointercancel', up); SFX.good(); go(openDom); return; } }
     guest.visible = true; SFX.boing(); tws(guest, 0.62, 350, 'back');
     await tw(guest.position, { z: 1.5 }, 420, 'out');
     burst(r.localToWorld(V(0, 1.6, 1.6)), 10); SFX.good(); hop(guest, 0.4);
@@ -1128,6 +1137,7 @@ function update(dt) {
   if (current && current.g && current.g.tick) current.g.tick(time, dt);
   for (const h of HALO) { h.scale.setScalar(1 + Math.sin(time * 6) * 0.1); h.material.opacity = 0.65 + Math.sin(time * 6) * 0.3; }
   // лёгкое покачивание камеры — ощущение объёма
+  if (current && current.camFn) { current.camFn(dt); return; } // прогулка по дому: камерой управляет dom.js
   cam.position.set(camBase.x + Math.sin(time * 0.5) * 0.25, camBase.y + Math.sin(time * 0.37) * 0.12, camBase.z);
   cam.lookAt(camLook);
 }
@@ -1147,4 +1157,4 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) Voice
 fit();
 startScreen();
 requestAnimationFrame(frame);
-window.__Z = { ICONS, clearWorld, step(n) { for (let i = 0; i < n; i++) update(0.033); }, S, Voice, runRoom, goHome, ROOMS, go, get current() { return current; }, get PICK() { return PICK; }, scr, cam, scene };
+window.__Z = { ICONS, clearWorld, tw, wait, step(n) { for (let i = 0; i < n; i++) update(0.033); }, S, Voice, runRoom, goHome, ROOMS, go, get current() { return current; }, get PICK() { return PICK; }, scr, cam, scene };
