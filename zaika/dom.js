@@ -1,11 +1,11 @@
 'use strict';
-// «Домик изнутри» (версия 4.7): прогулка по дому от первого лица, управление как в «SCP: Побег».
+// «Домик изнутри» (версия 4.8): прогулка по дому от первого лица, управление как в «SCP: Побег».
 // Слева джойстик — ходить. Пальцем по экрану — смотреть. Справа большая лапка — взять, открыть, включить.
 // Прежнее управление (нажал на пол — пошёл) осталось: адрес с ?ctl=tap или S.ctl = 'tap'.
 (() => {
   const EYE = 2.8, WH = 7.6, HS = 8, TH = 0.6, DW = 4.6, DH = 5.7, PAD = 1.2, SPEED = 8.5;
   const STEP = 2 * HS + TH;
-  const SH = 8, SL = 14; // высота этажа и длина лестницы
+  const SH = 8, SL = 14, CL = 6; // высота этажа, длина лестницы и коридора между комнатами
   const SIDES = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] }, OPP = { n: 's', s: 'n', w: 'e', e: 'w' };
   // дом как дерево: [комната, откуда вход, на какой стене той комнаты дверь, полуширина, 1 = лестница на этаж выше]
   // двери всегда посередине стены; комнаты разных этажей не накрывают друг друга
@@ -13,7 +13,7 @@
     ['h3', 'spal', 'e', 8, 1], ['poch', 'h3', 's', 7], ['azb', 'h3', 'n', 13], ['h4', 'h3', 'e', 9, 1], ['logic', 'h4', 's', 7]];
   const RM = { hall: { cx: 0, cz: 0, y: 0, hs: 8, fl: 1 } }, DOOR = {}, KIDS = { hall: [] };
   for (const [k, p, sd, hs, up] of PLAN) {
-    const P = RM[p], [dx, dz] = SIDES[sd], gap = up ? SL + 2 * TH : TH, at = o => ({ x: P.cx + dx * o, z: P.cz + dz * o });
+    const P = RM[p], [dx, dz] = SIDES[sd], gap = up ? SL + 2 * TH : CL + 2 * TH, at = o => ({ x: P.cx + dx * o, z: P.cz + dz * o });
     RM[k] = { cx: P.cx + dx * (P.hs + gap + hs), cz: P.cz + dz * (P.hs + gap + hs), y: P.y + (up ? SH : 0), hs, fl: P.fl + (up ? 1 : 0) }; KIDS[k] = []; KIDS[p].push(k);
     DOOR[k] = { p, sd, up: !!up, dx, dz, a: at(P.hs + TH / 2), b: at(P.hs + gap - TH / 2), out: at(P.hs - 1.5), in: at(P.hs + gap + 1.5) };
   }
@@ -103,11 +103,11 @@
   function wallTex(o) {
     const t = cnv(256, 512, (x, w, h) => {
       x.fillStyle = o.wall; x.fillRect(0, 0, w, h);
-      x.fillStyle = o.pat;
+      x.fillStyle = o.pat; x.globalAlpha = 0.5;
       if (o.kind === 'stripes') { for (let i = 0; i < 4; i++) x.fillRect(i * 64 + 20, 0, 24, h); }
       else if (o.kind === 'stars') { for (let i = 0; i < 4; i++) for (let j = 0; j < 6; j++) { const px = i * 64 + (j % 2 ? 48 : 16), py = j * 60 + 24, r = 9; x.beginPath(); for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5, q = k % 2 ? r * 0.45 : r; x.lineTo(px + Math.sin(a) * q, py - Math.cos(a) * q); } x.fill(); } }
       else { for (let i = 0; i < 4; i++) for (let j = 0; j < 6; j++) { x.beginPath(); x.arc(i * 64 + (j % 2 ? 48 : 16), j * 60 + 24, 8, 0, 7); x.fill(); } }
-      const py = h * 0.72; // нижняя панель
+      x.globalAlpha = 1; const py = h * 0.72; // нижняя панель
       x.fillStyle = o.panel; x.fillRect(0, py, w, h - py);
       x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(0, py - 10, w, 14);
       x.strokeStyle = 'rgba(0,0,0,.07)'; x.lineWidth = 3; for (let i = 0; i < 4; i++) x.strokeRect(i * 64 + 8, py + 18, 48, h - py - 46);
@@ -393,8 +393,8 @@
       Object.keys(COLORS).flatMap(c => ['najdi_' + c, 'eto_' + c]), ['bolshoy', 'sredniy', 'malenky'].map(s => 'mishka_' + s), ['morkovka', 'med', 'yabloko', 'moloko', 'kost'].map(f => 'kto_lubit_' + f)));
 
     // свет
-    const hemi = new T.HemisphereLight(C('#ffffff'), C('#ffe6c8'), 0.8); world.add(hemi);
-    const sun = new T.DirectionalLight(C('#fff3dc'), 0.4);
+    const hemi = new T.HemisphereLight(C('#ffffff'), C('#ffe6c8'), 0.7); world.add(hemi);
+    const sun = new T.DirectionalLight(C('#fff3dc'), 0.36);
     sun.position.set(15, 44, 8); sun.target.position.set(6, 0, -8); world.add(sun.target);
     sun.castShadow = !S.low; const sz = MOBILE ? 1024 : 2048; sun.shadow.mapSize.set(sz, sz);
     { const c = sun.shadow.camera; c.left = -30; c.right = 30; c.top = 30; c.bottom = -30; c.near = 1; c.far = 110; }
@@ -423,8 +423,10 @@
       logic: { wall: wallTex({ wall: '#e7e4ff', pat: '#d6d0ff', panel: '#f7f5ff', kind: 'dots' }), floor: floorTex({ kind: 'carpet', a: '#b5e3d8', rep: 3 }) },
       igr: { wall: wallTex({ wall: '#ffe1ea', pat: '#ffd0de', panel: '#fff3f6', kind: 'dots' }), floor: floorTex({ kind: 'carpet', a: '#9fd8ef', rep: 3 }) },
     };
-    const ceilM = M('#fffaf0', 1, { emissive: C('#fff3e0'), emissiveIntensity: 0.45 }), trimM = M('#ffffff', 0.7);
+    const ceilM = M('#fffaf0', 1, { emissive: C('#fff3e0'), emissiveIntensity: 0.32 }), trimM = M('#ffffff', 0.7);
     const WM = {};
+    const corW = new T.MeshStandardMaterial({ map: wallTex({ wall: '#f6efe6', pat: '#ede2d3', panel: '#fbf7f1', kind: 'stripes' }), roughness: 1 });
+    const corF = new T.MeshStandardMaterial({ map: floorTex({ hue: 30, l: 70, rep: 2 }), roughness: 0.85 });
     const frame = (c, X, y0, off = 0) => { // наличники проёма
       const box = (along, y, la, h) => { const m = rbox(trimM, X ? TH + 0.36 : la, h, X ? la : TH + 0.36, 0.08, X ? c : along + off, y0 + y, X ? along + off : c); m.castShadow = false; world.add(m); };
       box(-(DW / 2 + 0.12), (DH + 0.3) / 2, 0.5, DH + 0.3); box(DW / 2 + 0.12, (DH + 0.3) / 2, 0.5, DH + 0.3); box(0, DH + 0.24, DW + 0.9, 0.5);
@@ -457,8 +459,27 @@
     for (const k of RKEYS) {
       const D = DOOR[k]; if (!D) continue; const P = RM[D.p], X = D.dx !== 0;
       if (D.up) { stair(D); continue; }
-      frame(X ? D.a.x : D.a.z, X, P.y, X ? D.a.z : D.a.x);
-      const th = mesh(new T.BoxGeometry(X ? TH + 0.1 : DW, 0.06, X ? DW : TH + 0.1), M(WOOD, 0.6), D.a.x, P.y + 0.02, D.a.z); th.castShadow = false; th.receiveShadow = true; th.userData.surf = { room: k, floor: true }; world.add(th); SURF.push(th);
+      for (const E of [D.a, D.b]) {
+        frame(X ? E.x : E.z, X, P.y, X ? E.z : E.x);
+        const th = mesh(new T.BoxGeometry(X ? TH + 0.1 : DW, 0.06, X ? DW : TH + 0.1), M(WOOD, 0.6), E.x, P.y + 0.02, E.z); th.castShadow = false; th.receiveShadow = true; world.add(th);
+      }
+      corridor(D, k);
+    }
+    // коридор между соседними комнатами: спокойные стены, мягкий свет — видно, где кончается одна игра и начинается другая
+    function corridor(D, k) {
+      const P = RM[D.p], X = D.dx !== 0, Y = P.y, L = CL + 2 * TH, s = X ? D.dx : D.dz, m0 = P.hs + L / 2;
+      const cx = P.cx + D.dx * m0, cz = P.cz + D.dz * m0, rm = k;
+      const fl = new T.Mesh(new T.PlaneGeometry(X ? L : DW, X ? DW : L), corF); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, Y + 0.01, cz); fl.receiveShadow = true; fl.userData.surf = { room: rm, floor: true }; world.add(fl); SURF.push(fl);
+      const cl = new T.Mesh(new T.PlaneGeometry(X ? L : DW, X ? DW : L), ceilM); cl.rotation.x = Math.PI / 2; cl.position.set(cx, Y + DH, cz); world.add(cl);
+      for (const sg of [-1, 1]) {
+        const g = new T.PlaneGeometry(L, DH), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * L / 4, uv.getY(i) * DH / WH);
+        const w = new T.Mesh(g, corW), ox = X ? 0 : sg * DW / 2, oz = X ? sg * DW / 2 : 0; w.position.set(cx + ox, Y + DH / 2, cz + oz);
+        w.rotation.y = X ? (sg > 0 ? Math.PI : 0) : (sg > 0 ? -Math.PI / 2 : Math.PI / 2); w.userData.surf = { room: rm, nx: X ? 0 : -sg, nz: X ? -sg : 0 }; world.add(w); SURF.push(w);
+        const bb = mesh(new T.BoxGeometry(X ? L : 0.14, 0.36, X ? 0.14 : L), trimM, cx + ox * 0.97, Y + 0.18, cz + oz * 0.97); bb.castShadow = false; world.add(bb);
+      }
+      // дорожка и круглый плафон
+      const run = rbox(M('#e8d5bf', 0.9), X ? L - 0.6 : 2.2, 0.04, X ? 2.2 : L - 0.6, 0.02, cx, Y + 0.03, cz); run.castShadow = false; run.receiveShadow = true; world.add(run);
+      const lp = cyl(M('#ffffff', 0.4, { emissive: C('#fff1d6'), emissiveIntensity: 0.8 }), 0.55, 0.55, 0.12, cx, Y + DH - 0.06, cz, 24); lp.castShadow = false; world.add(lp);
     }
     // лестница на этаж выше (всегда на восток): ступеньки с дорожкой, перила, картинки
     function stair(D) {
@@ -499,7 +520,7 @@
     const pawM = M('#fff8f0', 0.9), slot = grp(); hands.add(slot);
     for (const s of [-1, 1]) { const p = ball(pawM, [0.3, 0.26, 0.42], s * 0.62, -0.28, 0.12); p.castShadow = false; p.rotation.y = s * 0.5; hands.add(p); const pad = ball(M('#f7b6c6', 0.8), [0.13, 0.05, 0.16], s * 0.6, -0.04, 0.05, true); pad.castShadow = false; hands.add(pad); }
     function setFov() {
-      cam.fov = landscape ? 62 : 84; cam.near = 0.3; cam.far = 160; cam.updateProjectionMatrix();
+      cam.fov = landscape ? 74 : 92; cam.near = 0.3; cam.far = 160; cam.updateProjectionMatrix();
       const D = 2.5, hh = D * Math.tan(cam.fov / 2 * Math.PI / 180), k = landscape ? 1 : 0.74;
       hands.position.set(0, -hh * 0.64, -D); hands.scale.setScalar(k); hands.userData.by = hands.position.y;
     }
@@ -858,7 +879,7 @@
       let garl = true; TICK.push(t => bulbs.forEach((b, i) => b.scale.setScalar(garl ? 0.16 * (1 + Math.sin(t * 3 + i * 1.3) * 0.25) : 0.08)));
       // ночник: выключает и включает свет
       const nl = mkFloorLamp(); nl.scale.setScalar(0.8); nl.position.set(cx + 3.7, 0, -6.9); up.add(nl); obst('spal', cx + 3.7, -6.9, 0.4, 0.4, 0.4); nl.userData.shade.emissiveIntensity = 0.9; let dark = false;
-      fun(nl, 'spal', [1.8, 4.6, 1.8], () => { dark = !dark; tone(dark ? 700 : 1200, 0, 0.06, 'square', 0.05); tw(hemi, { intensity: dark ? 0.42 : 0.8 }, 400); tw(sun, { intensity: dark ? 0.12 : 0.4 }, 400); hemi.color.copy(C(dark ? '#aab8ff' : '#ffffff')); garl = true; if (dark) SFX.twinkle(); });
+      fun(nl, 'spal', [1.8, 4.6, 1.8], () => { dark = !dark; tone(dark ? 700 : 1200, 0, 0.06, 'square', 0.05); tw(hemi, { intensity: dark ? 0.42 : 0.7 }, 400); tw(sun, { intensity: dark ? 0.12 : 0.36 }, 400); hemi.color.copy(C(dark ? '#aab8ff' : '#ffffff')); garl = true; if (dark) SFX.twinkle(); });
       const chest = grp(cx - 6.2, 0, 6.4); chest.add(rbox(M('#ff8a65', 0.7), 2.4, 1.3, 1.6, 0.14, 0, 0.65, 0)); const lidc = grp(0, 1.3, -0.8); lidc.add(rbox(M('#ffd54f', 0.5), 2.5, 0.25, 1.7, 0.1, 0, 0.1, 0.85)); chest.add(lidc); up.add(chest); obst('spal', cx - 6.2, 6.4, 1.2, 0.8, 0.5);
       { let op = false; fun(chest, 'spal', [2.6, 1.8, 1.8], () => { op = !op; SFX.whoosh(); tw(lidc.rotation, { x: op ? -1.3 : 0 }, 350, 'inout'); if (op) burst(V(cx - 6.2, Y + 1.8, 6.4), 10); }, { stand: () => ({ x: cx - 6.2, z: 3.6 }) }); }
       { const t = mkToy('zvezda'); t.position.set(cx - 5.6, Y + 0.6, -1.6); world.add(t); toy(t, 'spal', 0.6, 0.6, 0.1); }
