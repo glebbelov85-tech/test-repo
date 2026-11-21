@@ -29,12 +29,17 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 #ris.on { display: block; }
 #ris canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
 #ro { pointer-events: none; }
-#pal { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 1.6vmin; padding: 1.6vmin 1.6vmin calc(2.2vmin + env(safe-area-inset-bottom)); background: rgba(255,236,200,.92); box-shadow: 0 -0.6vmin 2vmin rgba(0,0,0,.12); }
-#pal .btn { position: relative; width: 12.5vmin; height: 12.5vmin; max-width: 96px; max-height: 96px; padding: 1.8vmin; }
-#pal .btn.ink { border: .9vmin solid #fff; }
-#pal .btn.sel { outline: .9vmin solid #5d3a24; transform: translateY(-1vmin); }
-#pal .btn.tsel { outline: .9vmin solid #ff8a1c; transform: translateY(-1vmin); }
-#pal .btn { width: 11.6vmin; height: 11.6vmin; }
+#pal { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 1.3vmin; padding: 1.3vmin calc(25vmin + env(safe-area-inset-right)) calc(1.6vmin + env(safe-area-inset-bottom)) calc(25vmin + env(safe-area-inset-left)); background: rgba(255,236,200,.94); box-shadow: 0 -0.6vmin 2vmin rgba(0,0,0,.1); }
+#rL, #rR { position: absolute; top: 0; bottom: 0; display: grid; align-content: center; justify-content: center; gap: 1.4vmin; padding: 1.4vmin; background: rgba(255,236,200,.94); box-shadow: 0 0 2vmin rgba(0,0,0,.1); z-index: 1; }
+#rL { left: 0; grid-template-columns: repeat(2, auto); padding-left: calc(1.4vmin + env(safe-area-inset-left)); }
+#rR { right: 0; grid-template-columns: auto; padding-right: calc(1.4vmin + env(safe-area-inset-right)); }
+#ris .btn { position: relative; width: 10.6vmin; height: 10.6vmin; max-width: 76px; max-height: 76px; padding: 1.5vmin; pointer-events: auto; transition: transform .12s; }
+#pal .btn.ink { width: 8.4vmin; height: 8.4vmin; max-width: 60px; max-height: 60px; border: .7vmin solid #fff; padding: 0; }
+#pal .btn.sel { outline: .8vmin solid #5d3a24; transform: translateY(-1.2vmin) scale(1.08); }
+#ris .btn.tsel { outline: .8vmin solid #ff8a1c; transform: scale(1.1); background: #fff7d6; }
+#ris .btn.dim { opacity: .4; }
+#ris .btn.home { background: #ffe0b2; }
+@media (orientation: portrait) { #rL, #rR { bottom: 26vmin; } #pal { padding-left: 1.3vmin; padding-right: 1.3vmin; } }
 #bHome { left: calc(2.5vmin + env(safe-area-inset-left)); top: calc(2.5vmin + env(safe-area-inset-top)); }
 #bRep { right: calc(2.5vmin + env(safe-area-inset-right)); top: calc(2.5vmin + env(safe-area-inset-top)); }
 #stars { position: absolute; left: 50%; top: calc(3.5vmin + env(safe-area-inset-top)); transform: translateX(-50%); display: flex; gap: 1.2vmin; background: rgba(255,255,255,.35); padding: 1.2vmin 2.4vmin; border-radius: 6vmin; }
@@ -65,17 +70,17 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 </div>
 <div id="start">
   <div class="btn green" id="bPlay"><svg viewBox="0 0 100 100"><path d="M36 24 L78 50 L36 76Z" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round"/></svg></div>
-  <div id="ver">v4.6</div>
+  <div id="ver">v4.7</div>
 </div>
 <div id="lvl"></div>
-<div id="ris"><canvas id="rc"></canvas><canvas id="ro"></canvas><div id="pal"></div></div>
+<div id="ris"><canvas id="rc"></canvas><canvas id="ro"></canvas><div id="pal"></div><div id="rL"></div><div id="rR"></div></div>
 <div id="wipe"></div>
 <script src="three.min.js"></script>
-<script src="frazy.js?v=4.6"></script>
-<script src="voice/zapisi.js?v=4.6"></script>
-<script src="modeli.js?v=4.6"></script>
-<script src="igra.js?v=4.6"></script>
-<script src="komnaty2.js?v=4.6"></script>
-<script src="dom.js?v=4.6"></script>
+<script src="frazy.js?v=4.7"></script>
+<script src="voice/zapisi.js?v=4.7"></script>
+<script src="modeli.js?v=4.7"></script>
+<script src="igra.js?v=4.7"></script>
+<script src="komnaty2.js?v=4.7"></script>
+<script src="dom.js?v=4.7"></script>
 </body>
 </html>

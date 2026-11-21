@@ -541,16 +541,27 @@ ICONS.muzyka = g => {
 
 // ===== Рисование (открывается с мольберта возле дома) =====
 (() => {
-  const el = $('ris'), cv = $('rc'), ov = $('ro'), pal = $('pal'), cx = cv.getContext('2d'), ox = ov.getContext('2d');
-  const INK = ['#f0352b', '#ff8a1c', '#ffd21f', '#35b24a', '#2a6df4', '#ff6fae', '#b25de0', '#8d5a34', '#2b2b2b'];
-  let col = INK[0], tool = 'pen', stamp = 0, pic = 0, dpr = 1, strokes = new Map(); // tool: pen, stamp, fill, erase
+  // ---------- мастерская рисования: кисти, размеры, заливка, штампы, раскраски, «назад» ----------
+  const el = $('ris'), cv = $('rc'), ov = $('ro'), pal = $('pal'), rL = $('rL'), rR = $('rR'), cx = cv.getContext('2d'), ox = ov.getContext('2d');
+  const INK = ['#f0352b', '#ff8a1c', '#ffd21f', '#c6e84a', '#35b24a', '#1fbfb0', '#4fc3f7', '#2a6df4', '#b25de0', '#ff6fae', '#ffc1d9', '#f6c9a0', '#8d5a34', '#9e9e9e', '#2b2b2b', '#ffffff'];
+  const PAPER = '#fffdf5';
+  let col = INK[0], tool = 'pen', stamp = 0, pic = 0, dpr = 1, size = 1, strokes = new Map(), hue = 0;
+  const B = '#5d3a24';
   const ico = {
-    home: '<svg viewBox="0 0 100 100"><path d="M14 48 L50 16 L86 48" fill="none" stroke="#5d3a24" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 44 V84 H76 V44" fill="#ffcc80" stroke="#5d3a24" stroke-width="7" stroke-linejoin="round"/></svg>',
-    eraser: '<svg viewBox="0 0 100 100"><rect x="22" y="34" width="56" height="34" rx="8" transform="rotate(-25 50 50)" fill="#ffb3c7" stroke="#5d3a24" stroke-width="6"/><path d="M20 84 H80" stroke="#5d3a24" stroke-width="6" stroke-linecap="round"/></svg>',
-    clear: '<svg viewBox="0 0 100 100"><rect x="20" y="16" width="60" height="68" rx="6" fill="#fff" stroke="#5d3a24" stroke-width="6"/><path d="M62 16 L80 34 H62Z" fill="#cfd8dc" stroke="#5d3a24" stroke-width="5" stroke-linejoin="round"/></svg>',
-    next: '<svg viewBox="0 0 100 100"><rect x="14" y="20" width="72" height="60" rx="8" fill="#fff" stroke="#5d3a24" stroke-width="6"/><circle cx="36" cy="42" r="8" fill="#ffd21f"/><path d="M20 74 L44 52 L58 64 L68 56 L82 72" fill="none" stroke="#35b24a" stroke-width="7" stroke-linejoin="round"/></svg>',
+    home: `<svg viewBox="0 0 100 100"><path d="M14 48 L50 16 L86 48" fill="none" stroke="${B}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 44 V84 H76 V44" fill="#ffcc80" stroke="${B}" stroke-width="7" stroke-linejoin="round"/></svg>`,
+    pen: `<svg viewBox="0 0 100 100"><path d="M24 76 L30 56 L68 18 L84 34 L46 72Z" fill="#ffd21f" stroke="${B}" stroke-width="6" stroke-linejoin="round"/><path d="M24 76 L30 56 L46 72Z" fill="${B}"/></svg>`,
+    soft: `<svg viewBox="0 0 100 100"><path d="M60 40 L84 14" stroke="#c98a4b" stroke-width="10" stroke-linecap="round"/><path d="M52 40 L62 50" stroke="#b0bec5" stroke-width="12" stroke-linecap="round"/><path d="M50 44 Q30 46 20 80 Q48 74 56 52Z" fill="#4fc3f7" stroke="${B}" stroke-width="5" stroke-linejoin="round"/></svg>`,
+    crayon: `<svg viewBox="0 0 100 100"><g transform="rotate(-45 50 50)"><path d="M22 40 H66 V60 H22Z" fill="#35b24a" stroke="${B}" stroke-width="5" stroke-linejoin="round"/><path d="M66 40 L84 50 L66 60Z" fill="#35b24a" stroke="${B}" stroke-width="5" stroke-linejoin="round"/><path d="M34 40 V60 M54 40 V60" stroke="#fff" stroke-width="4"/></g></svg>`,
+    spray: `<svg viewBox="0 0 100 100"><rect x="30" y="38" width="30" height="48" rx="8" fill="#ff6fae" stroke="${B}" stroke-width="5"/><rect x="38" y="26" width="14" height="12" rx="3" fill="#cfd8dc" stroke="${B}" stroke-width="5"/><g fill="#ff6fae"><circle cx="70" cy="22" r="4"/><circle cx="80" cy="30" r="3.5"/><circle cx="74" cy="36" r="3"/><circle cx="84" cy="18" r="3"/><circle cx="64" cy="14" r="3"/></g></svg>`,
+    rainbow: `<svg viewBox="0 0 100 100" fill="none" stroke-width="8" stroke-linecap="round"><path d="M14 74 A36 36 0 0 1 86 74" stroke="#f0352b"/><path d="M24 74 A26 26 0 0 1 76 74" stroke="#ffd21f"/><path d="M34 74 A16 16 0 0 1 66 74" stroke="#35b24a"/><path d="M44 74 A6 6 0 0 1 56 74" stroke="#2a6df4"/></svg>`,
+    magic: `<svg viewBox="0 0 100 100"><path d="M18 84 L58 44" stroke="${B}" stroke-width="8" stroke-linecap="round"/><path d="M64 14 L69 31 L86 36 L69 41 L64 58 L59 41 L42 36 L59 31Z" fill="#ffd21f" stroke="${B}" stroke-width="4" stroke-linejoin="round"/><circle cx="84" cy="62" r="5" fill="#ff6fae"/><circle cx="34" cy="22" r="4" fill="#4fc3f7"/></svg>`,
+    fill: `<svg viewBox="0 0 100 100"><path d="M28 44 L72 44 L64 84 L36 84Z" fill="#4fc3f7" stroke="${B}" stroke-width="6" stroke-linejoin="round"/><path d="M30 44 Q50 6 70 44" fill="none" stroke="${B}" stroke-width="6" stroke-linecap="round"/><path d="M80 54 q10 15 0 22 q-10 -7 0 -22z" fill="#f0352b"/></svg>`,
+    erase: `<svg viewBox="0 0 100 100"><rect x="22" y="34" width="56" height="34" rx="8" transform="rotate(-25 50 50)" fill="#ffb3c7" stroke="${B}" stroke-width="6"/><path d="M20 84 H80" stroke="${B}" stroke-width="6" stroke-linecap="round"/></svg>`,
+    undo: `<svg viewBox="0 0 100 100"><path d="M30 40 H62 A20 20 0 0 1 62 80 H40" fill="none" stroke="${B}" stroke-width="9" stroke-linecap="round"/><path d="M38 24 L20 40 L38 56Z" fill="${B}" stroke="${B}" stroke-width="6" stroke-linejoin="round"/></svg>`,
+    clear: `<svg viewBox="0 0 100 100"><rect x="20" y="16" width="60" height="68" rx="6" fill="#fff" stroke="${B}" stroke-width="6"/><path d="M62 16 L80 34 H62Z" fill="#cfd8dc" stroke="${B}" stroke-width="5" stroke-linejoin="round"/></svg>`,
+    next: `<svg viewBox="0 0 100 100"><rect x="14" y="20" width="72" height="60" rx="8" fill="#fff" stroke="${B}" stroke-width="6"/><circle cx="36" cy="42" r="8" fill="#ffd21f"/><path d="M20 74 L44 52 L58 64 L68 56 L82 72" fill="none" stroke="#35b24a" stroke-width="7" stroke-linejoin="round"/></svg>`,
   };
-  // картинки-раскраски: рисуются контуром поверх красок. Координаты от -1 до 1.
+  // картинки-раскраски: рисуются контуром поверх красок. Координаты от -1 до 1. Первая — чистый лист.
   const PICS = [
     null,
     (x) => { x.arc(0, 0, 0.42, 0, 7); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5; x.moveTo(Math.cos(a) * 0.55, Math.sin(a) * 0.55); x.lineTo(Math.cos(a) * 0.9, Math.sin(a) * 0.9); } },
@@ -560,13 +571,18 @@ ICONS.muzyka = g => {
     (x) => { x.arc(0, 0.25, 0.55, 0, 7); x.moveTo(-0.14, -0.3); x.ellipse(-0.3, -0.62, 0.16, 0.42, -0.15, 0, 7); x.moveTo(0.46, -0.3); x.ellipse(0.3, -0.62, 0.16, 0.42, 0.15, 0, 7); x.moveTo(-0.14, 0.15); x.arc(-0.2, 0.15, 0.06, 0, 7); x.moveTo(0.26, 0.15); x.arc(0.2, 0.15, 0.06, 0, 7); x.moveTo(0.07, 0.36); x.arc(0, 0.36, 0.07, 0, 7); x.moveTo(-0.2, 0.5); x.quadraticCurveTo(0, 0.66, 0.2, 0.5); },
     (x) => { x.ellipse(0, -0.25, 0.5, 0.6, 0, 0, 7); x.moveTo(-0.08, 0.35); x.lineTo(0.08, 0.35); x.lineTo(0, 0.44); x.closePath(); x.moveTo(0, 0.44); x.bezierCurveTo(0.25, 0.6, -0.25, 0.75, 0, 0.98); },
     (x) => { x.moveTo(0, -0.35); x.bezierCurveTo(-0.7, -0.85, -0.95, 0.2, 0, 0.8); x.bezierCurveTo(0.95, 0.2, 0.7, -0.85, 0, -0.35); },
+    // бабочка
+    (x) => { x.ellipse(-0.42, -0.3, 0.38, 0.32, -0.5, 0, 7); x.moveTo(0.8, -0.3); x.ellipse(0.42, -0.3, 0.38, 0.32, 0.5, 0, 7); x.moveTo(-0.08, 0.3); x.ellipse(-0.32, 0.3, 0.26, 0.22, 0.5, 0, 7); x.moveTo(0.58, 0.3); x.ellipse(0.32, 0.3, 0.26, 0.22, -0.5, 0, 7); x.moveTo(0.08, 0); x.ellipse(0, 0, 0.08, 0.55, 0, 0, 7); x.moveTo(-0.03, -0.52); x.quadraticCurveTo(-0.15, -0.85, -0.3, -0.88); x.moveTo(0.03, -0.52); x.quadraticCurveTo(0.15, -0.85, 0.3, -0.88); x.moveTo(-0.38, -0.3); x.arc(-0.45, -0.3, 0.1, 0, 7); x.moveTo(0.55, -0.3); x.arc(0.45, -0.3, 0.1, 0, 7); },
+    // машинка
+    (x) => { x.moveTo(-0.85, 0.3); x.lineTo(-0.85, -0.05); x.quadraticCurveTo(-0.85, -0.15, -0.7, -0.15); x.lineTo(-0.45, -0.15); x.lineTo(-0.25, -0.5); x.lineTo(0.35, -0.5); x.lineTo(0.55, -0.15); x.lineTo(0.75, -0.15); x.quadraticCurveTo(0.88, -0.15, 0.88, 0); x.lineTo(0.88, 0.3); x.closePath(); x.moveTo(-0.33, -0.18); x.lineTo(-0.18, -0.42); x.lineTo(0.02, -0.42); x.lineTo(0.02, -0.18); x.closePath(); x.moveTo(0.1, -0.18); x.lineTo(0.1, -0.42); x.lineTo(0.3, -0.42); x.lineTo(0.44, -0.18); x.closePath(); x.moveTo(-0.27, 0.32); x.arc(-0.45, 0.32, 0.18, 0, 7); x.moveTo(0.65, 0.32); x.arc(0.47, 0.32, 0.18, 0, 7); },
   ];
-  const area = () => { const r = pal.getBoundingClientRect(); return { w: innerWidth, h: Math.max(100, r.top) }; };
+  // где можно рисовать: между левой и правой панелями и над цветами
+  const area = () => { const a = rL.getBoundingClientRect(), b = rR.getBoundingClientRect(), c = pal.getBoundingClientRect(); const x0 = a.right, x1 = Math.max(x0 + 100, b.left); return { x: x0, y: 0, w: x1 - x0, h: Math.max(100, c.top) }; };
   function outline() {
     ox.setTransform(1, 0, 0, 1, 0, 0); ox.clearRect(0, 0, ov.width, ov.height);
     const f = PICS[pic]; if (!f) return;
-    const a = area(), k = Math.min(a.w, a.h) * 0.42 * dpr;
-    ox.setTransform(k, 0, 0, k, a.w / 2 * dpr, a.h / 2 * dpr);
+    const a = area(), k = Math.min(a.w, a.h) * 0.43 * dpr;
+    ox.setTransform(k, 0, 0, k, (a.x + a.w / 2) * dpr, a.h / 2 * dpr);
     ox.beginPath(); f(ox); ox.lineWidth = 0.035; ox.lineJoin = ox.lineCap = 'round'; ox.strokeStyle = '#4a3426'; ox.stroke();
   }
   function fitRis(keep) {
@@ -574,35 +590,73 @@ ICONS.muzyka = g => {
     const w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
     let old = null;
     if (keep && cv.width && (cv.width !== w || cv.height !== h)) { old = document.createElement('canvas'); old.width = cv.width; old.height = cv.height; old.getContext('2d').drawImage(cv, 0, 0); }
-    if (cv.width !== w || cv.height !== h || !keep) { cv.width = ov.width = w; cv.height = ov.height = h; cx.fillStyle = '#fffdf5'; cx.fillRect(0, 0, w, h); }
-    if (old) { const k = Math.min(w / old.width, h / old.height); cx.drawImage(old, (w - old.width * k) / 2, 0, old.width * k, old.height * k); }
+    if (cv.width !== w || cv.height !== h || !keep) { cv.width = ov.width = w; cv.height = ov.height = h; cx.fillStyle = PAPER; cx.fillRect(0, 0, w, h); }
+    if (old) { const k = Math.min(w / old.width, h / old.height); cx.drawImage(old, (w - old.width * k) / 2, 0, old.width * k, old.height * k); undo.length = 0; }
     outline();
   }
-  const wipe = () => { cx.fillStyle = '#fffdf5'; cx.fillRect(0, 0, cv.width, cv.height); };
-  const width = () => Math.min(innerWidth, innerHeight) * (tool === 'erase' ? 0.09 : 0.035) * dpr;
-  // штампы: звёздочка, сердечко, цветок, кружок
+  const wipe = () => { cx.fillStyle = PAPER; cx.fillRect(0, 0, cv.width, cv.height); };
+  // «назад»: до 8 снимков листа
+  const undo = [];
+  function snap() { const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; c.getContext('2d').drawImage(cv, 0, 0); undo.push(c); if (undo.length > 8) undo.shift(); upd(); }
+  function back() { const c = undo.pop(); if (!c) { SFX.boing(); return; } cx.drawImage(c, 0, 0); SFX.whoosh(); upd(); }
+  // размеры: маленький, средний, большой
+  const unit = () => Math.min(innerWidth, innerHeight) * dpr;
+  const width = () => unit() * [0.016, 0.032, 0.062][size] * (tool === 'erase' ? 2.2 : tool === 'soft' ? 1.7 : 1);
+  const stampSize = () => unit() * [0.045, 0.07, 0.11][size];
+  // кисти
+  const tint = new Map(); // мягкая кисть: круглое пятнышко с мягким краем
+  function softDab(c) { if (tint.has(c)) return tint.get(c); const s = 64, t = document.createElement('canvas'); t.width = t.height = s; const x = t.getContext('2d'), g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2); g.addColorStop(0, c); g.addColorStop(0.45, c); g.addColorStop(1, c + '00'); x.fillStyle = g; x.fillRect(0, 0, s, s); tint.set(c, t); return t; }
+  const crayP = new Map(); // восковой мелок: шершавая текстура
+  function crayon(c) { if (crayP.has(c)) return crayP.get(c); const s = 48, t = document.createElement('canvas'); t.width = t.height = s; const x = t.getContext('2d'); x.fillStyle = c; for (let i = 0; i < s; i++) for (let j = 0; j < s; j++) { const r = Math.random(); if (r < 0.28) continue; x.globalAlpha = r < 0.5 ? 0.45 : 1; x.fillRect(i, j, 1, 1); } const p = cx.createPattern(t, 'repeat'); crayP.set(c, p); return p; }
+  const BRIGHT = ['#ffd21f', '#ff6fae', '#4fc3f7', '#35b24a', '#ff8a1c', '#b25de0', '#ffffff'];
+  function star4(x, y, r, c, a) { cx.save(); cx.translate(x, y); cx.rotate(a); cx.fillStyle = c; cx.beginPath(); for (let k = 0; k < 8; k++) { const q = k % 2 ? r * 0.32 : r, an = k * Math.PI / 4; cx.lineTo(Math.cos(an) * q, Math.sin(an) * q); } cx.fill(); cx.restore(); }
+  function spray(x, y) { const w = width(), R = w * 1.7; cx.fillStyle = col; for (let i = 0; i < 26; i++) { const a = Math.random() * 7, d = Math.sqrt(Math.random()) * R; cx.beginPath(); cx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, Math.max(0.8 * dpr, w * 0.07), 0, 7); cx.fill(); } }
+  const line = (p, q, style, w) => { cx.strokeStyle = style; cx.lineWidth = w; cx.lineCap = cx.lineJoin = 'round'; cx.beginPath(); cx.moveTo(p[0], p[1]); cx.lineTo(q[0], q[1]); cx.stroke(); };
+  // кусочек мазка от точки s.p до q
+  function segment(s, q) {
+    const p = s.p, w = width(), L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (tool === 'pen') line(p, q, col, w);
+    else if (tool === 'erase') line(p, q, PAPER, w);
+    else if (tool === 'crayon') { cx.globalAlpha = 0.9; line(p, q, crayon(col), w * 1.15); cx.globalAlpha = 1; }
+    else if (tool === 'rainbow') { hue = (hue + L * 0.35 / dpr) % 360; line(p, q, `hsl(${hue},92%,56%)`, w); }
+    else if (tool === 'soft' || tool === 'spray' || tool === 'magic') {
+      const gap = tool === 'soft' ? w * 0.18 : tool === 'spray' ? w * 0.6 : w * 1.4; s.acc = (s.acc === undefined ? gap : s.acc) + L; if (s.acc < gap) return false;
+      const n = Math.min(120, Math.floor(s.acc / gap)); s.acc = Math.min(s.acc - n * gap, gap);
+      for (let i = 1; i <= n; i++) {
+        const k = i / n, x = p[0] + (q[0] - p[0]) * k, y = p[1] + (q[1] - p[1]) * k;
+        if (tool === 'soft') { cx.globalAlpha = 0.28; const d = softDab(col); cx.drawImage(d, x - w / 2, y - w / 2, w, w); cx.globalAlpha = 1; }
+        else if (tool === 'spray') spray(x, y);
+        else { star4(x + rr(-w, w) * 0.6, y + rr(-w, w) * 0.6, w * rr(0.5, 1.0), Math.random() < 0.4 ? col : BRIGHT[rnd(BRIGHT.length)], rr(0, 1)); cx.fillStyle = BRIGHT[rnd(BRIGHT.length)]; cx.beginPath(); cx.arc(x + rr(-w, w), y + rr(-w, w), w * 0.14, 0, 7); cx.fill(); }
+      }
+    }
+    return true;
+  }
+  // штампы: звёздочка, сердечко, цветок, кружок, облачко, лапка, бабочка, месяц
   const STAMPS = [
     (x, s) => { for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5, q = k % 2 ? s * 0.45 : s; x.lineTo(Math.sin(a) * q, -Math.cos(a) * q); } },
     (x, s) => { x.moveTo(0, s * 0.9); x.bezierCurveTo(-s * 1.5, -s * 0.1, -s * 0.6, -s * 1.2, 0, -s * 0.4); x.bezierCurveTo(s * 0.6, -s * 1.2, s * 1.5, -s * 0.1, 0, s * 0.9); },
     (x, s) => { for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; x.moveTo(Math.cos(a) * s * 0.55 + s * 0.42, Math.sin(a) * s * 0.55); x.arc(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55, s * 0.42, 0, 7); } },
     (x, s) => { x.arc(0, 0, s * 0.85, 0, 7); },
+    (x, s) => { for (const [a, b, r] of [[-0.55, 0.15, 0.42], [0, -0.2, 0.55], [0.55, 0.12, 0.45], [0.1, 0.3, 0.4]]) { x.moveTo(a * s + r * s, b * s); x.arc(a * s, b * s, r * s, 0, 7); } },
+    (x, s) => { for (const [a, b, r] of [[0, 0.3, 0.5], [-0.62, -0.25, 0.22], [-0.24, -0.62, 0.22], [0.24, -0.62, 0.22], [0.62, -0.25, 0.22]]) { x.moveTo(a * s + r * s, b * s); x.arc(a * s, b * s, r * s, 0, 7); } },
+    (x, s) => { for (const [a, b, r] of [[-0.48, -0.3, 0.45], [0.48, -0.3, 0.45], [-0.36, 0.42, 0.32], [0.36, 0.42, 0.32], [0, 0, 0.16], [0, 0.3, 0.14], [0, -0.3, 0.14]]) { x.moveTo(a * s + r * s, b * s); x.arc(a * s, b * s, r * s, 0, 7); } },
+    (x, s) => { x.moveTo(0.1 * s, -s); x.bezierCurveTo(-1.25 * s, -0.7 * s, -1.25 * s, 0.7 * s, 0.1 * s, s); x.bezierCurveTo(-0.55 * s, 0.5 * s, -0.55 * s, -0.5 * s, 0.1 * s, -s); },
   ];
-  const stampSize = () => Math.min(innerWidth, innerHeight) * 0.07 * dpr;
   function putStamp(p) {
     const s = stampSize(); cx.save(); cx.translate(p[0], p[1]); cx.rotate(rr(-0.3, 0.3)); cx.fillStyle = col; cx.beginPath(); STAMPS[stamp](cx, s); cx.fill();
     if (stamp === 2) { cx.fillStyle = col === '#ffd21f' ? '#ff8a1c' : '#ffd21f'; cx.beginPath(); cx.arc(0, 0, s * 0.3, 0, 7); cx.fill(); }
-    cx.restore(); tone(660 + stamp * 110, 0, 0.1, 'triangle', 0.09);
+    cx.restore(); tone(660 + stamp * 70, 0, 0.1, 'triangle', 0.09);
   }
   // заливка: закрашивает область до контура картинки или до другой краски
   function fill(px, py) {
-    const w = cv.width, h = cv.height; px |= 0; py |= 0; if (px < 0 || py < 0 || px >= w || py >= h) return;
+    const w = cv.width, h = cv.height; px |= 0; py |= 0; if (px < 0 || py < 0 || px >= w || py >= h) return false;
     const img = cx.getImageData(0, 0, w, h), d = img.data, od = ox.getImageData(0, 0, w, h).data;
     const i0 = (py * w + px) * 4, r0 = d[i0], g0 = d[i0 + 1], b0 = d[i0 + 2];
     const n = parseInt(col.slice(1), 16), fr = n >> 16, fg = (n >> 8) & 255, fb = n & 255;
-    if (Math.abs(r0 - fr) + Math.abs(g0 - fg) + Math.abs(b0 - fb) < 12) return;
+    if (Math.abs(r0 - fr) + Math.abs(g0 - fg) + Math.abs(b0 - fb) < 12) return false;
     const seen = new Uint8Array(w * h);
-    const can = (x, y) => { const q = y * w + x, i = q * 4; return !seen[q] && od[i + 3] < 110 && Math.abs(d[i] - r0) + Math.abs(d[i + 1] - g0) + Math.abs(d[i + 2] - b0) < 70; };
-    if (!can(px, py)) return;
+    const can = (x, y) => { const q = y * w + x, i = q * 4; return !seen[q] && od[i + 3] < 110 && Math.abs(d[i] - r0) + Math.abs(d[i + 1] - g0) + Math.abs(d[i + 2] - b0) < 90; };
+    if (!can(px, py)) return false;
     const st = [px, py];
     while (st.length) {
       const y = st.pop(), x = st.pop(); if (!can(x, y)) continue;
@@ -610,55 +664,80 @@ ICONS.muzyka = g => {
       for (let i = xl; i <= xr; i++) { const q = y * w + i, k = q * 4; seen[q] = 1; d[k] = fr; d[k + 1] = fg; d[k + 2] = fb; d[k + 3] = 255; }
       for (const ny of [y - 1, y + 1]) { if (ny < 0 || ny >= h) continue; let run = false; for (let i = xl; i <= xr; i++) { if (can(i, ny)) { if (!run) { st.push(i, ny); run = true; } } else run = false; } }
     }
-    cx.putImageData(img, 0, 0); SFX.plop();
+    // пиксели на самой границе тоже подкрашиваем, чтобы не оставалось белой каёмки у контура
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const q = y * w + x; if (seen[q] || !(seen[q - 1] || seen[q + 1] || seen[q - w] || seen[q + w])) continue; const k = q * 4; if (Math.abs(d[k] - r0) + Math.abs(d[k + 1] - g0) + Math.abs(d[k + 2] - b0) < 200) { d[k] = fr; d[k + 1] = fg; d[k + 2] = fb; } }
+    cx.putImageData(img, 0, 0); SFX.plop(); return true;
   }
+  // брызгалка шипит, пока палец стоит на месте
+  let sprayT = 0;
+  function sprayLoop() { sprayT = 0; if (tool !== 'spray' || !strokes.size) return; for (const s of strokes.values()) spray(s.p[0], s.p[1]); sprayT = requestAnimationFrame(sprayLoop); }
   cv.addEventListener('pointerdown', e => {
     e.preventDefault(); const p = [e.clientX * dpr, e.clientY * dpr];
-    if (tool === 'fill') { fill(p[0], p[1]); return; }
-    strokes.set(e.pointerId, p);
-    if (tool === 'stamp') { putStamp(p); return; }
-    cx.fillStyle = tool === 'erase' ? '#fffdf5' : col; cx.beginPath(); cx.arc(p[0], p[1], width() / 2, 0, 7); cx.fill();
+    if (tool === 'fill') { const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; c.getContext('2d').drawImage(cv, 0, 0); if (fill(p[0], p[1])) { undo.push(c); if (undo.length > 8) undo.shift(); upd(); } return; }
+    if (!strokes.size) snap();
+    const s = { p }; strokes.set(e.pointerId, s);
     try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    if (tool === 'stamp') { putStamp(p); return; }
+    if (tool === 'pen' || tool === 'erase' || tool === 'rainbow' || tool === 'crayon') { const w = width(); cx.fillStyle = tool === 'erase' ? PAPER : tool === 'rainbow' ? `hsl(${hue},92%,56%)` : tool === 'crayon' ? crayon(col) : col; cx.beginPath(); cx.arc(p[0], p[1], w / 2, 0, 7); cx.fill(); }
+    else segment(s, [p[0] + 0.01, p[1]]);
+    if (tool === 'spray' && !sprayT) sprayT = requestAnimationFrame(sprayLoop);
   });
   cv.addEventListener('pointermove', e => {
-    const p = strokes.get(e.pointerId); if (!p) return;
+    const s = strokes.get(e.pointerId); if (!s) return;
     const q = [e.clientX * dpr, e.clientY * dpr];
-    if (tool === 'stamp') { if (Math.hypot(q[0] - p[0], q[1] - p[1]) > stampSize() * 2.1) { putStamp(q); strokes.set(e.pointerId, q); } return; }
-    cx.strokeStyle = tool === 'erase' ? '#fffdf5' : col; cx.lineWidth = width(); cx.lineCap = cx.lineJoin = 'round';
-    cx.beginPath(); cx.moveTo(p[0], p[1]); cx.lineTo(q[0], q[1]); cx.stroke(); strokes.set(e.pointerId, q);
+    if (tool === 'stamp') { if (Math.hypot(q[0] - s.p[0], q[1] - s.p[1]) > stampSize() * 2.1) { putStamp(q); s.p = q; } return; }
+    segment(s, q); s.p = q;
   });
   const up = e => strokes.delete(e.pointerId);
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  // кнопки
-  const inks = [], tools = {};
-  const add = (html, fn, bg) => { const b = document.createElement('div'); b.className = 'btn'; if (bg) b.style.background = bg; b.innerHTML = html; tapBtn(b, () => fn(b)); pal.appendChild(b); return b; };
-  const mark = b => { inks.forEach(x => x.classList.remove('sel')); b.classList.add('sel'); };
-  const setTool = t => { tool = t; Object.keys(tools).forEach(k => tools[k].classList.toggle('tsel', k === t)); };
-  const stampIco = () => `<svg viewBox="-1.3 -1.3 2.6 2.6"><path d="${(() => { const pts = []; const rec = { moveTo: (x, y) => pts.push(`M${x.toFixed(2)} ${y.toFixed(2)}`), lineTo: (x, y) => pts.push(`${pts.length ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`), bezierCurveTo: (a, b, c, d, e, f) => pts.push(`C${a.toFixed(2)} ${b.toFixed(2)} ${c.toFixed(2)} ${d.toFixed(2)} ${e.toFixed(2)} ${f.toFixed(2)}`), arc: (x, y, r) => pts.push(`M${(x + r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(x - r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(x + r).toFixed(2)} ${y.toFixed(2)}`) }; STAMPS[stamp](rec, 1); return pts.join(''); })()}" fill="#ff6fae" stroke="#5d3a24" stroke-width="0.12" stroke-linejoin="round"/></svg>`;
-  add(ico.home, () => { SFX.tap(); go((current && current.back) || goHome); });
-  INK.forEach((c, i) => { const b = add('', bb => { col = c; if (tool === 'erase') setTool('pen'); mark(bb); tone(440 + i * 60, 0, 0.12, 'triangle', 0.1); }, c); b.classList.add('ink'); inks.push(b); if (!i) b.classList.add('sel'); });
-  tools.pen = add('<svg viewBox="0 0 100 100"><path d="M22 78 L28 56 L66 18 L82 34 L44 72Z" fill="#ffd21f" stroke="#5d3a24" stroke-width="6" stroke-linejoin="round"/><path d="M22 78 L28 56 L44 72Z" fill="#5d3a24"/></svg>', () => { setTool('pen'); SFX.tap(); });
-  tools.stamp = add(stampIco(), bb => { if (tool === 'stamp') stamp = (stamp + 1) % STAMPS.length; bb.innerHTML = stampIco(); setTool('stamp'); SFX.tap(); });
-  tools.fill = add('<svg viewBox="0 0 100 100"><path d="M28 44 L72 44 L64 84 L36 84Z" fill="#4fc3f7" stroke="#5d3a24" stroke-width="6" stroke-linejoin="round"/><path d="M30 44 Q50 6 70 44" fill="none" stroke="#5d3a24" stroke-width="6" stroke-linecap="round"/><path d="M78 56 q9 14 0 20 q-9 -6 0 -20z" fill="#f0352b"/></svg>', () => { setTool('fill'); SFX.tap(); });
-  tools.erase = add(ico.eraser, () => { setTool('erase'); SFX.tap(); });
+  // ---------- кнопки ----------
+  const inks = [], tools = {}, sizes = [];
+  const add = (where, html, fn, bg) => { const b = document.createElement('div'); b.className = 'btn'; if (bg) b.style.background = bg; b.innerHTML = html; tapBtn(b, () => fn(b)); where.appendChild(b); return b; };
+  const setTool = t => { tool = t; Object.keys(tools).forEach(k => tools[k].classList.toggle('tsel', k === t)); upd(); };
+  const stampIco = () => `<svg viewBox="-1.3 -1.3 2.6 2.6"><path d="${(() => { const pts = []; const rec = { moveTo: (x, y) => pts.push(`M${x.toFixed(2)} ${y.toFixed(2)}`), lineTo: (x, y) => pts.push(`${pts.length ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`), bezierCurveTo: (a, b, c, d, e, f) => pts.push(`C${a.toFixed(2)} ${b.toFixed(2)} ${c.toFixed(2)} ${d.toFixed(2)} ${e.toFixed(2)} ${f.toFixed(2)}`), arc: (x, y, r) => pts.push(`M${(x + r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(x - r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(x + r).toFixed(2)} ${y.toFixed(2)}`) }; STAMPS[stamp](rec, 1); return pts.join(''); })()}" fill="${col === '#ffffff' ? '#ff6fae' : col}" stroke="${B}" stroke-width="0.12" stroke-linejoin="round"/></svg>`;
+  // левая панель: домой и инструменты
+  add(rL, ico.home, () => { SFX.tap(); go((current && current.back) || goHome); }).classList.add('home');
+  const tsel = (k, snd) => () => { setTool(k); tone(snd, 0, 0.1, 'triangle', 0.08); };
+  tools.pen = add(rL, ico.pen, tsel('pen', 520));
+  tools.soft = add(rL, ico.soft, tsel('soft', 560));
+  tools.crayon = add(rL, ico.crayon, tsel('crayon', 600));
+  tools.spray = add(rL, ico.spray, tsel('spray', 640));
+  tools.rainbow = add(rL, ico.rainbow, tsel('rainbow', 680));
+  tools.magic = add(rL, ico.magic, tsel('magic', 720));
+  tools.stamp = add(rL, stampIco(), bb => { if (tool === 'stamp') stamp = (stamp + 1) % STAMPS.length; setTool('stamp'); tone(660 + stamp * 70, 0, 0.1, 'triangle', 0.08); });
+  tools.fill = add(rL, ico.fill, tsel('fill', 480));
+  tools.erase = add(rL, ico.erase, tsel('erase', 440));
+  // правая панель: размер, «назад», другая картинка, чистый лист
+  [0, 1, 2].forEach(i => { const b = add(rR, '', () => { size = i; upd(); tone(700 - i * 140, 0, 0.1, 'sine', 0.1); }); b.classList.add('size'); sizes.push(b); });
+  const bUndo = add(rR, ico.undo, back);
+  add(rR, ico.next, () => { snap(); pic = (pic + 1) % PICS.length; wipe(); outline(); SFX.plop(); });
+  add(rR, ico.clear, () => { snap(); wipe(); SFX.whoosh(); });
+  // нижняя полоса: цвета
+  INK.forEach((c, i) => { const b = add(pal, '', () => { col = c; if (tool === 'erase') setTool('pen'); upd(); tone(440 + i * 40, 0, 0.12, 'triangle', 0.1); }, c); b.classList.add('ink'); inks.push(b); });
+  function upd() {
+    inks.forEach((b, i) => b.classList.toggle('sel', INK[i] === col));
+    const dc = col === '#ffffff' ? '#e0e0e0' : col;
+    sizes.forEach((b, i) => { const r = [9, 17, 28][i]; b.innerHTML = `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${r}" fill="${dc}" stroke="${B}" stroke-width="4"/></svg>`; b.classList.toggle('tsel', i === size); b.classList.toggle('dim', tool === 'fill'); });
+    tools.stamp.innerHTML = stampIco();
+    bUndo.classList.toggle('dim', !undo.length);
+  }
   setTool('pen');
-  add(ico.next, () => { pic = (pic + 1) % PICS.length; wipe(); outline(); SFX.plop(); });
-  add(ico.clear, () => { wipe(); SFX.whoosh(); });
   // маленькая копия рисунка для стены в домике (null, если лист пустой)
   window.risSnap = () => {
     const a = area(), W = 320, H = 240, c = document.createElement('canvas'), x = c.getContext('2d'); c.width = W; c.height = H;
-    const sw = a.w * dpr, sh = a.h * dpr, k = Math.max(W / sw, H / sh), dw = sw * k, dh = sh * k;
-    x.fillStyle = '#fffdf5'; x.fillRect(0, 0, W, H);
-    const t = document.createElement('canvas'); t.width = 32; t.height = 24; const tx = t.getContext('2d'); tx.drawImage(cv, 0, 0, sw, sh, 0, 0, 32, 24);
+    const sx = a.x * dpr, sw = a.w * dpr, sh = a.h * dpr, k = Math.max(W / sw, H / sh), dw = sw * k, dh = sh * k;
+    x.fillStyle = PAPER; x.fillRect(0, 0, W, H);
+    const t = document.createElement('canvas'); t.width = 32; t.height = 24; const tx = t.getContext('2d'); tx.drawImage(cv, sx, 0, sw, sh, 0, 0, 32, 24);
     const d = tx.getImageData(0, 0, 32, 24).data; let ink = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 20 && (d[i] < 240 || d[i + 1] < 240 || d[i + 2] < 235)) ink++;
     if (ink < 3) return null;
-    x.drawImage(cv, 0, 0, sw, sh, (W - dw) / 2, (H - dh) / 2, dw, dh); x.drawImage(ov, 0, 0, sw, sh, (W - dw) / 2, (H - dh) / 2, dw, dh); return c;
+    x.drawImage(cv, sx, 0, sw, sh, (W - dw) / 2, (H - dh) / 2, dw, dh); x.drawImage(ov, sx, 0, sw, sh, (W - dw) / 2, (H - dh) / 2, dw, dh); return c;
   };
   window.openRis = back => {
-    clearWorld(); scene.background = new T.Color(C('#fffdf5'));
+    clearWorld(); scene.background = new T.Color(C(PAPER));
     current = { name: 'ris', rebuild: () => fitRis(true), back: typeof back === 'function' ? back : null };
     el.classList.add('on'); if (!pic) pic = 1 + rnd(PICS.length - 1);
-    fitRis(false);
+    undo.length = 0; fitRis(false); upd();
   };
+  window.__ris = { setTool, get tool() { return tool; }, setSize: i => { size = i; upd(); }, setCol: c => { col = c; upd(); }, back, undo };
   addEventListener('resize', () => { if (current && current.name === 'ris') setTimeout(() => fitRis(true), 60); });
 })();
