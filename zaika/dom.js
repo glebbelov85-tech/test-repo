@@ -469,7 +469,7 @@
     function corridor(D, k) {
       const P = RM[D.p], X = D.dx !== 0, Y = P.y, L = CL + 2 * TH, s = X ? D.dx : D.dz, m0 = P.hs + L / 2;
       const cx = P.cx + D.dx * m0, cz = P.cz + D.dz * m0, rm = k;
-      const fl = new T.Mesh(new T.PlaneGeometry(X ? L : DW, X ? DW : L), corF); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, Y + 0.01, cz); fl.receiveShadow = true; fl.userData.surf = { room: rm, floor: true }; world.add(fl); SURF.push(fl);
+      const fl = new T.Mesh(new T.PlaneGeometry(X ? L - 0.6 : DW, X ? DW : L - 0.6), corF); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, Y + 0.004, cz); fl.receiveShadow = true; fl.userData.surf = { room: rm, floor: true }; world.add(fl); SURF.push(fl);
       const cl = new T.Mesh(new T.PlaneGeometry(X ? L : DW, X ? DW : L), ceilM); cl.rotation.x = Math.PI / 2; cl.position.set(cx, Y + DH, cz); world.add(cl);
       for (const sg of [-1, 1]) {
         const g = new T.PlaneGeometry(L, DH), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * L / 4, uv.getY(i) * DH / WH);
@@ -478,7 +478,7 @@
         const bb = mesh(new T.BoxGeometry(X ? L : 0.14, 0.36, X ? 0.14 : L), trimM, cx + ox * 0.97, Y + 0.18, cz + oz * 0.97); bb.castShadow = false; world.add(bb);
       }
       // дорожка и круглый плафон
-      const run = rbox(M('#e8d5bf', 0.9), X ? L - 0.6 : 2.2, 0.04, X ? 2.2 : L - 0.6, 0.02, cx, Y + 0.03, cz); run.castShadow = false; run.receiveShadow = true; world.add(run);
+      const run = rbox(M('#e8d5bf', 0.9), X ? L - 1.4 : 2.2, 0.06, X ? 2.2 : L - 1.4, 0.03, cx, Y + 0.08, cz); run.castShadow = false; run.receiveShadow = true; world.add(run);
       const lp = cyl(M('#ffffff', 0.4, { emissive: C('#fff1d6'), emissiveIntensity: 0.8 }), 0.55, 0.55, 0.12, cx, Y + DH - 0.06, cz, 24); lp.castShadow = false; world.add(lp);
     }
     // лестница на этаж выше (всегда на восток): ступеньки с дорожкой, перила, картинки
