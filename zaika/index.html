@@ -25,6 +25,26 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 #lvl .btn { position: relative; width: 11.5vmin; height: 11.5vmin; max-width: 92px; max-height: 92px; padding: 1.3vmin; background: rgba(255,255,255,.7); }
 #lvl .btn svg { opacity: .45; }
 #lvl .btn.sel { background: #fff; outline: .7vmin solid #ffb300; } #lvl .btn.sel svg { opacity: 1; }
+#lvl { flex-wrap: wrap; justify-content: flex-end; max-width: 46vmin; }
+#lvl .btn.age { display: flex; align-items: center; justify-content: center; padding: 0; font: 900 5.4vmin "Arial Rounded MT Bold","Nunito","Trebuchet MS",system-ui,sans-serif; color: #b0896a; pointer-events: auto; }
+#lvl .btn.age.sel { color: #e2574c; }
+#lvl .btn.age.hold { animation: holdfill .8s linear both; }
+@keyframes holdfill { from { box-shadow: inset 0 0 0 0 #ffcf5a; } to { box-shadow: inset 0 0 0 6vmin #ffcf5a; } }
+#lvl .par { flex-basis: 100%; text-align: right; pointer-events: auto; cursor: pointer; }
+#lvl .par { font: 700 2.6vmin system-ui,sans-serif; color: #7a5a44; } #lvl .par::before { content: ''; }
+#lvl.on .par { display: block; }
+#lvl .par { background: none; } #lvl .par { text-decoration: underline; padding: .6vmin 1vmin; }
+#par { position: fixed; inset: 0; z-index: 30; display: none; background: rgba(60,40,30,.45); overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 3vmin; box-sizing: border-box; }
+#par.on { display: block; }
+#par .card { position: relative; max-width: 760px; margin: 0 auto; background: #fffaf0; border-radius: 24px; padding: 22px 26px 26px; font: 16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; color: #4a3528; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+#par .card.small { max-width: 520px; margin-top: 8vh; text-align: center; }
+#par h2 { margin: 0 0 12px; font-size: 26px; color: #e2574c; } #par h3 { margin: 18px 0 8px; font-size: 18px; color: #7a4a2a; }
+#par p { margin: 8px 0; } #par .dim { color: #8a7566; font-size: 14px; }
+#par .x { position: absolute; right: 14px; top: 12px; width: 44px; height: 44px; border-radius: 50%; background: #ffe0b2; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; }
+#par .ages { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 10px 0; }
+#par .ab { padding: 14px 22px; border-radius: 18px; background: #fff; border: 3px solid #ffd9a0; font-weight: 800; font-size: 20px; cursor: pointer; }
+#par .ab.sel { background: #ffcf5a; border-color: #ffb300; }
+#par table { width: 100%; border-collapse: collapse; font-size: 14px; } #par th, #par td { border: 1px solid #f0dcc0; padding: 6px 8px; text-align: left; vertical-align: top; } #par th { background: #fff0d6; }
 #ris { position: fixed; inset: 0; background: #fffdf5; display: none; z-index: 10; }
 #ris.on { display: block; }
 #ris canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
@@ -70,17 +90,18 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 </div>
 <div id="start">
   <div class="btn green" id="bPlay"><svg viewBox="0 0 100 100"><path d="M36 24 L78 50 L36 76Z" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round"/></svg></div>
-  <div id="ver">v4.11</div>
+  <div id="ver">v5.0</div>
 </div>
 <div id="lvl"></div>
+<div id="par"></div>
 <div id="ris"><canvas id="rc"></canvas><canvas id="ro"></canvas><div id="pal"></div><div id="rL"></div><div id="rR"></div></div>
 <div id="wipe"></div>
 <script src="three.min.js"></script>
-<script src="frazy.js?v=4.11"></script>
-<script src="voice/zapisi.js?v=4.11"></script>
-<script src="modeli.js?v=4.11"></script>
-<script src="igra.js?v=4.11"></script>
-<script src="komnaty2.js?v=4.11"></script>
-<script src="dom.js?v=4.11"></script>
+<script src="frazy.js?v=5.0"></script>
+<script src="voice/zapisi.js?v=5.0"></script>
+<script src="modeli.js?v=5.0"></script>
+<script src="igra.js?v=5.0"></script>
+<script src="komnaty2.js?v=5.0"></script>
+<script src="dom.js?v=5.0"></script>
 </body>
 </html>

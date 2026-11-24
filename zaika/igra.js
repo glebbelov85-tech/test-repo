@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '4.11';
+const VERSION = '5.0';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -122,7 +122,6 @@ const Voice = {
         });
       });
     }
-    if (this.have.size > 50) return new Promise(res => setTimeout(res, 250));
     return this.tts(TEXT[id] || id);
   },
   tts(text) {
@@ -475,13 +474,54 @@ tapBtn($('bAgain'), () => { SFX.tap(); if (current && current.again) return go(c
 tapBtn($('bHome2'), () => { SFX.tap(); go(goHome); });
 const LVL = $('lvl');
 const STAR_P = 'M50 6 L62 37 L95 39 L69 60 L78 93 L50 74 L22 93 L31 60 L5 39 L38 37Z';
-function updLvl() { [...LVL.children].forEach((b, i) => b.classList.toggle('sel', i === lvlOf())); }
-[[[25, 25, 0.5]], [[3, 27, 0.46], [51, 27, 0.46]], [[27, 3, 0.46], [3, 48, 0.46], [51, 48, 0.46]]].forEach((ps, i) => {
-  const b = document.createElement('div'); b.className = 'btn';
-  b.innerHTML = `<svg viewBox="0 0 100 100">${ps.map(([x, y, k]) => `<path transform="translate(${x} ${y}) scale(${k})" d="${STAR_P}" fill="#ffd23f" stroke="#f59e0b" stroke-width="8" stroke-linejoin="round"/>`).join('')}</svg>`;
-  tapBtn(b, () => { S.diff = i; save(); updLvl(); for (let k = 0; k <= i; k++) tone(660 + k * 220, k * 0.11, 0.16, 'triangle', 0.13); });
+// возраст ребёнка: 0 — 3–4 года, 1 — 4–5 лет, 2 — 5–7 лет. Чтобы малыш не сменил случайно, кнопку нужно подержать.
+const AGES = ['3–4 года', '4–5 лет', '5–7 лет'];
+function updLvl() { [...LVL.querySelectorAll('.age')].forEach((b, i) => b.classList.toggle('sel', S.diff !== undefined && i === lvlOf())); }
+function setAge(i) { S.diff = i; save(); updLvl(); for (let k = 0; k <= i; k++) tone(660 + k * 220, k * 0.11, 0.16, 'triangle', 0.13); }
+['3', '4', '5+'].forEach((t, i) => {
+  const b = document.createElement('div'); b.className = 'btn age'; b.innerHTML = `<b>${t}</b>`; let tm = 0;
+  const stop = () => { clearTimeout(tm); tm = 0; b.classList.remove('hold'); };
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (S.diff !== undefined && i === lvlOf()) { SFX.tap(); return; } SFX.tap(); b.classList.add('hold'); tm = setTimeout(() => { stop(); setAge(i); }, 800); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(n => b.addEventListener(n, stop));
   LVL.appendChild(b);
 });
+{ const p = document.createElement('div'); p.className = 'par'; p.textContent = 'Родителям'; tapBtn(p, () => { SFX.tap(); openPar(); }); LVL.appendChild(p); }
+// ---------- страничка для родителей и вопрос про возраст ----------
+const PAR = $('par');
+const ROOM_RU = { hall: 'Гостиная: цвета', kuh: 'Кухня: кто что любит', igr: 'Игровая: мячики по цветам', spal: 'Спальня: большой и маленький', zak: 'Заказы: счёт', zal: 'Зал с мячами: цвет и счёт', h3: 'Буквы на шариках', poch: 'Почта', azb: 'Азбука', h4: 'Кубики и слова', logic: 'Что дальше?' };
+const COL_RU = { krasny: 'красный', zhelty: 'жёлтый', siniy: 'синий', zeleny: 'зелёный', oranzhevy: 'оранжевый', rozovy: 'розовый' };
+function closePar() { PAR.classList.remove('on'); PAR.innerHTML = ''; }
+function ageBtns(done) { return `<div class="ages">${AGES.map((a, i) => `<div class="ab${S.diff !== undefined && i === lvlOf() ? ' sel' : ''}" data-a="${i}">${a}</div>`).join('')}</div>`; }
+function bindPar(after) {
+  PAR.querySelectorAll('.ab').forEach(b => b.addEventListener('pointerdown', e => { e.stopPropagation(); setAge(+b.dataset.a); after(); }));
+  const x = PAR.querySelector('.x'); if (x) x.addEventListener('pointerdown', e => { e.stopPropagation(); SFX.tap(); closePar(); });
+}
+function askAge() {
+  PAR.innerHTML = `<div class="card small"><h2>Сколько лет ребёнку?</h2>${ageBtns()}<p class="dim">От возраста зависят задания во всех комнатах. Потом его можно поменять в домике: кнопки 3, 4 и 5+ вверху справа.</p></div>`;
+  PAR.classList.add('on'); bindPar(closePar);
+}
+function openPar() {
+  const a = lvlOf(), st = (S.st || {})[a] || {}, er = S.err || {};
+  const rows = Object.keys(ROOM_RU).map(k => { const r = st[k] || {}; return `<tr><td>${ROOM_RU[k]}</td><td>${'●'.repeat((r.s || 0) + 1)}${'○'.repeat(2 - (r.s || 0))}</td><td>${r.n || 0}</td></tr>`; }).join('');
+  const hard = [['c_', 'цвета', k => COL_RU[k]], ['b_', 'буквы', k => k]].map(([p, name, f]) => { const l = Object.keys(er).filter(k => k.startsWith(p)).map(k => f(k.slice(2))).filter(Boolean); return l.length ? `${name}: ${l.join(', ')}` : ''; }).filter(Boolean).join('; ');
+  PAR.innerHTML = `<div class="card"><div class="x">✕</div><h2>Родителям</h2>
+<p><b>«Домик Зайки» растёт вместе с ребёнком.</b> Это один дом на три возраста: 3–4 года, 4–5 лет и 5–7 лет. Комнаты те же, а задания в них становятся глубже. Игра не на один год: когда ребёнок подрос, достаточно сменить возраст.</p>
+<h3>Возраст сейчас</h3>${ageBtns()}
+<p class="dim">В домике возраст меняют кнопки 3, 4 и 5+ вверху справа. Кнопку нужно подержать секунду, чтобы малыш не переключил случайно.</p>
+<h3>Как устроен дом</h3>
+<table><tr><th>Этаж</th><th>3–4 года</th><th>4–5 лет</th><th>5–7 лет</th></tr>
+<tr><td>1. Цвета, размеры, кто что любит</td><td>находит цвет, большой и маленький, кормит зверят</td><td>цвет и размер вместе, три размера, сам выбирает еду</td><td>запоминает порядок, выполняет просьбу из двух и трёх шагов</td></tr>
+<tr><td>2. Счёт</td><td>один и два, потом три</td><td>до пяти, цифра и столько же точек</td><td>несколько заказов сразу, только цифры</td></tr>
+<tr><td>3. Буквы</td><td>А, О, У, М, И; одинаковые картинки; «принеси утку»</td><td>десять букв, буква к букве, «что начинается на М»</td><td>все буквы, первая буква слова на слух</td></tr>
+<tr><td>4. Слова и логика</td><td>повторяет ряд из фигур, простые цепочки</td><td>слова из трёх букв с подсказкой, цепочки сложнее</td><td>слова без подсказки, цепочки из трёх и по размеру</td></tr></table>
+<h3>Игра подстраивается сама</h3>
+<p>В каждой комнате есть три скрытые ступеньки. Два раза прошёл почти без ошибок, и задание станет чуть труднее. Много ошибок, и оно станет чуть легче. То, что ребёнок путает, встречается чаще. Звёздочка над дверью показывает, куда идти дальше, но весь дом открыт всегда.</p>
+<h3>Как идут дела (${AGES[a]})</h3>
+<table><tr><th>Комната</th><th>Ступенька</th><th>Пройдено раз</th></tr>${rows}</table>
+<p>${hard ? 'Сейчас повторяем чаще: ' + hard + '.' : 'Трудных мест пока не замечено.'}</p>
+<p class="dim">Играйте по 10–15 минут. Лучше всего рядом со взрослым: называйте вслух цвета, цифры и буквы вместе с Зайкой.</p></div>`;
+  PAR.classList.add('on'); bindPar(openPar);
+}
 
 // ---------- смена сцен ----------
 let session = 0, current = null, busyWipe = false;
@@ -499,7 +539,7 @@ function clearWorld() {
   for (let i = cam.children.length - 1; i >= 0; i--) cam.remove(cam.children[i]);
   if (scene.background && scene.background.isTexture) scene.background.dispose();
   world = new T.Group(); scene.add(world);
-  UI.fin.classList.remove('on'); UI.top.classList.remove('on'); UI.start.classList.remove('on'); LVL.classList.remove('on'); $('ris').classList.remove('on');
+  UI.fin.classList.remove('on'); UI.top.classList.remove('on'); UI.start.classList.remove('on'); LVL.classList.remove('on'); closePar(); $('ris').classList.remove('on');
   return session;
 }
 async function go(fn) {
@@ -515,7 +555,7 @@ async function go(fn) {
 // ---------- комнаты ----------
 const ROOMS = {};
 // уровень сложности выбирают кнопками-звёздочками в домике: 0 — легко, 1 — средне, 2 — сложно
-function lvlOf() { return S.diff === undefined ? 1 : S.diff; }
+function lvlOf() { return S.diff === undefined ? 0 : S.diff; }
 
 function runRoom(key, keepRound) {
   const Rm = ROOMS[key];
@@ -1070,7 +1110,7 @@ function homeDoor(x, y, z, k, standalone) {
 function goHome() {
   const my = clearWorld();
   current = { name: 'home', rebuild: () => goHome() };
-  LVL.classList.add('on'); updLvl();
+  LVL.classList.add('on'); updLvl(); if (S.diff === undefined) askAge();
   const cw = 4.3, ch = 3.6, cd = 2.6, fl = 0.55;
   const cols = landscape ? 4 : 3, rows = ROOM_KEYS.length / cols;
   const y0 = landscape ? 0 : 3.5; // в портретном положении дом стоит на высоком крыльце, Зайка перед ним

@@ -1,5 +1,5 @@
 'use strict';
-// «Домик изнутри» (версия 4.8): прогулка по дому от первого лица, управление как в «SCP: Побег».
+// «Домик изнутри» (версия 5.0): прогулка по дому от первого лица, управление как в «SCP: Побег».
 // Слева джойстик — ходить. Пальцем по экрану — смотреть. Справа большая лапка — взять, открыть, включить.
 // Прежнее управление (нажал на пол — пошёл) осталось: адрес с ?ctl=tap или S.ctl = 'tap'.
 (() => {
@@ -308,14 +308,14 @@
     Object.assign(g.userData, { dome, mat, tri }); return g;
   }
   const _num = {};
-  function numTex(n, col, plain, got) { // большая цифра и столько же точек под ней (got: сколько уже закрашено)
-    const k = n + col + (plain ? 'p' : '') + (got === undefined ? '' : 'g' + got); if (_num[k]) return _num[k];
+  function numTex(n, col, plain, got, nodots) { // большая цифра и столько же точек под ней (got: сколько уже закрашено)
+    const k = n + col + (plain ? 'p' : '') + (got === undefined ? '' : 'g' + got) + (nodots ? 'n' : ''); if (_num[k]) return _num[k];
     const t = cnv(256, 256, (x, w, h) => {
       x.clearRect(0, 0, w, h);
       if (!plain) { x.fillStyle = '#ffffff'; x.beginPath(); x.arc(128, 128, 120, 0, 7); x.fill(); x.strokeStyle = col; x.lineWidth = 14; x.beginPath(); x.arc(128, 128, 113, 0, 7); x.stroke(); }
       x.font = '900 168px "Arial Rounded MT Bold","Nunito","Baloo 2","Trebuchet MS","Segoe UI",system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.lineJoin = 'round'; x.lineWidth = 12; x.strokeStyle = col; x.fillStyle = col; x.strokeText(String(n), 128, 108); x.fillText(String(n), 128, 108);
-      for (let i = 0; i < n; i++) { x.beginPath(); x.arc(128 + (i - (n - 1) / 2) * 30, 208, 11, 0, 7); if (got === undefined || i < got) x.fill(); else { x.lineWidth = 5; x.stroke(); } }
+      x.lineJoin = 'round'; x.lineWidth = 12; x.strokeStyle = col; x.fillStyle = col; x.strokeText(String(n), 128, nodots ? 132 : 108); x.fillText(String(n), 128, nodots ? 132 : 108);
+      if (!nodots) for (let i = 0; i < n; i++) { x.beginPath(); x.arc(128 + (i - (n - 1) / 2) * 30, 208, 11, 0, 7); if (got === undefined || i < got) x.fill(); else { x.lineWidth = 5; x.stroke(); } }
     });
     t.wrapS = t.wrapT = T.ClampToEdgeWrapping; t.repeat.set(1, 1); return _num[k] = t;
   }
@@ -329,11 +329,21 @@
   const FONT = '"Arial Rounded MT Bold","Nunito","Baloo 2","Trebuchet MS","Segoe UI",system-ui,sans-serif';
   const _lt = {};
   // буква на текстуре: bg — плашка, ring — её кант, out — обводка буквы, faint — бледная подсказка
+  const FIGCH = { '●': 'krug', '■': 'kvadrat', '▲': 'treugolnik', '★': 'zvezda', '♥': 'serdce' };
+  function figPath(x, f) {
+    if (f === 'kvadrat') { rrect(x, 54, 60, 148, 148, 20); return; }
+    x.beginPath();
+    if (f === 'krug') x.arc(128, 134, 78, 0, 7);
+    else if (f === 'treugolnik') { x.moveTo(128, 48); x.lineTo(214, 204); x.lineTo(42, 204); x.closePath(); }
+    else if (f === 'zvezda') { for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 42 : 92; x.lineTo(128 + Math.cos(a) * r, 138 + Math.sin(a) * r); } x.closePath(); }
+    else { x.moveTo(128, 214); x.bezierCurveTo(20, 140, 40, 40, 128, 92); x.bezierCurveTo(216, 40, 236, 140, 128, 214); x.closePath(); }
+  }
   function letTex(ch, col, o = {}) {
     const k = [ch, col, o.bg, o.ring, o.out, o.faint].join('|'); if (_lt[k]) return _lt[k];
     const t = cnv(256, 256, (x, w, h) => {
       if (o.bg) { x.fillStyle = o.bg; rrect(x, 8, 8, 240, 240, 60); x.fill(); if (o.ring) { x.lineWidth = 12; x.strokeStyle = o.ring; rrect(x, 16, 16, 224, 224, 52); x.stroke(); } }
       if (!ch) return;
+      if (FIGCH[ch]) { figPath(x, FIGCH[ch]); x.lineJoin = 'round'; if (o.out) { x.lineWidth = 22; x.strokeStyle = o.out; x.stroke(); } x.globalAlpha = o.faint ? 0.28 : 1; x.fillStyle = col; x.fill(); return; }
       x.font = '900 176px ' + FONT; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
       if (o.out) { x.lineWidth = 22; x.strokeStyle = o.out; x.strokeText(ch, 128, 140); }
       x.globalAlpha = o.faint ? 0.28 : 1; x.fillStyle = col; x.fillText(ch, 128, 140);
@@ -343,7 +353,7 @@
   const letPlate = (ch, col, s, o) => { const m = new T.Mesh(new T.PlaneGeometry(s, s), new T.MeshBasicMaterial({ map: letTex(ch, col, o), transparent: true })); m.castShadow = false; m.renderOrder = 2; return m; };
   // буквы, которые Зайка называет вслух: озвучка b_<…>
   const LV = { 'А': 'a', 'Б': 'b', 'Д': 'd', 'З': 'z', 'И': 'i', 'К': 'k', 'М': 'm', 'О': 'o', 'Р': 'r', 'Т': 't', 'У': 'u', 'Ч': 'ch', 'Ш': 'sh', 'Ы': 'y', 'Ё': 'yo', 'Я': 'ya' };
-  const bv = ch => 'b_' + LV[ch];
+  const bv = ch => (FIGCH[ch] ? 'naz_' + FIGCH[ch] : 'b_' + LV[ch]), nmv = ch => (FIGCH[ch] ? [bv(ch)] : ['eto_bukva', bv(ch)]);
   const LCOL = ['#f0352b', '#2a6df4', '#35b24a', '#ff8a1c', '#b25de0', '#ff4f9a', '#00a8b5', '#e0a800'];
   function mkArbuz() {
     const g = grp(), t = cnv(64, 32, (x, w, h) => { x.fillStyle = '#6cc64f'; x.fillRect(0, 0, w, h); x.fillStyle = '#2f7d32'; for (let i = 0; i < 8; i++) { x.beginPath(); x.ellipse(i * 8 + 4, h / 2, 2.4, h / 2 + 3, 0, 0, 7); x.fill(); } });
@@ -386,6 +396,14 @@
   function openDom() {
     const my = clearWorld(), alive = () => my === session;
     const lvl = window.__lvl !== undefined ? window.__lvl : lvlOf();
+    // возраст (lvl: 0 — 3–4 года, 1 — 4–5, 2 — 5–7) и скрытые ступеньки внутри возраста: у каждой комнаты своя
+    const STL = ((S.st = S.st || {})[lvl] = S.st[lvl] || {}), ERR = (S.err = S.err || {});
+    const stp = k => (window.__step !== undefined ? window.__step : Math.min(2, (STL[k] || {}).s || 0));
+    const P3 = (k, t) => t[lvl][stp(k)];
+    // что путает ребёнок, то встречается чаще
+    const bad = id => { ERR[id] = Math.min(4, (ERR[id] || 0) + 1); }, okk = id => { if (ERR[id] && --ERR[id] <= 0) delete ERR[id]; };
+    const wsel = (pool, n, pre) => shuffle(shuffle(pool).sort((a, b) => (ERR[pre + b] || 0) - (ERR[pre + a] || 0)).slice(0, n));
+    const wpick = (arr, f) => { const w = arr.map(a => 1 + 2 * (ERR[f(a)] || 0)); let r = Math.random() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < arr.length; i++) { r -= w[i]; if (r <= 0) return arr[i]; } return arr[arr.length - 1]; };
     const TAP = S.ctl === 'tap' || /[?&]ctl=tap/.test(location.search); // прежнее управление: нажал на пол — пошёл
     hud.classList.add('on'); hud.classList.toggle('tap', TAP); checkRot(); goLandscape();
     scene.background = new T.Color(C('#fdf3dc'));
@@ -703,6 +721,11 @@
     }
     async function roomDone(key, pos) {
       const g = G[key]; g.done = true; g.q = null; Idle.off();
+      { // ступенька: два чистых прохода — задание чуть сложнее, много ошибок — чуть легче
+        const r = STL[key] = STL[key] || { s: 0, c: 0 }, e = g.errs || 0; r.n = (r.n || 0) + 1;
+        if (e <= 1) { if (++r.c >= 2 && r.s < 2) { r.s++; r.c = 0; } } else if (e >= 4) { r.c = 0; if (r.s > 0) r.s--; }
+        save();
+      }
       st.stars++; hudFloor(); SFX.good(); burst(pos, 22);
       const bt = BTN[key]; if (bt) { const s = mkZvezda(true, 0.5); s.castShadow = false; s.position.y = 2.5; bt.add(s); popIn(s, 0.5); TICK.push(t => { s.rotation.y = t * 2; }); }
       const sg = SIGN[key]; if (sg) { const s = mkZvezda(true, 0.42); s.castShadow = false; s.position.set(0.62, 0.62, 0.25); sg.add(s); popIn(s, 0.42); TICK.push(t => { s.rotation.y = Math.sin(t * 2) * 0.6; }); }
@@ -721,7 +744,7 @@
       if (!alive()) return;
       if (all) { UI.fin.classList.add('on'); say('esche'); } else wait(2500).then(() => tws(star, 0.001, 400).then(() => cam.remove(star)));
     }
-    const miss = g => { g.wrong = (g.wrong || 0) + 1; SFX.soft(); return g.wrong >= 2; };
+    const miss = g => { g.wrong = (g.wrong || 0) + 1; g.errs = (g.errs || 0) + 1; SFX.soft(); return g.wrong >= 2; };
     // «живой» предмет: нажал — что-то происходит
     const fun = (obj, room, hb, act, o = {}) => { obj.userData.stat = true; hitBox(obj, hb[0], hb[1], hb[2], hb[3] || 0, hb[4] === undefined ? hb[1] / 2 : hb[4], hb[5] || 0); obj.userData.cy = hb[4] === undefined ? hb[1] / 2 : hb[4]; return inter(obj, Object.assign({ room, fh: hb[1] + 0.6, stand: near(obj, o.d || 3.6), look: () => { const p = wpos(obj); p.y += obj.userData.cy; return p; }, act }, o)); };
     // игрушка, которую можно взять и переложить
@@ -757,41 +780,75 @@
       { const i = mkMyach(COLORS.krasny); i.scale.setScalar(0.78); plaque('igr', 0, -HS + 0.12, 0, i); }
       { const t = mkMyach(COLORS.zeleny); t.position.set(-3.6, 0.72, 4.6); t.scale.setScalar(1.2); world.add(t); toy(t, 'hall', 0.78, 0.72, 0.1); }
 
-      const n = [3, 4, 6][lvl], cols = shuffle(Object.keys(COLORS)).slice(0, n);
+      // по возрасту: 3–4 цвета; 4–5 цвет и размер; 5–7 запомни и лопни по порядку
+      const mode = ['col', 'size', 'seq'][lvl], sp = stp('hall');
+      const n = mode === 'col' ? [3, 4, 6][sp] : mode === 'size' ? [4, 6, 6][sp] : [4, 5, 6][sp];
+      const cset = wsel(Object.keys(COLORS), mode === 'size' ? n / 2 : n, 'c_');
+      const list = mode === 'size' ? shuffle(cset.flatMap(c => [[c, 'b'], [c, 'm']])) : cset.map(c => [c, '']);
       const P = [[-4.6, 4.5, -5.2], [2.2, 4.9, -3.6], [-2.9, 5.3, -6.6], [6.2, 4.5, -2.8], [-6.2, 4.6, 0.2], [5.6, 4.8, 2.6]];
-      const g = G.hall = { intro: 'kraski_intro', left: 3, balls: [] };
-      cols.forEach((c, i) => {
-        const b = mkShar(COLORS[c]), U = b.userData; U.c = c; U.by = P[i][1]; U.cy = 0;
-        b.position.set(P[i][0], P[i][1], P[i][2]); b.scale.setScalar(0.95); hitBox(b, 2.2, 2.7, 2.2, 0, -0.1, 0);
+      const g = G.hall = { intro: mode === 'seq' ? 'kraski_intro_c' : 'kraski_intro', left: mode === 'size' && sp === 2 ? 4 : 3, balls: [] };
+      const szq = U => (U.sz === 'b' ? 'sh_bolshoy' : U.sz === 'm' ? 'sh_malenky' : null);
+      list.forEach(([c, sz], i) => {
+        const b = mkShar(COLORS[c]), U = b.userData; U.c = c; U.sz = sz; U.sc = sz === 'b' ? 1.22 : sz === 'm' ? 0.66 : 0.95; U.by = P[i][1] - (sz === 'm' ? 0.5 : 0); U.cy = 0;
+        b.position.set(P[i][0], U.by, P[i][2]); b.scale.setScalar(U.sc); hitBox(b, 2.2, 2.7, 2.2, 0, -0.1, 0);
         const wt = ball(M(COLORS[c], 0.5), 0.2, P[i][0], 0.2, P[i][2]); world.add(wt);
         const str = cyl(M('#9a9a9a', 0.8), 0.014, 0.014, 1, P[i][0], 1, P[i][2], 4); str.castShadow = false; world.add(str); U.str = str;
-        world.add(b); g.balls.push(b); popIn(b, 0.95, 300 + i * 120);
-        inter(b, { room: 'hall', far: true, fh: 1.6, look: () => wpos(b), act: () => { if (g.tapBall) g.tapBall(b); else { wobble(b, 0.3); say('eto_' + c); } } });
+        world.add(b); g.balls.push(b); popIn(b, U.sc, 300 + i * 120);
+        U.fpo = () => ({ room: 'hall', far: true, fh: 1.6, look: () => wpos(b), act: () => { if (g.tapBall) g.tapBall(b); else { wobble(b, 0.3); say(['eto_' + c, szq(U)]); } } });
+        inter(b, U.fpo());
       });
-      TICK.push(t => g.balls.forEach(b => { const U = b.userData; if (!b.parent) return; b.position.y = U.by + Math.sin(t * 1.3 + U.ph) * 0.14; b.rotation.z = Math.sin(t * 0.9 + U.ph) * 0.06; const y0 = 0.3, y1 = b.position.y - 2.75; U.str.scale.y = Math.max(0.01, y1 - y0); U.str.position.y = (y0 + y1) / 2; }));
-      g.start = () => {
+      TICK.push(t => g.balls.forEach(b => { const U = b.userData; if (!b.parent) return; b.position.y = U.by + Math.sin(t * 1.3 + U.ph) * 0.14; b.rotation.z = Math.sin(t * 0.9 + U.ph) * 0.06; const y0 = 0.3, y1 = b.position.y - 2.75 * U.sc / 0.95; U.str.scale.y = Math.max(0.01, y1 - y0); U.str.position.y = (y0 + y1) / 2; }));
+      const popBall = async b => {
+        const U = b.userData; U.popped = true; uninter(b); SFX.pop(); const pos = b.position.clone();
+        await tws(b, U.sc * 1.35, 90, 'out'); world.remove(b); world.remove(U.str);
+        burst(pos, 22, [COLORS[U.c], '#ffffff', COLORS[U.c]], { conf: true, speed: 1.2 }); SFX.good(); return pos;
+      };
+      const revive = (b, i) => { const U = b.userData; if (!U.popped) return; U.popped = false; world.add(b); world.add(U.str); b.scale.setScalar(0.001); popIn(b, U.sc, 150 + i * 120); inter(b, U.fpo()); };
+      const pulse = b => { const U = b.userData; tone(520 + g.balls.indexOf(b) * 70, 0, 0.25, 'triangle', 0.12); tws(b, U.sc * 1.3, 180, 'out').then(() => { if (b.parent) tws(b, U.sc, 320, 'back'); }); };
+      const startFind = () => {
         const liveB = g.balls.filter(b => b.parent && !b.userData.popped);
-        const tb = pick(liveB), target = tb.userData.c; g.wrong = 0;
+        const tb = wpick(liveB, b => 'c_' + b.userData.c), target = tb.userData.c, q = ['najdi_' + target, szq(tb.userData)]; g.wrong = 0;
         g.tapBall = async b => {
           const U = b.userData; if (U.popped) return;
-          if (g.done || g.busy) { wobble(b, 0.3); say('eto_' + U.c); return; }
-          if (U.c === target) {
-            g.busy = true; g.balls.forEach(unmark); U.popped = true; uninter(b);
-            SFX.pop(); const pos = b.position.clone();
-            await tws(b, 1.3, 90, 'out'); world.remove(b); world.remove(U.str);
-            burst(pos, 22, [COLORS[U.c], '#ffffff', COLORS[U.c]], { conf: true, speed: 1.2 }); SFX.good();
+          if (g.done || g.busy) { wobble(b, 0.3); say(['eto_' + U.c, szq(U)]); return; }
+          if (b === tb) {
+            g.busy = true; g.balls.forEach(unmark); okk('c_' + target);
+            const pos = await popBall(b);
             g.left--; g.busy = false;
             if (g.left <= 0) { g.q = null; await say('eto_' + U.c); if (alive()) roomDone('hall', pos); return; }
             g.q = null; Idle.off();
             await say(['eto_' + U.c, praise()]); if (alive()) g.start();
           } else {
-            const hint = miss(g); wobble(b, 0.35);
+            const hint = miss(g); wobble(b, 0.35); if (U.c !== target) bad('c_' + target);
             if (hint) mark(tb, 1.5);
-            say(['eto_' + U.c, hint ? 'podskazka' : null, 'najdi_' + target]);
+            say(['eto_' + U.c, szq(U), hint ? 'podskazka' : null].concat(q));
           }
         };
-        setQ('hall', ['najdi_' + target], () => { nudge(tb); });
+        g.tgt = () => tb; setQ('hall', q, () => { nudge(tb); });
       };
+      const startSeq = async () => {
+        const L = [2, 3, 4][sp]; g.busy = true; g.wrong = 0; g.q = null;
+        g.balls.forEach(revive); await wait(g.balls.some(b => b.scale.x < 0.1) ? 900 : 100); if (!alive()) return;
+        const seq = shuffle(g.balls).slice(0, L); let i = 0; g.tgt = () => seq[i];
+        g.tapBall = async b => {
+          const U = b.userData; if (U.popped) return;
+          if (g.done || g.busy) { wobble(b, 0.3); say('eto_' + U.c); return; }
+          if (b === seq[i]) {
+            g.busy = true; g.balls.forEach(unmark); g.wrong = 0; i++;
+            const pos = await popBall(b); g.busy = false;
+            if (i < L) { say('cv_' + U.c); Idle.poke(); return; }
+            g.left--; g.q = null; Idle.off();
+            if (g.left <= 0) { await say('cv_' + U.c); if (alive()) roomDone('hall', pos); return; }
+            await say(['cv_' + U.c, praise()]); if (alive()) startSeq();
+          } else { const hint = miss(g); wobble(b, 0.35); if (hint) mark(seq[i], 1.5); say(hint ? ['po_poryadku_ne', 'podskazka'] : 'po_poryadku_ne'); }
+        };
+        await say('zapomni');
+        for (const b of seq) { if (!alive()) return; pulse(b); if (!(await say('cv_' + b.userData.c))) break; await wait(150); }
+        if (!alive()) return; g.busy = false;
+        g.q = ['zapomni'].concat(seq.slice(i).map(b => 'cv_' + b.userData.c)); g.hint = () => seq.slice(i).forEach((b, k) => wait(1500 + k * 1100).then(() => { if (alive() && b.parent && !b.userData.popped) pulse(b); }));
+        if (st.room === 'hall') { say('teper_ty'); Idle.set(() => { if (st.room === 'hall' && !g.busy) { say(g.q); g.hint(); } }); }
+      };
+      g.start = mode === 'seq' ? startSeq : startFind;
       startBtn('hall', 3.4, 3.0);
     }
 
@@ -816,8 +873,10 @@
 
       const FOODS = { mishka: ['med', mkMed, 1.35, 0.35], ezhik: ['yabloko', mkYabloko, 1.5, 0.3], koshka: ['moloko', mkMiska, 1.1, 0.3], sobaka: ['kost', mkKost, 1.25, 0.35] };
       const SC = { mishka: 1.1, ezhik: 1.3, koshka: 1.3, sobaka: 1.25 }, MK = { mishka: mkMishka, ezhik: mkEzhik, koshka: () => mkZver('koshka'), sobaka: () => mkZver('sobaka') };
-      const n = [3, 4, 4][lvl], set = shuffle(Object.keys(FOODS)).slice(0, n);
-      const g = G.kuh = { intro: 'eda_intro', left: 3, an: [] };
+      // по возрасту: 3–4 «кто это любит?»; 4–5 «что любит мишка?» (выбери еду сам); 5–7 покорми по порядку, как сказала Зайка
+      const mode = ['who', 'what', 'seq'][lvl], sp = stp('kuh');
+      const n = mode === 'who' ? [3, 3, 4][sp] : 4, set = shuffle(Object.keys(FOODS)).slice(0, n);
+      const g = G.kuh = { intro: mode === 'seq' ? 'eda_intro_c' : 'eda_intro', left: mode === 'seq' ? [2, 3, 3][sp] : [3, 4, 4][sp], an: [] };
       const ax = cx - 5.7, z0 = n === 4 ? 5.0 : 4.4, dz = n === 4 ? 2.95 : 3.6;
       set.forEach((who, i) => {
         const a = actor(MK[who]()), s = SC[who], U = a.userData, z = z0 - i * dz;
@@ -828,34 +887,66 @@
         inter(a, { room: 'kuh', fh: U.h * s + 0.9, stand: () => ({ x: ax + 4.7, z }), look: () => V(ax, U.h * 0.55 * s, z), act: () => { if (g.tapAn) g.tapAn(a); else { hop(a, 0.4); SFX.boing(); } } });
       });
       const tray = mkTarelka(); tray.scale.setScalar(0.62); tray.position.set(cx - 1.4, 2.12, -6.95); world.add(tray);
-      const trayPos = V(cx - 1.4, 2.62, -6.95);
-      g.start = () => {
-        const who = bag(g, 'w', set), [name, mk, fs, hy] = FOODS[who], q = 'kto_lubit_' + name; g.wrong = 0;
-        const food = mk(); food.position.copy(trayPos); food.userData.cy = 0; hitBox(food, 1.4, 1.4, 1.4); world.add(food); popIn(food, fs, 100);
-        food.userData.float = true;
-        const it = { obj: food, hs: fs * 0.62, hy, fy: 0.5, lookAfter: V(ax, 1.6, z0 - (n - 1) * dz / 2), home: { p: trayPos.clone(), r: new T.Euler(), s: fs }, onBack: () => { food.userData.float = true; mark(food, 0.95); }, onDrop: p => { food.userData.fp.stand = near(food, 3.0); food.userData.fp.room = roomOf(p.x, p.z); } };
-        mark(food, 0.95);
-        inter(food, { room: 'kuh', fh: 1.4, stand: () => ({ x: trayPos.x, z: -4.2 }), look: () => wpos(food), act: () => { take(it); say(q); } });
-        const fl = t => { if (food.userData.float && food.parent === world) { food.position.y = trayPos.y + Math.sin(t * 2) * 0.1; food.rotation.y = t * 0.8; } }; TICK.push(fl);
-        const ta = g.an.find(a => a.userData.who === who);
+      const trayPos = V(cx - 1.4, 2.62, -6.95), FD = {}; g.FD = FD;
+      // еда на столе: одна (для малышей) или вся сразу
+      const putFood = (who, k, cnt) => {
+        if (FD[who] && FD[who].obj.parent) return FD[who];
+        const [name, mk, fs, hy] = FOODS[who], home = trayPos.clone(); home.x += (k - (cnt - 1) / 2) * 1.5;
+        const food = mk(); food.position.copy(home); food.userData.cy = 0; hitBox(food, 1.4, 1.4, 1.4); world.add(food); popIn(food, fs, 100 + k * 90); food.userData.float = true;
+        const it = FD[who] = { obj: food, who, food: true, fs, hs: fs * 0.62, hy, fy: 0.5, lookAfter: V(ax, 1.6, z0 - (n - 1) * dz / 2), home: { p: home.clone(), r: new T.Euler(), s: fs }, onBack: () => { food.userData.float = true; }, onDrop: p => { food.userData.fp.stand = near(food, 3.0); food.userData.fp.room = roomOf(p.x, p.z); } };
+        inter(food, { room: 'kuh', fh: 1.4, stand: () => ({ x: home.x, z: -4.2 }), look: () => wpos(food), act: () => { take(it); if (g.q) say(g.q); } });
+        it.fl = t => { if (food.userData.float && food.parent === world) { food.position.y = home.y + Math.sin(t * 2 + k) * 0.1; food.rotation.y = t * 0.8; } }; TICK.push(it.fl);
+        return it;
+      };
+      const feed = async (a, it) => {
+        const U = a.userData, food = it.obj, fs = it.fs, s = a.scale.x, mp = V(a.position.x + 1.0 * s, U.h * 0.5 * s, a.position.z);
+        release(it, fs * 0.8); TICK.splice(TICK.indexOf(it.fl), 1); uninter(food); delete FD[it.who];
+        await arc(food, mp, 420, 0.8);
+        for (let i = 0; i < 2; i++) { SFX.munch(); squash(a, 240); tws(food, fs * (0.5 - i * 0.4), 200); await wait(230); }
+        world.remove(food); happy(a, false); burst(mp.clone().add(V(0.6, 0.6, 0)), 14); SFX.good(); return mp;
+      };
+      const anOf = who => g.an.find(a => a.userData.who === who);
+      const startWho = () => {
+        const who = bag(g, 'w', set), q = ['kto_lubit_' + FOODS[who][0]]; g.wrong = 0;
+        const it = putFood(who, 0, 1), food = it.obj, ta = anOf(who); mark(food, 0.95); it.onBack = () => { food.userData.float = true; mark(food, 0.95); };
         g.tapAn = async a => {
           if (g.busy) return;
           const U = a.userData;
           if (st.held !== it) { hop(a, 0.35); say(q); if (food.parent === world) nudge(food); return; }
-          if (U.who !== who) { const hint = miss(g); headNo(a); wobble(a, 0.07); if (hint) mark(ta, ta.userData.h * ta.scale.x + 0.7, 0.4); say(['ne_to', hint ? 'podskazka' : q]); return; }
-          g.busy = true; g.an.forEach(unmark); g.q = null; Idle.off();
-          const s = a.scale.x, mp = V(a.position.x + 1.0 * s, U.h * 0.5 * s, a.position.z);
-          release(it, fs * 0.8); TICK.splice(TICK.indexOf(fl), 1); uninter(food);
-          await arc(food, mp, 420, 0.8);
-          for (let i = 0; i < 2; i++) { SFX.munch(); squash(a, 240); tws(food, fs * (0.5 - i * 0.4), 200); await wait(230); }
-          world.remove(food); happy(a, false); burst(mp.clone().add(V(0.6, 0.6, 0)), 14); SFX.good();
+          if (U.who !== who) { const hint = miss(g); bad('f_' + who); headNo(a); wobble(a, 0.07); if (hint) mark(ta, ta.userData.h * ta.scale.x + 0.7, 0.4); say(['ne_to', hint ? 'podskazka' : q[0]]); return; }
+          g.busy = true; g.an.forEach(unmark); g.q = null; Idle.off(); okk('f_' + who);
+          const mp = await feed(a, it);
           g.left--; g.busy = false;
           await Voice.say('nyam', a); if (!alive()) return;
           if (g.left <= 0) { g.tapAn = null; roomDone('kuh', mp); return; }
           await say(praise()); if (alive()) g.start();
         };
-        setQ('kuh', [q], () => { if (st.held !== it && food.parent === world) nudge(food); });
+        g.need = () => who; setQ('kuh', q, () => { if (st.held !== it && food.parent === world) nudge(food); });
       };
+      const startMulti = () => {
+        const L = mode === 'seq' ? [2, 2, 3][sp] : 1, order = mode === 'seq' ? shuffle(set).slice(0, L) : [bag(g, 'w', set)]; let i = 0; g.wrong = 0;
+        set.forEach((w, k) => putFood(w, k, n));
+        const q = mode === 'seq' ? order.flatMap((w, k) => [k ? 'a_potom' : 'pokormi_snachala', 'kogo_' + w]) : ['chto_lubit_' + order[0]];
+        g.tapAn = async a => {
+          if (g.busy) return;
+          const U = a.userData, it = st.held, need = order[i];
+          if (!it || !it.food) { hop(a, 0.35); say(q); return; }
+          if (U.who !== need || it.who !== need) {
+            const hint = miss(g); headNo(a); wobble(a, 0.07); if (it.who !== need) bad('f_' + need);
+            if (hint) { const ta = anOf(need); mark(ta, ta.userData.h * ta.scale.x + 0.7, 0.4); if (FD[need] && st.held !== FD[need]) mark(FD[need].obj, 0.95); }
+            say([mode === 'seq' && U.who !== need ? 'ne_po_poryadku' : 'ne_to', hint ? 'podskazka' : null].concat(hint ? [] : q)); return;
+          }
+          g.busy = true; g.an.forEach(unmark); Object.values(FD).forEach(f => unmark(f.obj)); Idle.off(); okk('f_' + need); g.wrong = 0;
+          const mp = await feed(a, it); i++; g.busy = false;
+          await Voice.say('nyam', a); if (!alive()) return;
+          if (i < order.length) { Idle.poke(); return; }
+          g.left--; g.q = null;
+          if (g.left <= 0) { g.tapAn = null; roomDone('kuh', mp); return; }
+          await say(praise()); if (alive()) g.start();
+        };
+        g.need = () => order[i]; setQ('kuh', q, () => { const f = FD[order[i]]; if (mode !== 'seq' && f && st.held !== f && f.obj.parent === world) nudge(f.obj); });
+      };
+      g.start = mode === 'who' ? startWho : startMulti;
       startBtn('kuh', cx + 2.6, 4.4);
     }
 
@@ -884,8 +975,8 @@
       { let op = false; fun(chest, 'spal', [2.6, 1.8, 1.8], () => { op = !op; SFX.whoosh(); tw(lidc.rotation, { x: op ? -1.3 : 0 }, 350, 'inout'); if (op) burst(V(cx - 6.2, Y + 1.8, 6.4), 10); }, { stand: () => ({ x: cx - 6.2, z: 3.6 }) }); }
       { const t = mkToy('zvezda'); t.position.set(cx - 5.6, Y + 0.6, -1.6); world.add(t); toy(t, 'spal', 0.6, 0.6, 0.1); }
 
-      const sizes = lvl < 1 ? ['bolshoy', 'malenky'] : ['bolshoy', 'sredniy', 'malenky'];
-      const BS = lvl < 2 ? { bolshoy: 1.5, sredniy: 1.13, malenky: 0.8 } : { bolshoy: 1.38, sredniy: 1.14, malenky: 0.93 };
+      const sizes = lvl < 1 && stp('spal') < 2 ? ['bolshoy', 'malenky'] : ['bolshoy', 'sredniy', 'malenky'];
+      const BS = lvl < 2 && !(lvl === 1 && stp('spal') === 2) ? { bolshoy: 1.5, sredniy: 1.13, malenky: 0.8 } : { bolshoy: 1.38, sredniy: 1.14, malenky: 0.93 };
       const k = sizes.length === 3 ? 0.75 : 0.95, gap = 0.5, order = shuffle(sizes);
       const lens = order.map(s => 3.3 * BS[s] * k), total = lens.reduce((a, b) => a + b, 0) + gap * (order.length - 1);
       const g = G.spal = { intro: 'mishki_intro', left: sizes.length, beds: [], bears: [] };
@@ -977,7 +1068,7 @@
         const hb = grp(mx, 1.0, mz); world.add(hb); fun(hb, 'igr', [3.4, 2.4, 6.6, 0, 0.2, 0], () => enter(), { fh: 2.6, far: true });
       }
 
-      const n = [3, 4, 5][lvl], cols = shuffle(Object.keys(COLORS)).slice(0, n);
+      const n = P3('igr', [[3, 3, 4], [4, 4, 5], [5, 5, 5]]), cols = wsel(Object.keys(COLORS), n, 'c_');
       const g = G.igr = { intro: 'vedra_intro', left: n, buckets: [], balls: [] };
       const bz = cz - HS + 1.6, sp = n === 5 ? 2.5 : 3.0, bsc = n === 5 ? 1.15 : 1.35, x0 = -1.6;
       cols.forEach((c, i) => {
@@ -999,7 +1090,7 @@
         if (g.busy) return;
         const ballO = g.cur, it = ballO && ballO.userData.it, c = b.userData.c;
         if (!ballO || st.held !== it) { wobble(b, 0.06); say(g.started && g.q ? g.q : 'eto_' + c); return; }
-        if (ballO.userData.c !== c) { const hint = miss(g); wobble(b, 0.08); const tb = g.buckets.find(x => x.userData.c === ballO.userData.c); if (hint && tb) mark(tb, 2.1, 0.4); say(['vedro_ne', hint ? 'podskazka' : null]); return; }
+        if (ballO.userData.c !== c) { const hint = miss(g); bad('c_' + ballO.userData.c); wobble(b, 0.08); const tb = g.buckets.find(x => x.userData.c === ballO.userData.c); if (hint && tb) mark(tb, 2.1, 0.4); say(['vedro_ne', hint ? 'podskazka' : null]); return; }
         g.busy = true; g.buckets.forEach(unmark); g.q = null; Idle.off();
         release(it, 1.0); uninter(ballO); ballO.userData.done = true;
         const top = V(b.position.x, 1.3 * bsc + 1.2, b.position.z);
@@ -1098,7 +1189,7 @@
         const ic = T_.mk(); ic.scale.setScalar(0.8 * T_.s); ic.position.set(-1.0, -0.42 + (U.type === 'kost' ? 0.4 : 0), 0.34); sg.add(ic);
         const nm = new T.MeshBasicMaterial({ transparent: true }), np = new T.Mesh(new T.PlaneGeometry(2.2, 2.2), nm); np.position.set(0.85, 0, 0.09); sg.add(np);
         sg.traverse(o => { if (o.isMesh) o.castShadow = false; }); sg.visible = false; world.add(sg);
-        U.sign = sg; U.setNeed = n => { U.need = n; if (n) { nm.map = numTex(n, T_.col, true); nm.needsUpdate = true; sg.visible = true; popIn(sg, 1); } else if (sg.visible) tws(sg, 0.001, 250).then(() => { sg.visible = false; }); };
+        U.sign = sg; U.setNeed = n => { U.need = n; if (n) { nm.map = numTex(n, T_.col, true, undefined, lvl === 2 && stp('zak') > 0); nm.needsUpdate = true; sg.visible = true; popIn(sg, 1); } else if (sg.visible) tws(sg, 0.001, 250).then(() => { sg.visible = false; }); };
         inter(a, { room: 'zak', fh: U.h * s + 0.9, stand: near(a, 4.0), look: () => V(x, Y + U.h * 0.55 * s, z), act: () => give(a) });
       });
       TICK.push(t => g.an.forEach((a, i) => { const s = a.userData.sign; if (s.visible) { s.rotation.y = st.yaw; s.position.y = Y + a.userData.h * a.scale.x + 2.0 + Math.sin(t * 2 + i) * 0.08; } }));
@@ -1128,7 +1219,7 @@
       }
       function next() {
         const open = g.an.filter(a => a.userData.need !== null);
-        if (lvl < 2 || !open.length) { const w = bag(g, 'w', whos), a = g.an.find(x => x.userData.who === w); a.userData.setNeed(bag(g, 'n', lvl === 0 ? [1, 2] : [1, 2, 3])); setQ('zak', qOf(a), () => hintFor(a)); return; }
+        if (lvl < 2 || !open.length) { const w = bag(g, 'w', whos), a = g.an.find(x => x.userData.who === w); a.userData.setNeed(bag(g, 'n', P3('zak', [[[1, 2], [1, 2], [1, 2, 3]], [[1, 2, 3], [1, 2, 3, 4], [2, 3, 4, 5]], [[1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]]]))); setQ('zak', qOf(a), () => hintFor(a)); return; }
         const a = open[0]; setQ('zak', qOf(a), () => hintFor(a));
       }
       g.start = () => {
@@ -1149,7 +1240,7 @@
         const fc = ['#f0352b', '#ffd21f', '#2a6df4', '#35b24a', '#ff8a1c', '#ff6fae'];
         for (let i = 0; i < 17; i++) { const f = mesh(new T.CylinderGeometry(0.42, 0.42, 0.05, 3), M(fc[i % 6], 0.7), cx - H + 2 + i * 2, 6.75 - Math.sin(i / 16 * Math.PI) * 0.7, cz - H + 0.5); f.rotation.x = Math.PI / 2; f.rotation.z = Math.PI; f.castShadow = false; up.add(f); }
       }
-      const n = [2, 3, 4][lvl], cols = shuffle(Object.keys(COLORS)).slice(0, n), needs = lvl === 0 ? shuffle([1, 2]) : lvl === 1 ? shuffle([1, 2, 3]) : shuffle([2, 3, 4, 5]);
+      const needs = shuffle(P3('zal', [[[1, 2], [2, 3], [1, 2, 3]], [[1, 2, 3], [2, 3, 4], [1, 2, 3, 4]], [[2, 3, 4, 5], [2, 3, 4, 5], [3, 4, 5, 5]]])), n = needs.length, cols = wsel(Object.keys(COLORS), n, 'c_');
       const g = G.zal = { intro: 'zal_intro', left: n, bks: [], balls: [] };
       const RIM = 2.1, BR = 1.8, GR = 24, BS = 0.8, RAD = 0.6 * BS, FL = [];
       const spot = () => { for (let k = 0; k < 60; k++) { const x = cx + rr(-H + 3, H - 3), z = cz + rr(-H + 11, H - 3); if (Math.hypot(x - cx, z - (cz + H - 2)) < 5) continue; if (g.balls.every(b => b.done || Math.hypot(b.obj.position.x - x, b.obj.position.z - z) > 2.4) && !OBST.zal.some(o => x > o.x0 && x < o.x1 && z > o.z0 && z < o.z1)) return V(x, Y + RAD, z); } return V(cx + rr(-6, 6), Y + RAD, cz + rr(-2, 8)); };
@@ -1167,7 +1258,7 @@
       });
       TICK.push(t => g.bks.forEach((b, i) => { const s = b.userData.sign; if (s.visible) { s.rotation.y = st.yaw; s.position.y = Y + 5.0 + Math.sin(t * 2 + i) * 0.08; } }));
       // мячи
-      const per = lvl === 2 ? 6 : 4, list = cols.flatMap(c => Array(per).fill(c)).concat(lvl ? shuffle(Object.keys(COLORS).filter(c => !cols.includes(c))).slice(0, 2) : []);
+      const per = Math.max(...needs) + 1, list = cols.flatMap(c => Array(per).fill(c)).concat(lvl ? shuffle(Object.keys(COLORS).filter(c => !cols.includes(c))).slice(0, 2) : []);
       list.forEach(c => {
         const o = mkMyach(COLORS[c]), it = { obj: o, c, s: BS, hs: 0.56, hy: 0.1, fy: RAD, throwable: true, done: false }; g.balls.push(it);
         o.position.copy(spot()); o.rotation.y = rr(0, 6); o.scale.setScalar(BS); o.userData.cy = 0; hitBox(o, 2.0, 2.0, 2.0); world.add(o);
@@ -1275,7 +1366,10 @@
     }
 
     // =========================== ТРЕТИЙ ЭТАЖ: БУКВЫ ===========================
-    const LET3 = ['А', 'М', 'У', 'З', 'Я', 'Р', 'К', 'Д', 'Ш'];
+    const LET3 = ['А', 'М', 'У', 'З', 'Я', 'Р', 'К', 'Д', 'Ш'], LET10 = [...'АОУМИКДТРШ'];
+    const ITEMS3 = [['arbuz', 'А', mkArbuz, 1.2, 0.58], ['myach', 'М', () => mkMyach(COLORS.siniy), 0.85, 0.52], ['utka', 'У', () => mkToy('utka'), 1.1, 0.0], ['zvezda', 'З', () => mkToy('zvezda'), 1.05, 0.7],
+        ['yabloko', 'Я', () => mkToy('yabloko'), 1.0, 0.45], ['rybka', 'Р', () => mkRybka(), 1.3, 0.48], ['kubik', 'К', mkKubik, 1.1, 0.5], ['domik', 'Д', mkDomik, 1.15, 0.0], ['sharik', 'Ш', () => mkShar('#ff6fae'), 0.5, 1.5]];
+    const WORD3 = Object.fromEntries(ITEMS3.map(q => [q[1], q[0]]));
     const billboard = (o, y0) => TICK.push(t => { if (o.visible) { o.rotation.y = st.yaw; o.position.y = y0 + Math.sin(t * 2) * 0.08; } });
     const bigSign = (x, y, z, room) => { // табличка с большой буквой, всегда смотрит на Зайку
       const s = grp(x, y, z); s.add(rbox(M('#ffffff', 0.5), 2.5, 2.5, 0.18, 0.55)); s.add(rbox(M('#ffc928', 0.4), 2.75, 2.75, 0.1, 0.6, 0, 0, -0.06));
@@ -1300,9 +1394,11 @@
       plant('h3', cx - 6.8, cz - 6.8, Y); plant('h3', cx + 6.8, cz + 6.8, Y);
       { const sh = mkShelf(true); sh.position.set(cx + H - 0.75, Y, cz - 5.0); sh.rotation.y = -Math.PI / 2; world.add(sh); obst('h3', cx + H - 0.75, cz - 5.0, 0.7, 1.9, 0.5); }
 
-      const n = [4, 5, 6][lvl], lets = shuffle(LET3).slice(0, n), COLS = ['#ff6fae', '#4fc3f7', '#ffd21f', '#81c784', '#ff8a65', '#ba68c8'];
+      const sp3 = stp('h3'), byWord = lvl === 2 && sp3 > 0; // 5–7 лет: «с какой буквы начинается слово?»
+      const pool3 = lvl === 0 ? ['А', 'О', 'У', 'М', 'И'].slice(0, 3 + sp3) : lvl === 1 ? LET10 : byWord ? LET3 : Object.keys(LV);
+      const n = lvl === 0 ? 3 + sp3 : lvl === 1 ? [4, 5, 6][sp3] : 6, lets = wsel(pool3, n, 'b_'), COLS = ['#ff6fae', '#4fc3f7', '#ffd21f', '#81c784', '#ff8a65', '#ba68c8'];
       const P = [[-4.6, 4.7, -4.6], [4.2, 5.0, -4.4], [-4.9, 5.2, 4.3], [4.7, 4.8, 4.6], [-1.6, 5.4, -6.0], [1.9, 5.3, 6.1]];
-      const g = G.h3 = { intro: 'bukvy_intro', left: 3, balls: [] };
+      const g = G.h3 = { intro: 'bukvy_intro', left: lvl === 0 ? 3 : 4, balls: [] };
       const sign = bigSign(cx, Y + 4.7, cz, 'h3');
       lets.forEach((ch, i) => {
         const b = mkShar(COLS[i]), U = b.userData; U.ch = ch; U.by = Y + P[i][1]; U.cy = 0; U.ph = i * 1.7;
@@ -1315,25 +1411,26 @@
       });
       TICK.push(t => g.balls.forEach(b => { const U = b.userData; if (!b.parent) return; b.position.y = U.by + Math.sin(t * 1.3 + U.ph) * 0.14; b.rotation.z = Math.sin(t * 0.9 + U.ph) * 0.06; b.rotation.y = st.yaw; const y0 = Y + 0.3, y1 = b.position.y - 2.75; U.str.scale.y = Math.max(0.01, y1 - y0); U.str.position.y = (y0 + y1) / 2; }));
       g.start = () => {
-        const tb = pick(g.balls.filter(b => b.parent && !b.userData.popped)), ch = tb.userData.ch; g.wrong = 0; sign.userData.show(ch);
+        const tb = wpick(g.balls.filter(b => b.parent && !b.userData.popped), b => 'b_' + b.userData.ch), ch = tb.userData.ch, q = byWord ? ['s_kakoy_bukvy', 'sl_' + WORD3[ch]] : ['najdi_bukvu', bv(ch)]; g.wrong = 0; if (byWord) sign.userData.show('?', '#9aa7ad'); else sign.userData.show(ch);
         g.tapBall = async b => {
           const U = b.userData; if (U.popped) return;
           if (g.done || g.busy) { wobble(b, 0.3); say(['eto_bukva', bv(U.ch)]); return; }
           if (U.ch === ch) {
-            g.busy = true; g.balls.forEach(unmark); U.popped = true; uninter(b);
+            g.busy = true; g.balls.forEach(unmark); U.popped = true; uninter(b); okk('b_' + ch);
             SFX.pop(); const pos = b.position.clone();
             await tws(b, 1.3, 90, 'out'); world.remove(b); world.remove(U.str);
             burst(pos, 22, [b.children[0].material.color.getStyle(), '#ffffff', '#ffd54f'], { conf: true, speed: 1.2 }); SFX.good();
             g.left--; g.busy = false; sign.visible = false;
-            if (g.left <= 0) { g.q = null; await say(bv(U.ch)); if (alive()) roomDone('h3', pos); return; }
+            const fin = byWord ? ['sl_' + WORD3[ch], 'na_bukvu', bv(ch)] : [bv(ch)];
+            if (g.left <= 0) { g.q = null; await say(fin); if (alive()) roomDone('h3', pos); return; }
             g.q = null; Idle.off();
-            await say([bv(U.ch), praise()]); if (alive()) g.start();
+            await say(fin.concat([praise()])); if (alive()) g.start();
           } else {
-            const hint = miss(g); wobble(b, 0.35); if (hint) mark(tb, 1.5);
-            say(['eto_bukva', bv(U.ch), hint ? 'podskazka' : null, 'najdi_bukvu', bv(ch)]);
+            const hint = miss(g); bad('b_' + ch); wobble(b, 0.35); if (hint) mark(tb, 1.5);
+            say(['eto_bukva', bv(U.ch), hint ? 'podskazka' : null].concat(q));
           }
         };
-        setQ('h3', ['najdi_bukvu', bv(ch)], () => { nudge(tb); wobble(sign, 0.1); });
+        g.tgt = () => tb; setQ('h3', q, () => { if (!byWord) nudge(tb); wobble(sign, 0.1); });
       };
       startBtn('h3', cx - 3.2, cz + 2.8);
     }
@@ -1349,8 +1446,9 @@
         [[-1.2, 1.28, 0.9, '#d9a066'], [0.2, 1.28, 0.7, '#e8b27a'], [1.3, 1.28, 0.8, '#d9a066'], [-0.8, 2.68, 0.75, '#e8b27a'], [0.8, 2.68, 0.9, '#d9a066']].forEach(([x, y, s, c]) => { sh.add(rbox(M(c, 0.8), s * 1.1, s * 0.8, s * 0.8, 0.08, x, y + s * 0.4, 0)); sh.add(rbox(M('#ff6fae', 0.6), 0.1, s * 0.82, s * 0.82, 0.03, x, y + s * 0.4, 0)); });
         world.add(sh); obst('poch', cx + H - 0.7, cz - 1.5, 0.6, 2.1, 0.4);
       }
-      const n = [3, 4, 5][lvl], lets = shuffle(LET3).slice(0, n), BC = ['#f0352b', '#2a6df4', '#35b24a', '#ff8a1c', '#b25de0'];
-      const g = G.poch = { intro: 'pochta_intro', left: n, boxes: [], envs: [] };
+      const spP = stp('poch'), pmode = ['fig', 'let', 'pic'][lvl]; // 3–4: такая же картинка; 4–5: такая же буква; 5–7: с какой буквы начинается слово
+      const n = P3('poch', [[3, 3, 4], [3, 4, 5], [4, 5, 5]]), lets = pmode === 'fig' ? shuffle(Object.keys(FIGCH)).slice(0, n) : wsel(pmode === 'let' ? LET10 : LET3, n, 'b_'), BC = ['#f0352b', '#2a6df4', '#35b24a', '#ff8a1c', '#b25de0'];
+      const g = G.poch = { intro: pmode === 'fig' ? 'pochta_intro_a' : pmode === 'pic' ? 'pochta_intro_c' : 'pochta_intro', left: n, boxes: [], envs: [] };
       const bz = cz + H - 0.9, sp = n === 5 ? 2.55 : 3.0;
       lets.forEach((ch, i) => {
         const x = cx + (i - (n - 1) / 2) * sp, b = grp(x, Y, bz), col = BC[i]; b.rotation.y = Math.PI;
@@ -1368,18 +1466,20 @@
         const e = grp(cx + (i - (n - 1) / 2) * 1.5, Y + 1.78, tz); e.rotation.y = Math.PI; e.rotation.x = -0.12;
         e.add(rbox(M('#fffaf0', 0.6), 1.3, 0.9, 0.08, 0.06));
         const fp_ = mesh(new T.CylinderGeometry(0.62, 0.62, 0.02, 3), M('#f1e3c8', 0.6), 0, 0.33, 0.045); fp_.rotation.x = Math.PI / 2; fp_.scale.z = 0.4; fp_.castShadow = false; e.add(fp_);
-        e.add(rbox(M(BC[lets.indexOf(ch)], 0.5), 0.22, 0.26, 0.02, 0.03, 0.45, 0.22, 0.05));
-        const pl = letPlate(ch, '#3a2a20', 0.6); pl.position.set(-0.08, -0.13, 0.06); e.add(pl);
+        e.add(rbox(M(pmode === 'fig' || (pmode === 'let' && spP === 0) ? BC[lets.indexOf(ch)] : '#ff6fae', 0.5), 0.22, 0.26, 0.02, 0.03, 0.45, 0.22, 0.05));
+        const I3 = pmode === 'pic' && ITEMS3.find(q => q[1] === ch);
+        if (I3) { const m = I3[2](), k = I3[3] * 0.34; m.scale.setScalar(k); m.position.set(-0.1, -0.36 + I3[4] * k, 0.22); m.rotation.y = 0.4; m.traverse(o => { if (o.isMesh) o.castShadow = false; }); e.add(m); }
+        else { const pl = letPlate(ch, pmode === 'fig' ? BC[lets.indexOf(ch)] : '#3a2a20', 0.6); pl.position.set(-0.08, -0.13, 0.06); e.add(pl); }
         e.userData.cy = 0; hitBox(e, 1.5, 1.4, 1.0); world.add(e);
-        const it = { obj: e, ch, env: true, hs: 0.8, hy: 0.15 }; g.envs.push(it);
+        const it = { obj: e, ch, key: I3 && I3[0], env: true, hs: 0.8, hy: 0.15 }; g.envs.push(it);
         it.onDrop = p => { e.userData.fp.room = roomOf(p.x, p.z); };
-        inter(e, { room: 'poch', fh: 1.3, stand: () => ({ x: e.position.x, z: tz - 2.6 }), look: () => wpos(e), act: () => { take(it); say(['eto_bukva', bv(ch)]); } });
+        inter(e, { room: 'poch', fh: 1.3, stand: () => ({ x: e.position.x, z: tz - 2.6 }), look: () => wpos(e), act: () => { take(it); say(I3 ? 'sl_' + I3[0] : nmv(ch)); } });
       });
       async function post(b) {
         const it = st.held, U = b.userData;
-        if (!it || !it.env) { wobble(b, 0.05); say(['eto_bukva', bv(U.ch)]); return; }
+        if (!it || !it.env) { wobble(b, 0.05); say(nmv(U.ch)); return; }
         if (g.busy) return;
-        if (it.ch !== U.ch) { const hint = g.started && !g.done && miss(g); wobble(b, 0.07); SFX.soft(); const tb = g.boxes.find(x => x.userData.ch === it.ch); if (hint && tb) mark(tb, 3.9, 0.45); say('pochta_ne'); return; }
+        if (it.ch !== U.ch) { const hint = g.started && !g.done && miss(g); wobble(b, 0.07); SFX.soft(); const tb = g.boxes.find(x => x.userData.ch === it.ch); if (hint && tb) mark(tb, 3.9, 0.45); if (pmode !== 'fig') bad('b_' + it.ch); say(pmode === 'fig' ? 'drugaya' : pmode === 'pic' ? ['sl_' + it.key, 'pochta_ne_c'] : 'pochta_ne'); return; }
         g.busy = true; g.boxes.forEach(unmark);
         const o = release(it); o.userData.fp.off = true;
         tw(o.rotation, { x: 0, y: Math.PI, z: Math.PI / 2 }, 300); await arc(o, V(b.position.x, Y + 2.72, b.position.z - 0.9), 380, 0.6); await tw(o.position, { z: b.position.z - 0.2 }, 200); o.visible = false;
@@ -1389,11 +1489,12 @@
           say('pochta_da'); wait(1400).then(() => { if (!alive()) return; tw(U.flag.rotation, { z: 1.4 }, 300); o.visible = true; o.position.copy(it.home.p); o.rotation.copy(it.home.r); popIn(o, it.home.s); o.userData.fp.off = false; o.userData.fp.room = 'poch'; });
           return;
         }
-        it.done = true; uninter(o); g.left--;
+        it.done = true; uninter(o); g.left--; okk('b_' + it.ch); g.wrong = 0;
+        if (pmode === 'pic') await say(['sl_' + it.key, 'na_bukvu', bv(it.ch)]);
         if (g.left <= 0) { g.q = null; await say('pochta_da'); if (alive()) roomDone('poch', V(b.position.x, Y + 3, b.position.z - 1.2)); return; }
         await say(['pochta_da', praise()]);
       }
-      g.start = () => { g.wrong = 0; setQ('poch', ['pochta_q'], () => { const e = g.envs.find(x => !x.done && x.obj.parent === world && !x.obj.userData.fp.off); e && nudge(e.obj); }); };
+      g.start = () => { g.wrong = 0; setQ('poch', [pmode === 'fig' ? 'pochta_q_a' : pmode === 'pic' ? 'pochta_q_c' : 'pochta_q'], () => { const e = g.envs.find(x => !x.done && x.obj.parent === world && !x.obj.userData.fp.off); e && nudge(e.obj); }); };
       startBtn('poch', cx + 4.6, cz - 3.8);
     }
 
@@ -1409,8 +1510,6 @@
       const pd = grp(cx, Y, cz); pd.add(cyl(M('#ffffff', 0.5), 1.5, 1.7, 1.2, 0, 0.6, 0, 36)); const pr = mesh(new T.TorusGeometry(1.52, 0.12, 10, 44), M('#ffc928', 0.3), 0, 1.2, 0); pr.rotation.x = Math.PI / 2; pd.add(pr); pd.add(ball(M('#ff8fb1', 0.8), [1.3, 0.25, 1.3], 0, 1.3, 0));
       world.add(pd); obst('azb', cx, cz, 1.6, 1.6, 0.5); hitBox(pd, 3.6, 2.4, 3.6, 0, 1.2, 0); pd.userData.cy = 1.4; pd.userData.stat = true;
       const sign = bigSign(cx, Y + 4.8, cz, 'azb'); sign.userData.show('?', '#9aa7ad');
-      const ITEMS3 = [['arbuz', 'А', mkArbuz, 1.2, 0.58], ['myach', 'М', () => mkMyach(COLORS.siniy), 0.85, 0.52], ['utka', 'У', () => mkToy('utka'), 1.1, 0.0], ['zvezda', 'З', () => mkToy('zvezda'), 1.05, 0.7],
-        ['yabloko', 'Я', () => mkToy('yabloko'), 1.0, 0.45], ['rybka', 'Р', () => mkRybka(), 1.3, 0.48], ['kubik', 'К', mkKubik, 1.1, 0.5], ['domik', 'Д', mkDomik, 1.15, 0.0], ['sharik', 'Ш', () => mkShar('#ff6fae'), 0.5, 1.5]];
       const g = G.azb = { intro: 'azb_intro', left: 0, items: [] };
       ITEMS3.forEach(([key, ch, mk, s, fy], i) => {
         const a = (i - 4) * 0.6, x = cx + Math.sin(a) * 8.2, z = cz - Math.cos(a) * 8.2, col = LCOL[i % 8];
@@ -1435,13 +1534,15 @@
           if (g.left <= 0) { g.q = null; sign.visible = false; roomDone('azb', V(cx, Y + 3, cz)); return; }
           await say(praise()); if (alive()) next();
         } else {
-          const hint = miss(g); wobble(o, 0.2); await say(['sl_' + it.key, 'na_bukvu', bv(it.ch)]); back(it); g.busy = false; if (!alive()) return;
+          const hint = miss(g); if (lvl) bad('b_' + target); wobble(o, 0.2); await say(['sl_' + it.key, 'na_bukvu', bv(it.ch)]); back(it); g.busy = false; if (!alive()) return;
           if (hint) { const t = g.items.find(x => x.ch === target); t && mark(t.obj, 1.3); }
           say(g.q);
         }
       } });
-      const next = () => { const ch = bag(g, 'l', lvl === 0 ? ['А', 'М', 'У', 'Я', 'Д'] : LET3); g.ch = ch; g.wrong = 0; sign.userData.show(ch); setQ('azb', ['prinesi_na', bv(ch)], () => { const t = g.items.find(x => x.ch === ch); t && t.obj.parent === world && nudge(t.obj); }); };
-      g.start = () => { g.left = [3, 4, 5][lvl]; next(); };
+      const spA = stp('azb'); // 3–4: «принеси утку»; 4–5: на букву, буква видна; 5–7: только на слух
+      const next = () => { let ch, q; if (lvl === 0) { const k = bag(g, 'i', ITEMS3.map(q => q[0])); ch = ITEMS3.find(q => q[0] === k)[1]; q = ['prinesi', 'sl_' + k]; } else { ch = bag(g, 'l', lvl === 1 && spA === 0 ? ['А', 'М', 'У', 'Я', 'Д'] : LET3); q = ['prinesi_na', bv(ch)]; }
+        g.ch = ch; g.wrong = 0; if (lvl === 2 && spA > 0) sign.userData.show('?', '#9aa7ad'); else sign.userData.show(ch); setQ('azb', q, () => { const t = g.items.find(x => x.ch === ch); t && t.obj.parent === world && nudge(t.obj); }); };
+      g.intro = lvl === 0 ? 'azb_intro_a' : 'azb_intro'; g.start = () => { g.left = P3('azb', [[3, 3, 4], [3, 4, 4], [5, 5, 5]]); next(); };
       startBtn('azb', cx + 3.6, cz + H - 3.4);
     }
 
@@ -1460,7 +1561,8 @@
       const WORD = { kot: ['КОТ', () => mkZver('koshka'), 1.25, 0], dom: ['ДОМ', mkDomik, 1.7, 0], myach: ['МЯЧ', () => mkMyach(COLORS.krasny), 1.15, 0.6], shar: ['ШАР', () => mkShar('#4fc3f7'), 0.6, 2.9],
         med: ['МЁД', mkMed, 1.5, 0.46], utka: ['УТКА', () => mkZver('utka'), 1.2, 0], ryba: ['РЫБА', () => mkRybka('#4fc3f7'), 2.0, 0.36], sharik: ['ШАРИК', () => mkShar('#ffd21f'), 0.6, 2.9] };
       const SP = [[-6, 1.5], [-6, 5.5], [-3.6, 3.2], [-3.6, 6.6], [-1.4, 1.8], [-1.4, 5.0], [2.6, 2.6], [2.6, 6.4], [4.8, 1.0], [4.8, 4.4], [6.6, 2.8], [6.6, 6.6]];
-      const g = G.h4 = { intro: 'slovo_intro', left: [2, 3, 3][lvl], cubes: [], slots: [] };
+      const sp4 = stp('h4'), figs4 = lvl === 0; // 3–4 года: повтори ряд кубиков с фигурами; дальше слова
+      const g = G.h4 = { intro: figs4 ? 'kubiki_intro' : 'slovo_intro', left: P3('h4', [[2, 3, 3], [2, 3, 3], [3, 3, 3]]), cubes: [], slots: [] };
       let word = null, model = null, idx = 0;
       const mkCube = (ch, col) => {
         const c = grp(); c.add(rbox(M(col, 0.45), 1.1, 1.1, 1.1, 0.26));
@@ -1468,40 +1570,42 @@
         return c;
       };
       function setWord() {
-        const key = bag(g, 'w', lvl < 2 ? ['kot', 'dom', 'myach', 'shar', 'med'] : ['utka', 'ryba', 'sharik']), [txt, mk, s, fy] = WORD[key];
-        word = { key, txt }; idx = 0; g.wrong = 0;
-        model = mk(); model.position.set(cx, Y + 4.7 + fy * s, bz + 0.55); world.add(model); popIn(model, s, 200);
-        g.slots = [...txt].map((ch, i) => { const p = new T.Mesh(new T.PlaneGeometry(1.6, 1.6), new T.MeshBasicMaterial({ map: letTex(lvl === 0 ? ch : '', '#5d3a24', { bg: '#f3efff', ring: '#c9bfff', faint: true }), transparent: true })); p.position.set((i - (txt.length - 1) / 2) * 1.9, 2.6, 0.17); board.add(p); return p; });
-        const extra = shuffle('АОУКМДТРШЯ'.split('').filter(c => !txt.includes(c))).slice(0, [1, 2, 3][lvl]), lets = shuffle([...txt, ...extra]), spots = shuffle(SP);
+        let key = null, txt, mk, s, fy;
+        if (figs4) txt = shuffle(Object.keys(FIGCH)).slice(0, [2, 3, 3][sp4]).join('');
+        else { key = bag(g, 'w', lvl === 2 && sp4 > 0 ? ['utka', 'ryba', 'sharik'] : ['kot', 'dom', 'myach', 'shar', 'med']); [txt, mk, s, fy] = WORD[key]; }
+        word = { key, txt }; idx = 0; g.wrong = 0; model = null;
+        if (key) { model = mk(); model.position.set(cx, Y + 4.7 + fy * s, bz + 0.55); world.add(model); popIn(model, s, 200); }
+        g.slots = [...txt].map((ch, i) => { const p = new T.Mesh(new T.PlaneGeometry(1.6, 1.6), new T.MeshBasicMaterial({ map: letTex(figs4 || (lvl === 1 && sp4 < 2) ? ch : '', figs4 ? LCOL[i] : '#5d3a24', { bg: '#f3efff', ring: '#c9bfff', faint: !figs4 }), transparent: true })); p.position.set((i - (txt.length - 1) / 2) * 1.9, 2.6, 0.17); board.add(p); return p; });
+        const extra = shuffle((figs4 ? Object.keys(FIGCH) : 'АОУКМДТРШЯ'.split('')).filter(c => !txt.includes(c))).slice(0, P3('h4', [[0, 1, 2], [1, 2, 2], [3, 3, 3]])), lets = shuffle([...txt, ...extra]), spots = shuffle(SP);
         g.cubes = lets.map((ch, i) => {
           const o = mkCube(ch, LCOL[(i * 3) % 8]); o.position.set(cx + spots[i][0], Y + 0.56, cz + spots[i][1]); o.rotation.y = rr(-0.5, 0.5); o.userData.cy = 0; hitBox(o, 1.6, 1.6, 1.6); world.add(o); popIn(o, 1, 300 + i * 90);
           const it = { obj: o, ch, cube: true, hs: 0.55, hy: 0.1, fy: 0.56 }; it.onDrop = p => { o.userData.fp.room = roomOf(p.x, p.z); };
           inter(o, { room: 'h4', fh: 1.4, stand: near(o, 2.8), look: () => wpos(o), act: () => { take(it); say(bv(ch)); } });
           return it;
         });
-        setQ('h4', ['slovo_sobery', 'sl_' + key], () => { const c = g.cubes.find(c => !c.done && c.ch === txt[idx] && c.obj.parent === world); c && nudge(c.obj); });
+        setQ('h4', figs4 ? ['kubiki_kak'] : ['slovo_sobery', 'sl_' + key], () => { const c = g.cubes.find(c => !c.done && c.ch === txt[idx] && c.obj.parent === world); c && nudge(c.obj); });
       }
       inter(board, { room: 'h4', fh: 6.6, stand: () => ({ x: cx, z: bz + 4.4 }), look: () => V(cx, Y + 2.8, bz), act: async () => {
         const it = st.held;
         if (!word) { wobble(board, 0.01); SFX.tap(); return; }
-        if (!it || !it.cube) { say(['slovo_sobery', 'sl_' + word.key]); return; }
+        if (!it || !it.cube) { say(g.q || 'slovo_intro'); return; }
         if (g.busy) return;
         const need = word.txt[idx];
-        if (it.ch !== need) { const hint = miss(g); wobble(board, 0.01); putBack(it); say(['slovo_ne']); if (hint) { const c = g.cubes.find(c => !c.done && c.ch === need && st.held !== c); c && mark(c.obj, 1.3); } return; }
+        if (it.ch !== need) { const hint = miss(g); if (!figs4) bad('b_' + need); wobble(board, 0.01); putBack(it); say([figs4 ? 'drugaya' : 'slovo_ne']); if (hint) { const c = g.cubes.find(c => !c.done && c.ch === need && st.held !== c); c && mark(c.obj, 1.3); } return; }
         g.busy = true; g.wrong = 0; g.cubes.forEach(c => unmark(c.obj));
         const o = release(it); uninter(o); it.done = true; const dst = g.slots[idx].getWorldPosition(new T.Vector3()); dst.z += 0.62;
         tw(o.rotation, { x: 0, y: 0, z: 0 }, 300); tws(o, 1.4, 300); await arc(o, dst, 380, 0.8);
         SFX.thunk(); tone(392 + idx * 90, 0, 0.18, 'triangle', 0.12); burst(dst, 6); idx++; g.busy = false;
         if (idx < word.txt.length) { say(bv(it.ch)); return; }
-        g.busy = true; Idle.off(); g.q = null; await wait(400); SFX.good(); hop(model, 0.6); burst(V(cx, Y + 5.4, bz + 0.9), 22);
-        await say(['slovo_gotovo', 'sl_' + word.key]); if (!alive()) return; g.left--; await wait(600); if (!alive()) return;
+        g.busy = true; Idle.off(); g.q = null; await wait(400); SFX.good(); model && hop(model, 0.6); burst(V(cx, Y + 5.4, bz + 0.9), 22);
+        if (word.key) await say(['slovo_gotovo', 'sl_' + word.key]); if (!alive()) return; g.left--; await wait(600); if (!alive()) return;
         if (st.held && st.held.cube) { const h = release(st.held); world.remove(h); }
-        const old = g.cubes, om = model; g.cubes = []; old.forEach((c, i) => { if (c.obj.userData.fp) uninter(c.obj); tws(c.obj, 0.001, 300, 'in', i * 60).then(() => world.remove(c.obj)); }); tws(om, 0.001, 300).then(() => world.remove(om));
+        const old = g.cubes, om = model; g.cubes = []; old.forEach((c, i) => { if (c.obj.userData.fp) uninter(c.obj); tws(c.obj, 0.001, 300, 'in', i * 60).then(() => world.remove(c.obj)); }); om && tws(om, 0.001, 300).then(() => world.remove(om));
         g.slots.forEach(p => board.remove(p)); g.slots = []; word = null; g.busy = false;
         if (g.left <= 0) { roomDone('h4', V(cx, Y + 3, bz + 2)); return; }
         await say(praise()); if (alive()) setWord();
       } });
-      g.start = () => setWord();
+      g.start = () => setWord(); g.word = () => word;
       startBtn('h4', cx - 4.0, cz + 4.2);
     }
 
@@ -1529,7 +1633,7 @@
       let row = [], chs = [], ans = -1;
       const clear = () => { row.concat(chs.map(c => c.o)).forEach(o => { if (o.userData.fp) uninter(o); tws(o, 0.001, 260).then(() => world.remove(o)); }); row = []; chs = []; qr.visible = qp.visible = false; };
       function round() {
-        const cols = shuffle(Object.values(COLORS)), figs = shuffle(FIGS), kinds = [['AB'], ['AB', 'AAB', 'ABf'], ['ABC', 'AAB', 'ABB', 'size', 'ABf']][lvl], kind = bag(g, 'k', kinds);
+        const cols = shuffle(Object.values(COLORS)), figs = shuffle(FIGS), kinds = P3('logic', [[['AB'], ['AB'], ['AB', 'ABf']], [['AB', 'AAB'], ['AB', 'AAB', 'ABf'], ['AAB', 'ABB', 'ABf', 'size']], [['ABC', 'AAB', 'ABB', 'size', 'ABf'], ['ABC', 'AAB', 'ABB', 'size', 'ABf'], ['ABC', 'AAB', 'ABB', 'size', 'ABf']]]), nopt = lvl === 0 && stp('logic') < 1 ? 2 : 3, px = j => PX(nopt === 2 ? j * 2 : j), kind = bag(g, 'k', kinds);
         const ball_ = c => ({ t: 'ball', c, s: 1 }), fig = (f, c, s = 1) => ({ t: 'fig', f, c, s });
         let E, pat;
         if (kind === 'AB') { E = { A: ball_(cols[0]), B: ball_(cols[1]) }; pat = 'ABABAB'; }
@@ -1539,12 +1643,12 @@
         else if (kind === 'size') { E = { A: fig(figs[0], cols[0], 1.35), B: fig(figs[0], cols[0], 0.7) }; pat = 'ABABAB'; }
         else { E = { A: fig(figs[0], cols[0]), B: fig(figs[1], cols[1]) }; pat = 'ABABAB'; }
         const answer = E[pat[5]], pool = Object.values(E).filter(e => elId(e) !== elId(answer)).concat([kind === 'size' ? fig(figs[0], cols[0], 1.0) : (answer.t === 'ball' ? ball_(cols[3]) : fig(figs[2], cols[2]))]);
-        const opts = shuffle([answer].concat(shuffle(pool).slice(0, 2))); ans = opts.findIndex(e => elId(e) === elId(answer));
+        const opts = shuffle([answer].concat(shuffle(pool).slice(0, nopt - 1))); ans = opts.findIndex(e => elId(e) === elId(answer));
         for (let i = 0; i < 5; i++) { const o = mkEl(E[pat[i]]), s = o.scale.x; o.position.set(cx + SX(i), Y + 1.58 + o.userData.dy, tz); world.add(o); popIn(o, s, 150 + i * 160); row.push(o); }
         wait(950).then(() => { if (alive() && row.length) { qr.visible = qp.visible = true; popIn(qp, 1); } });
         chs = opts.map((el, j) => {
-          const o = mkEl(el), s = o.scale.x; o.position.set(PX(j), Y + 1.3 + o.userData.dy, pz); o.userData.cy = 0; hitBox(o, 1.6 / s, 1.6 / s, 1.6 / s); world.add(o); popIn(o, s, 1100 + j * 120);
-          inter(o, { room: 'logic', fh: 1.4, stand: () => ({ x: PX(j), z: pz - 3.0 }), look: () => wpos(o), act: () => choose(j) });
+          const o = mkEl(el), s = o.scale.x; o.position.set(px(j), Y + 1.3 + o.userData.dy, pz); o.userData.cy = 0; hitBox(o, 1.6 / s, 1.6 / s, 1.6 / s); world.add(o); popIn(o, s, 1100 + j * 120);
+          inter(o, { room: 'logic', fh: 1.4, stand: () => ({ x: px(j), z: pz - 3.0 }), look: () => wpos(o), act: () => choose(j) });
           return { o, s };
         });
         g.wrong = 0; setQ('logic', ['dalshe_q'], () => { nudge(chs[ans].o); qr.scale.setScalar(1.3); });
@@ -1560,7 +1664,7 @@
         if (g.left <= 0) { roomDone('logic', V(cx, Y + 3, tz - 1)); return; }
         await wait(400); if (alive()) round();
       }
-      g.start = () => { g.left = [3, 4, 5][lvl]; round(); }; g.ans = () => ans; g.choose = j => choose(j);
+      g.start = () => { g.left = P3('logic', [[3, 3, 4], [4, 4, 4], [5, 5, 5]]); round(); }; g.ans = () => ans; g.choose = j => choose(j);
       startBtn('logic', cx + 4.6, cz - 4.0);
     }
 
@@ -1634,6 +1738,17 @@
     }
     function cullRooms() { let m = 1; NEAR[st.room].forEach(k => { m |= 1 << LAYER[k]; }); cam.layers.mask = m; sun.shadow.camera.layers.mask = m; }
     if (rc.layers) rc.layers.enableAll();
+    { // звёздочка-подсказка: висит над дверью, за которой ближайшее несделанное задание
+      const gs = grp(0, 0, 0), sm = mkZvezda(true, 0.55); sm.castShadow = false; gs.add(sm); gs.visible = false; world.add(gs); let cur = '', tgt = null;
+      const ORDER = ['hall', 'kuh', 'igr', 'spal', 'zak', 'zal', 'h3', 'poch', 'azb', 'h4', 'logic'].filter(k => G[k]);
+      TICK.push(t => {
+        const r = st.room, to = ORDER.find(k => !G[k].done), key = r + '>' + to;
+        if (key !== cur) { cur = key; tgt = null;
+          if (to && to !== r && RM[r]) { const path = ['hall'].concat(chainOf(to)), i = path.indexOf(r), p = i >= 0 ? DOOR[path[i + 1]].out : DOOR[r] && DOOR[r].in; if (p) tgt = V(p.x, RM[r].y + 5.3, p.z); }
+          gs.visible = !!tgt; if (tgt) { gs.position.copy(tgt); gs.scale.setScalar(0.3); tws(gs, 1, 400, 'back'); } }
+        if (tgt) { gs.position.y = tgt.y + Math.sin(t * 3) * 0.18; sm.rotation.y = t * 2.2; }
+      });
+    }
     ON_CLEAR.push(function cl() { cam.layers.enableAll(); cam.layers.mask = 0xffffffff; ON_CLEAR.splice(ON_CLEAR.indexOf(cl), 1); });
     hudFloor(); cullRooms();
     current = { name: 'dom', fp: true, rebuild: () => setFov(), camFn, again: openDom, st, G, INTER, use, tap, BTN, RM };
