@@ -28,7 +28,7 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 #lvl { flex-wrap: wrap; justify-content: flex-end; max-width: 46vmin; }
 #lvl .btn.age { display: flex; align-items: center; justify-content: center; padding: 0; font: 900 5.4vmin "Arial Rounded MT Bold","Nunito","Trebuchet MS",system-ui,sans-serif; color: #b0896a; pointer-events: auto; }
 #lvl .btn.age.sel { color: #e2574c; }
-#lvl .btn.age.hold { animation: holdfill .8s linear both; }
+#lvl .btn.age.pop { animation: popin .35s cubic-bezier(.3,1.6,.5,1); }
 @keyframes holdfill { from { box-shadow: inset 0 0 0 0 #ffcf5a; } to { box-shadow: inset 0 0 0 6vmin #ffcf5a; } }
 #lvl .par { flex-basis: 100%; text-align: right; pointer-events: auto; cursor: pointer; }
 #lvl .par { font: 700 2.6vmin system-ui,sans-serif; color: #7a5a44; } #lvl .par::before { content: ''; }
@@ -90,18 +90,18 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 </div>
 <div id="start">
   <div class="btn green" id="bPlay"><svg viewBox="0 0 100 100"><path d="M36 24 L78 50 L36 76Z" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round"/></svg></div>
-  <div id="ver">v5.0</div>
+  <div id="ver">v5.1</div>
 </div>
 <div id="lvl"></div>
 <div id="par"></div>
 <div id="ris"><canvas id="rc"></canvas><canvas id="ro"></canvas><div id="pal"></div><div id="rL"></div><div id="rR"></div></div>
 <div id="wipe"></div>
 <script src="three.min.js"></script>
-<script src="frazy.js?v=5.0"></script>
-<script src="voice/zapisi.js?v=5.0"></script>
-<script src="modeli.js?v=5.0"></script>
-<script src="igra.js?v=5.0"></script>
-<script src="komnaty2.js?v=5.0"></script>
-<script src="dom.js?v=5.0"></script>
+<script src="frazy.js?v=5.1"></script>
+<script src="voice/zapisi.js?v=5.1"></script>
+<script src="modeli.js?v=5.1"></script>
+<script src="igra.js?v=5.1"></script>
+<script src="komnaty2.js?v=5.1"></script>
+<script src="dom.js?v=5.1"></script>
 </body>
 </html>

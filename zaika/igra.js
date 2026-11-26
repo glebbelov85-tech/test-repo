@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '5.0';
+const VERSION = '5.1';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -479,13 +479,11 @@ const AGES = ['3–4 года', '4–5 лет', '5–7 лет'];
 function updLvl() { [...LVL.querySelectorAll('.age')].forEach((b, i) => b.classList.toggle('sel', S.diff !== undefined && i === lvlOf())); }
 function setAge(i) { S.diff = i; save(); updLvl(); for (let k = 0; k <= i; k++) tone(660 + k * 220, k * 0.11, 0.16, 'triangle', 0.13); }
 ['3', '4', '5+'].forEach((t, i) => {
-  const b = document.createElement('div'); b.className = 'btn age'; b.innerHTML = `<b>${t}</b>`; let tm = 0;
-  const stop = () => { clearTimeout(tm); tm = 0; b.classList.remove('hold'); };
-  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (S.diff !== undefined && i === lvlOf()) { SFX.tap(); return; } SFX.tap(); b.classList.add('hold'); tm = setTimeout(() => { stop(); setAge(i); }, 800); });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach(n => b.addEventListener(n, stop));
+  const b = document.createElement('div'); b.className = 'btn age'; b.innerHTML = `<b>${t}</b>`;
+  tapBtn(b, () => { if (S.diff !== undefined && i === lvlOf()) { SFX.tap(); return; } setAge(i); squashEl(b); });
   LVL.appendChild(b);
 });
-{ const p = document.createElement('div'); p.className = 'par'; p.textContent = 'Родителям'; tapBtn(p, () => { SFX.tap(); openPar(); }); LVL.appendChild(p); }
+function squashEl(b) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
 // ---------- страничка для родителей и вопрос про возраст ----------
 const PAR = $('par');
 const ROOM_RU = { hall: 'Гостиная: цвета', kuh: 'Кухня: кто что любит', igr: 'Игровая: мячики по цветам', spal: 'Спальня: большой и маленький', zak: 'Заказы: счёт', zal: 'Зал с мячами: цвет и счёт', h3: 'Буквы на шариках', poch: 'Почта', azb: 'Азбука', h4: 'Кубики и слова', logic: 'Что дальше?' };
@@ -497,7 +495,7 @@ function bindPar(after) {
   const x = PAR.querySelector('.x'); if (x) x.addEventListener('pointerdown', e => { e.stopPropagation(); SFX.tap(); closePar(); });
 }
 function askAge() {
-  PAR.innerHTML = `<div class="card small"><h2>Сколько лет ребёнку?</h2>${ageBtns()}<p class="dim">От возраста зависят задания во всех комнатах. Потом его можно поменять в домике: кнопки 3, 4 и 5+ вверху справа.</p></div>`;
+  PAR.innerHTML = `<div class="card small"><h2>Сколько лет ребёнку?</h2>${ageBtns()}<p class="dim">От возраста зависят задания во всех комнатах. Потом его можно поменять в домике: просто нажмите 3, 4 или 5+ вверху справа.</p></div>`;
   PAR.classList.add('on'); bindPar(closePar);
 }
 function openPar() {
@@ -507,7 +505,7 @@ function openPar() {
   PAR.innerHTML = `<div class="card"><div class="x">✕</div><h2>Родителям</h2>
 <p><b>«Домик Зайки» растёт вместе с ребёнком.</b> Это один дом на три возраста: 3–4 года, 4–5 лет и 5–7 лет. Комнаты те же, а задания в них становятся глубже. Игра не на один год: когда ребёнок подрос, достаточно сменить возраст.</p>
 <h3>Возраст сейчас</h3>${ageBtns()}
-<p class="dim">В домике возраст меняют кнопки 3, 4 и 5+ вверху справа. Кнопку нужно подержать секунду, чтобы малыш не переключил случайно.</p>
+<p class="dim">В домике возраст меняют кнопки 3, 4 и 5+ вверху справа.</p>
 <h3>Как устроен дом</h3>
 <table><tr><th>Этаж</th><th>3–4 года</th><th>4–5 лет</th><th>5–7 лет</th></tr>
 <tr><td>1. Цвета, размеры, кто что любит</td><td>находит цвет, большой и маленький, кормит зверят</td><td>цвет и размер вместе, три размера, сам выбирает еду</td><td>запоминает порядок, выполняет просьбу из двух и трёх шагов</td></tr>
