@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '5.2';
+const VERSION = '5.2.1';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -1176,7 +1176,7 @@ function goHome() {
   pickable(mb, () => { if (busyWipe || !window.openRis) return; SFX.tap(); hop(mb, 0.4, 300); go(openRis); });
   hitBox(zaika, 2.2, 4.0, 1.8, 0, 1.9, 0); zaika.userData.cy = 1.9 * zaika.scale.x;
   pickable(zaika, () => {
-    hop(zaika, 0.5); SFX.boing(); Voice.say('hihi');
+    hop(zaika, 0.5); SFX.boing(); if (lvlOf() === 0) Voice.say('hihi'); // старшим щекотка не нужна
     const n = outfitsOpen(); // нажатие меняет наряд, если их открыто больше одного
     if (n > 1) { S.outfit = ((S.outfit || 0) + 1) % n; save(); dressZaika(zaika); burst(V(zaika.position.x, 3.4 * zaika.scale.x, zaika.position.z + 0.6), 10); }
   });

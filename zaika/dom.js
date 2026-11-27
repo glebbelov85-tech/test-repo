@@ -803,7 +803,7 @@
     // =========== ГОСТИНАЯ: шарики по цветам ===========
     {
       const sofa = mkSofa('#8fc7e8'); sofa.position.set(-6.75, 0, 5.2); sofa.rotation.y = Math.PI / 2; world.add(sofa); obst('hall', -6.75, 5.2, 1.0, 2.6, 0.5);
-      fun(sofa, 'hall', [4.8, 2.4, 2.2, 0, 1.2, 0], () => { SFX.boing(); squash(sofa, 400); st.hopT = 0.0001; Voice.say('hihi', null); });
+      fun(sofa, 'hall', [4.8, 2.4, 2.2, 0, 1.2, 0], () => { SFX.boing(); squash(sofa, 400); st.hopT = 0.0001; if (lvl === 0) Voice.say('hihi', null); });
       const sh = mkShelf(false); sh.position.set(7.25, 0, 5.2); sh.rotation.y = -Math.PI / 2; world.add(sh); obst('hall', 7.25, 5.2, 0.7, 1.9, 0.5);
       { const p = mkPlant(); p.position.set(-6.9, 0, -6.9); world.add(p); obst('hall', -6.9, -6.9, 0.5, 0.5, 0.5); fun(p, 'hall', [1.6, 2.8, 1.6], () => { wobble(p, 0.12); SFX.chirp(); burst(V(-6.9, 2.6, -6.9), 6, ['#66c45c', '#4fae4d', '#ff6b8a']); }); }
       world.add(mkRug(4.2, '#ff9db4', '#fff1c9'));
