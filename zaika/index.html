@@ -45,6 +45,16 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 #par .ab { padding: 14px 22px; border-radius: 18px; background: #fff; border: 3px solid #ffd9a0; font-weight: 800; font-size: 20px; cursor: pointer; }
 #par .ab.sel { background: #ffcf5a; border-color: #ffb300; }
 #par table { width: 100%; border-collapse: collapse; font-size: 14px; } #par th, #par td { border: 1px solid #f0dcc0; padding: 6px 8px; text-align: left; vertical-align: top; } #par th { background: #fff0d6; }
+#rsk { position: fixed; inset: 0; background: #fff7e6; display: none; z-index: 10; }
+#rsk.on { display: block; }
+#rsk canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
+#rsk .btn { width: 13vmin; height: 13vmin; max-width: 100px; max-height: 100px; top: calc(2.5vmin + env(safe-area-inset-top)); }
+#rsk .btn.home { left: calc(2.5vmin + env(safe-area-inset-left)); background: #ffe0b2; } #rsk .btn.next { right: calc(2.5vmin + env(safe-area-inset-right)); }
+#prp { position: fixed; inset: 0; background: #fffdf5; display: none; z-index: 10; }
+#prp.on { display: block; }
+#prp canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
+#prp .btn { width: 13vmin; height: 13vmin; max-width: 100px; max-height: 100px; top: calc(2.5vmin + env(safe-area-inset-top)); }
+#prp .btn.home { left: calc(2.5vmin + env(safe-area-inset-left)); background: #ffe0b2; } #prp .btn.next { right: calc(2.5vmin + env(safe-area-inset-right)); }
 #ris { position: fixed; inset: 0; background: #fffdf5; display: none; z-index: 10; }
 #ris.on { display: block; }
 #ris canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
@@ -90,18 +100,23 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 </div>
 <div id="start">
   <div class="btn green" id="bPlay"><svg viewBox="0 0 100 100"><path d="M36 24 L78 50 L36 76Z" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round"/></svg></div>
-  <div id="ver">v5.1</div>
+  <div id="ver">v5.2</div>
 </div>
 <div id="lvl"></div>
 <div id="par"></div>
 <div id="ris"><canvas id="rc"></canvas><canvas id="ro"></canvas><div id="pal"></div><div id="rL"></div><div id="rR"></div></div>
+<div id="prp"><canvas id="pc"></canvas></div>
+<div id="rsk"><canvas id="kc"></canvas></div>
 <div id="wipe"></div>
 <script src="three.min.js"></script>
-<script src="frazy.js?v=5.1"></script>
-<script src="voice/zapisi.js?v=5.1"></script>
-<script src="modeli.js?v=5.1"></script>
-<script src="igra.js?v=5.1"></script>
-<script src="komnaty2.js?v=5.1"></script>
-<script src="dom.js?v=5.1"></script>
+<script src="nastroyki.js?v=5.2"></script>
+<script src="frazy.js?v=5.2"></script>
+<script src="voice/zapisi.js?v=5.2"></script>
+<script src="modeli.js?v=5.2"></script>
+<script src="igra.js?v=5.2"></script>
+<script src="komnaty2.js?v=5.2"></script>
+<script src="propis.js?v=5.2"></script>
+<script src="raskraska.js?v=5.2"></script>
+<script src="dom.js?v=5.2"></script>
 </body>
 </html>

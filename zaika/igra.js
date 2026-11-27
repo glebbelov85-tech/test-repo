@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '5.1';
+const VERSION = '5.2';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -67,6 +67,10 @@ const SFX = {
 
 // ---------- голос ----------
 const TEXT = {}; (window.FRAZY || []).forEach(([id, t]) => TEXT[id] = t);
+// вариант без имени ребёнка (для магазина): в nastroyki.js window.ZAIKA_IMYA = false, или ?imya=0 в адресе.
+// Фразы с именем заменяются на <id>_n: запись voice/<id>_n.mp3, а пока её нет, читает голос телефона.
+const BEZ_IMENI = window.ZAIKA_IMYA === false || /[?&]imya=0/.test(location.search);
+const ALIAS = {}; if (BEZ_IMENI) Object.keys(TEXT).forEach(id => { if (TEXT[id + '_n']) ALIAS[id] = id + '_n'; });
 let speaker = null; // кто «говорит» по умолчанию (Зайка в комнате)
 const Voice = {
   have: new Set(window.ZAPISI || []),
@@ -77,6 +81,7 @@ const Voice = {
     this.ru = vs.find(v => /milena|female|жен|google/i.test(v.name)) || vs[0] || null;
   },
   load(id) {
+    id = ALIAS[id] || id;
     if (!this.have.has(id)) return Promise.resolve(null);
     if (this.buf[id]) return this.buf[id];
     const c = ac();
@@ -110,6 +115,7 @@ const Voice = {
     return t === this.token;
   },
   one(id, t) {
+    id = ALIAS[id] || id;
     if (this.have.has(id)) {
       return this.load(id).then(b => {
         if (t !== this.token) return;
@@ -139,7 +145,7 @@ const Voice = {
 };
 if (window.speechSynthesis) { Voice.pickVoice(); speechSynthesis.onvoiceschanged = () => Voice.pickVoice(); }
 
-const PRAISE = ['molodec', 'molodec_mira', 'umnica', 'pravilno', 'ura', 'zdorovo', 'poluchilos'];
+const PRAISE = ['molodec', 'molodec_mira', 'umnica', 'pravilno', 'ura', 'zdorovo', 'poluchilos'].filter(p => !(BEZ_IMENI && p === 'molodec_mira'));
 let lastPraise = '';
 function praise() { let p; do p = pick(PRAISE); while (p === lastPraise); lastPraise = p; return p; }
 
@@ -486,7 +492,7 @@ function setAge(i) { S.diff = i; save(); updLvl(); for (let k = 0; k <= i; k++) 
 function squashEl(b) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
 // ---------- страничка для родителей и вопрос про возраст ----------
 const PAR = $('par');
-const ROOM_RU = { hall: 'Гостиная: цвета', kuh: 'Кухня: кто что любит', igr: 'Игровая: мячики по цветам', spal: 'Спальня: большой и маленький', zak: 'Заказы: счёт', zal: 'Зал с мячами: цвет и счёт', h3: 'Буквы на шариках', poch: 'Почта', azb: 'Азбука', h4: 'Кубики и слова', logic: 'Что дальше?' };
+const ROOM_RU = { hall: 'Гостиная: цвета', kuh: 'Кухня: кто что любит', igr: 'Игровая: мячики по цветам', spal: 'Спальня: большой и маленький', zak: 'Заказы: счёт', zal: 'Зал с мячами: цвет и счёт', h3: 'Буквы на шариках', poch: 'Почта', azb: 'Азбука', h4: 'Кубики и слова', logic: 'Что дальше?', lish: 'Что лишнее?' };
 const COL_RU = { krasny: 'красный', zhelty: 'жёлтый', siniy: 'синий', zeleny: 'зелёный', oranzhevy: 'оранжевый', rozovy: 'розовый' };
 function closePar() { PAR.classList.remove('on'); PAR.innerHTML = ''; }
 function ageBtns(done) { return `<div class="ages">${AGES.map((a, i) => `<div class="ab${S.diff !== undefined && i === lvlOf() ? ' sel' : ''}" data-a="${i}">${a}</div>`).join('')}</div>`; }
