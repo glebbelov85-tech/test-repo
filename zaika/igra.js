@@ -1,6 +1,6 @@
 'use strict';
 // «Домик Зайки» 3.0 — 3D развивающая игра для Миры (3 года).
-const VERSION = '5.2.1';
+const VERSION = '5.2.2';
 const ROUNDS = 5;
 
 // ---------- сохранение ----------
@@ -93,17 +93,26 @@ const Voice = {
   },
   preload(ids) { ids.forEach(id => this.load(id)); },
   stop() {
-    this.token++;
+    this.token++; this.unprot();
     if (this.cur) { this.cur.userData.talk = false; this.cur = null; }
     if (this.src) { try { this.src.stop(); } catch (e) {} this.src = null; }
     if (window.speechSynthesis) speechSynthesis.cancel();
   },
+  // «важная» фраза (задание): другие фразы её не обрывают, а ждут, пока она кончится.
+  // Оборвать её может только Voice.stop() — уход из комнаты или с экрана.
+  prot: null, protR: null,
+  unprot() { if (this.protR) { const r = this.protR; this.protR = this.prot = null; r(); } },
   // who: объект-персонаж, функция id => персонаж, null (никто) или undefined (Зайка)
-  async say(ids, who) {
+  async say(ids, who, important) {
     if (!Array.isArray(ids)) ids = [ids];
     ids = ids.filter(Boolean);
+    while (this.prot && !important) { const tk = this.token; await this.prot; if (tk !== this.token) return false; }
     this.stop();
     const t = this.token;
+    if (important) { this.prot = new Promise(r => { this.protR = r; }); }
+    try { return await this.sayIds(ids, who, t); } finally { if (important && t === this.token) this.unprot(); }
+  },
+  async sayIds(ids, who, t) {
     for (const id of ids) {
       if (t !== this.token) return false;
       const w = typeof who === 'function' ? who(id) : (who === undefined ? speaker : who);

@@ -458,7 +458,7 @@
     const P0 = () => (landscape ? -0.05 : -0.2);
     const st = FP = { x: 0, z: 5.4, y: 0, yaw: 0, pitch: P0(), path: [], arrive: null, look: null, t: 0, maxT: 0, turn: 0, turnLeft: 0, turnDir: 0, room: 'hall', bob: 0, held: null, stars: 0, jx: 0, jy: 0, hopY: 0, build: null, repeat: () => repeat(), use: () => useBtn(), drop: () => drop() };
     const INTER = [], SURF = [], OBST = Object.fromEntries(RKEYS.map(k => [k, []])), TICK = [], G = {}; WINS.length = 0;
-    const say = ids => Voice.say(ids, null);
+    const say = ids => Voice.say(ids, null), sayImp = ids => Voice.say(ids, null, true); // sayImp: задание, его не перебивают
     const STAIRS = PLAN.filter(q => q[4]).map(([k]) => { const D = DOOR[k], P = RM[D.p]; return { x0: P.cx + P.hs + TH, z: P.cz, y0: P.y, k }; });
     const floorY = (x, z) => { for (const q of STAIRS) if (x >= q.x0 - 0.3 && x <= q.x0 + SL + 0.3 && Math.abs(z - q.z) < DW / 2 + 0.8) return q.y0 + SH * Math.max(0, Math.min(1, (x - q.x0) / SL)); return RM[roomOf(x, z)].y; };
 
@@ -734,7 +734,7 @@
     const SIGN = {}, BTN = {};
     function setQ(key, ids, hint) {
       const g = G[key]; g.q = ids; g.hint = hint || null;
-      if (st.room === key) { say(ids); Idle.set(() => { if (st.room === key) { say(g.q); g.hint && g.hint(); } }); }
+      if (st.room === key) { sayImp(ids); Idle.set(() => { if (st.room === key) { say(g.q); g.hint && g.hint(); } }); }
     }
     function repeat() { const g = G[st.room]; if (g && g.started && g.q && !g.done) { say(g.q); g.hint && g.hint(); } else SFX.tap(); }
     // задание начинается только с зелёной кнопки в комнате; без неё по дому можно просто гулять
@@ -747,7 +747,7 @@
         if (g.started) { SFX.tap(); if (g.q) { say(g.q); g.hint && g.hint(); } return; }
         g.started = true; SFX.good(); U.tri.visible = false; U.mat.color.copy(C('#ffb300')); U.mat.emissive.copy(C('#ffb300'));
         const carry = key !== 'hall' && !st.told; if (carry) st.told = true;
-        say([g.intro, carry ? 'dom_vozmi' : null]).then(ok => { if (alive()) { if (ok) g.start(); else g.pending = true; } });
+        sayImp([g.intro, carry ? 'dom_vozmi' : null]).then(ok => { if (alive()) { if (ok) g.start(); else g.pending = true; } });
       } });
       TICK.push(t => { const U = b.userData, g = G[key]; if (g && !g.started) { U.mat.emissiveIntensity = 0.3 + Math.sin(t * 4) * 0.25; U.tri.rotation.y = t * 1.5; } else U.mat.emissiveIntensity = 0.15; });
     }
@@ -908,8 +908,8 @@
             await say(['cv_' + U.c, praise()]); if (alive()) startSeq();
           } else { const hint = miss(g); wobble(b, 0.35); if (hint) mark(seq[i], 1.5); say(hint ? ['po_poryadku_ne', 'podskazka'] : 'po_poryadku_ne'); }
         };
-        await say('zapomni');
-        for (const b of seq) { if (!alive()) return; pulse(b); if (!(await say('cv_' + b.userData.c))) break; await wait(150); }
+        await sayImp('zapomni');
+        for (const b of seq) { if (!alive()) return; pulse(b); if (!(await sayImp('cv_' + b.userData.c))) break; await wait(150); }
         if (!alive()) return; g.busy = false;
         g.q = ['zapomni'].concat(seq.slice(i).map(b => 'cv_' + b.userData.c)); g.hint = () => seq.slice(i).forEach((b, k) => wait(1500 + k * 1100).then(() => { if (alive() && b.parent && !b.userData.popped) pulse(b); }));
         if (st.room === 'hall') { say('teper_ty'); Idle.set(() => { if (st.room === 'hall' && !g.busy) { say(g.q); g.hint(); } }); }
